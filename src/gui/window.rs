@@ -1297,7 +1297,14 @@ pub mod imp {
                         Some(env!("CARGO_PKG_VERSION")),
                     );
 
-                    about_dialog.set_comments(env!("CARGO_PKG_DESCRIPTION"));
+                    about_dialog.set_comments(concat!(
+                        env!("CARGO_PKG_DESCRIPTION"),
+                        "\n\nPipeline Home adds your YouTube account's Home feed, Up next with autoplay, and window fullscreen. A spin-off of Pipeline by Julian Schmidhuber and contributors."
+                    ));
+                    about_dialog.add_credit_section(
+                        Some("Pipeline Home"),
+                        &["y-essine https://github.com/y-essine/pipeline-home"],
+                    );
 
                     // translators: One per line: How you want to be credited as a translator, e.g. by the name you use, and optionally an email address ("Edgar Allan Poe <edgar@poe.com>")
                     about_dialog.set_translator_credits(&gettextrs::gettext("translator-credits"));

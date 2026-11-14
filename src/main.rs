@@ -163,7 +163,7 @@ fn build_ui(app: &gtk::Application) {
     init_icons(&window.display());
 
     glib::set_prgname(Some("tubefeeder"));
-    glib::set_application_name(&gettextrs::gettext("Pipeline"));
+    glib::set_application_name(&gettextrs::gettext("Pipeline Home"));
     window.set_icon_name(Some(APP_ID));
 
     window.present();

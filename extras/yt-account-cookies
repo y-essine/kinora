@@ -1,0 +1,51 @@
+#!/usr/bin/python3
+# yt-account-cookies [CHROMIUM_PROFILE]
+#
+# Export a Chromium profile's YouTube cookies to a private cookies.txt and print
+# its path. Pipeline Home runs this (the "account-cookies-command" setting) to
+# sign in to your YouTube account for Home, Up next and watch history.
+#
+#   yt-account-cookies "Profile 3"     # the profile folder name in ~/.config/chromium
+#
+# Why not `yt-dlp --cookies-from-browser`? yt-dlp picks Chromium's key from the
+# GNOME keyring by label ("Chromium Safe Storage"), and other Chromium-based
+# apps (Electron) can store a key under the same label, so it may take the wrong
+# one. Here the key is looked up by its application=chromium attribute; yt-dlp
+# still does the decrypting. Needs python-secretstorage and yt-dlp.
+import os
+import sys
+
+import secretstorage
+import yt_dlp.cookies as cookies
+
+PROFILE = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("PIPELINE_HOME_CHROMIUM_PROFILE", "Default")
+OUT = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "pipeline-home", "cookies.txt")
+
+
+def chromium_key(browser_keyring_name, logger):
+    con = secretstorage.dbus_init()
+    try:
+        col = secretstorage.get_default_collection(con)
+        if col.is_locked():
+            col.unlock()
+        for item in col.search_items({"application": "chromium"}):
+            return item.get_secret()
+    finally:
+        con.close()
+    return b""
+
+
+cookies._get_gnome_keyring_password = chromium_key
+
+jar = cookies.extract_cookies_from_browser("chromium", PROFILE, keyring="GNOMEKEYRING")
+if not any(c.name == "LOGIN_INFO" and "youtube.com" in c.domain for c in jar):
+    sys.exit(f"yt-account-cookies: no YouTube login found in Chromium profile {PROFILE!r}")
+
+os.makedirs(os.path.dirname(OUT), mode=0o700, exist_ok=True)
+old = os.umask(0o077)
+try:
+    jar.save(OUT, ignore_discard=True, ignore_expires=True)
+finally:
+    os.umask(old)
+os.chmod(OUT, 0o600)
+print(OUT)

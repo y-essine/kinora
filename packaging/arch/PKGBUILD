@@ -1,0 +1,70 @@
+# Maintainer: y-essine
+# Based on the AUR pipeline-gtk PKGBUILD by Mark Wagie and contributors.
+pkgname=pipeline-home
+pkgver=4.1.1.r3
+pkgrel=1
+pkgdesc="Pipeline with your YouTube account's Home feed, Up next with autoplay, and window fullscreen"
+arch=('x86_64' 'aarch64')
+url="https://github.com/y-essine/pipeline-home"
+license=('GPL-3.0-or-later')
+depends=(
+  'clapper-enhancers'
+  'gtk4'
+  'libadwaita'
+  'libclapper'
+  'libclapper-gtk'
+  'openssl'
+  'python-secretstorage'
+  'sqlite'
+  'yt-dlp'
+)
+makedepends=(
+  'blueprint-compiler'
+  'cargo'
+  'git'
+  'meson'
+)
+checkdepends=(
+  'appstream'
+  'desktop-file-utils'
+)
+optdepends=(
+  'gst-libav: more video formats'
+  'gst-plugin-va: hardware video decoding'
+)
+provides=('pipeline-gtk' 'tubefeeder')
+conflicts=('pipeline-gtk' 'tubefeeder')
+source=("git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$pkgname"
+  local base
+  base=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+  # Commits on top of the upstream import (the root commit).
+  printf "%s.r%s.g%s" "$base" "$(( $(git rev-list --count HEAD) - 1 ))" "$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+  cd "$pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target host-tuple
+}
+
+build() {
+  export GETTEXT_SYSTEM=true
+  export LIBSQLITE3_SYS_USE_PKG_CONFIG=1
+  export OPENSSL_NO_VENDOR=1
+  export RUSTUP_TOOLCHAIN=stable
+  arch-meson "$pkgname" build
+  meson compile -C build
+}
+
+check() {
+  meson test -C build --no-rebuild --print-errorlogs
+}
+
+package() {
+  meson install -C build --no-rebuild --destdir "$pkgdir"
+  install -Dm755 "$pkgname/extras/yt-account-cookies" "$pkgdir/usr/bin/yt-account-cookies"
+}

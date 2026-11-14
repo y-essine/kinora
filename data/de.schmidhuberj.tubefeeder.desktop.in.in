@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Icon=@app-id@
-Name=Pipeline
+Name=Pipeline Home
 Comment=Follow video creators
 StartupWMClass=Pipeline
 StartupNotify=true

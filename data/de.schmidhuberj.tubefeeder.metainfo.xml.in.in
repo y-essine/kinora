@@ -3,7 +3,7 @@
   <id>@app-id@</id>
   <project_license>GPL-3.0-or-later</project_license>
   <metadata_license>FSFAP</metadata_license>
-  <name>Pipeline</name>
+  <name>Pipeline Home</name>
   <summary>Follow video creators</summary>
   <launchable type="desktop-id">@app-id@.desktop</launchable>
   <content_rating type="oars-1.1"/>

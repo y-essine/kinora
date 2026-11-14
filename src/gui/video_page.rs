@@ -269,8 +269,8 @@ pub mod imp {
     use crate::config::APP_ID;
     use crate::config::BASE_ID;
     use crate::gspawn;
-    use crate::gui::finite_video_list::FiniteVideoList;
     use crate::gui::utility::Utility;
+    use crate::gui::video_item::VideoItem;
 
     static INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -296,7 +296,7 @@ pub mod imp {
         #[template_child]
         up_next_box: TemplateChild<gtk::Box>,
         #[template_child]
-        up_next_list: TemplateChild<FiniteVideoList>,
+        up_next_list: TemplateChild<gtk::ListBox>,
         #[template_child]
         autoplay_switch: TemplateChild<gtk::Switch>,
         up_next_store: FiniteVideoStore,
@@ -515,9 +515,15 @@ pub mod imp {
         }
 
         #[template_callback]
-        fn up_next_play_video(&self, video: Video, play_type: PlayType) {
-            self.obj()
-                .emit_by_name::<()>("play-video", &[&video, &play_type]);
+        fn up_next_row_activated(&self, row: &gtk::ListBoxRow) {
+            if let Some(video) = self
+                .up_next_store
+                .item(row.index() as u32)
+                .and_then(|o| o.downcast::<Video>().ok())
+            {
+                self.obj()
+                    .emit_by_name::<()>("play-video", &[&video, &PlayType::Default]);
+            }
         }
 
         #[template_callback]
@@ -759,7 +765,7 @@ pub mod imp {
                         )
                         .to_value(),
                     ),
-                    ("identity", &gettextrs::gettext("Pipeline").to_value()),
+                    ("identity", &gettextrs::gettext("Pipeline Home").to_value()),
                     ("desktop-entry", &APP_ID.to_value()),
                 ]));
                 mpris.set_target_creation_allowed(true);
@@ -775,7 +781,44 @@ pub mod imp {
             ));
 
             // Pipeline Home: "Up next" list and autoplay.
-            self.up_next_list.set_model(self.up_next_store.clone());
+            self.up_next_list.bind_model(
+                Some(&self.up_next_store),
+                clone!(
+                    #[weak]
+                    obj,
+                    #[upgrade_or_panic]
+                    move |item| {
+                        let video = item
+                            .downcast_ref::<Video>()
+                            .expect("Up next items to be videos");
+                        let video_item = VideoItem::new();
+                        video_item.set_client(obj.client());
+                        video_item.set_compact(true);
+                        video_item.set_video(video);
+                        // The item's own menu ("play externally", ...).
+                        video_item.connect_local(
+                            "play-video",
+                            false,
+                            clone!(
+                                #[weak]
+                                obj,
+                                #[upgrade_or_default]
+                                move |args| {
+                                    let video: Video = args[1].get().expect("Video argument");
+                                    let play_type: PlayType =
+                                        args[2].get().expect("PlayType argument");
+                                    obj.emit_by_name::<()>("play-video", &[&video, &play_type]);
+                                    None
+                                }
+                            ),
+                        );
+                        gtk::ListBoxRow::builder()
+                            .child(&video_item)
+                            .build()
+                            .upcast()
+                    }
+                ),
+            );
             settings
                 .bind("autoplay-next", &*self.autoplay_switch, "active")
                 .build();
@@ -866,7 +909,6 @@ pub mod imp {
         fn class_init(klass: &mut Self::Class) {
             clapper_gtk::Video::ensure_type();
             clapper_gtk::Billboard::ensure_type();
-            FiniteVideoList::ensure_type();
             Self::bind_template(klass);
             Self::bind_template_callbacks(klass);
             Utility::bind_template_callbacks(klass);

@@ -138,10 +138,16 @@ template $TFVideoPage: Adw.Bin {
       title-widget: Adw.WindowTitle main_title {};
     }
 
+    // Pipeline Home: one scrolling column, so the player scrolls away with the
+    // page like on YouTube. In fullscreen only the player is left, filling it.
+    ScrolledWindow page_scroller {
+    hscrollbar-policy: never;
+    vexpand: true;
+
     Gtk.Box {
       orientation: vertical;
       valign: fill;
-      vexpand: bind template.fullscreened;
+      vexpand: true;
       // The player for playing internally.
       ClapperGtk.Video clapper {
         focusable: true;
@@ -218,12 +224,8 @@ template $TFVideoPage: Adw.Bin {
         }
       }
 
-      ScrolledWindow scrolled_window {
-        hscrollbar-policy: never;
-        valign: fill;
-        vexpand: true;
-        propagate-natural-height: false;
-        min-content-height: 150;
+      Gtk.Box details_box {
+        orientation: vertical;
         visible: bind template.fullscreened inverted;
 
         Adw.Clamp {
@@ -549,15 +551,21 @@ template $TFVideoPage: Adw.Bin {
                 }
               }
 
-              $TFFiniteVideoList up_next_list {
-                compact: true;
-                client: bind template.client;
-                play-video => $up_next_play_video() swapped;
+              // A plain list, laid out in full inside the page's scrolling.
+              Gtk.ListBox up_next_list {
+                selection-mode: none;
+                activate-on-single-click: true;
+                row-activated => $up_next_row_activated() swapped;
+
+                styles [
+                  "background",
+                ]
               }
             }
           }
         }
       }
+    }
     }
   }
 }
