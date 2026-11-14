@@ -75,11 +75,13 @@ meson compile -C build
 
 ## What changed
 
-The account code is kept apart so the patch stays easy to rebase onto new Pipeline releases:
+The Kinora code is kept apart so the patch stays easy to rebase onto new Pipeline releases (the
+layers are described in [docs/architecture.md](docs/architecture.md)):
 
-- `src/backend/account.rs` (new): cookies, home feed (yt-dlp), Up next (RustyPipe, signed in),
-  marking watched.
-- `src/backend/client.rs`: `home_store`, `refresh_home()`, `up_next()`, `mark_watched_on_account()`.
+- `crates/kinora-core` (new, no GTK): Home (InnerTube, chips), the account (cookies, Up next,
+  subscriptions, marking watched), prepared playback, the `Player` trait and the extensions.
+- `src/backend/client.rs`: the adapter between GSettings/GObject stores and the core:
+  `home_store`, `refresh_home()`, `up_next()`, `mark_watched_on_account()`.
 - `src/gui/window.rs`, `data/resources/ui/window.blp`: the Home page.
 - `src/gui/video_page.rs`, `data/resources/ui/video_page.blp`: Up next, autoplay, window
   fullscreen, single scrolling page.
