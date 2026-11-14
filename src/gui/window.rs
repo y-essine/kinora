@@ -1547,6 +1547,43 @@ pub mod imp {
                     dialog.present(Some(&obj));
                 }
             ));
+            // Kinora: subscribe to everything the connected YouTube account is subscribed to.
+            let action_import_account = SimpleAction::new("import-account", None);
+            action_import_account.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    let client = obj.client();
+                    if client.importing_subscriptions() {
+                        return;
+                    }
+                    gspawn!(clone!(
+                        #[weak]
+                        obj,
+                        async move {
+                            let message = match client.import_account_subscriptions().await {
+                                Ok((0, total)) => gettextrs::ngettext(
+                                    "Already subscribed to the {} channel",
+                                    "Already subscribed to all {} channels",
+                                    total as u32,
+                                )
+                                .replace("{}", &total.to_string()),
+                                Ok((added, _)) => gettextrs::ngettext(
+                                    "Imported {} channel",
+                                    "Imported {} channels",
+                                    added as u32,
+                                )
+                                .replace("{}", &added.to_string()),
+                                Err(e) => gettextrs::gettext("Could not import subscriptions: {}")
+                                    .replace("{}", &e),
+                            };
+                            obj.show_toast(Toast::new(&message));
+                            // Show the new channels' videos in the feed.
+                            obj.imp().video_list.reload();
+                        }
+                    ));
+                }
+            ));
             let action_export = SimpleAction::new("export", None);
             action_export.connect_activate(clone!(
                 #[weak]
@@ -1595,6 +1632,7 @@ pub mod imp {
             actions.add_action(&action_tab_watch_later);
             actions.add_action(&action_tab_subscriptions);
             actions.add_action(&action_import);
+            actions.add_action(&action_import_account);
             actions.add_action(&action_export);
             actions.add_action(&action_toggle_sidebar);
             actions.add_action(&action_privacy_notice);
