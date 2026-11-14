@@ -35,6 +35,9 @@ optdepends=(
 # Kinora has its own app ID, so it installs next to upstream Pipeline.
 conflicts=('pipeline-home')
 replaces=('pipeline-home')
+# Arch's default LTO turns rquickjs' bundled C (QuickJS) into GCC bytecode that
+# Rust's linker can't read (undefined JS_* symbols).
+options=('!lto')
 source=("git+$url.git")
 sha256sums=('SKIP')
 
