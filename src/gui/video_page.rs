@@ -455,6 +455,8 @@ pub mod imp {
                             imp.up_next_store.add(v);
                         }
                         imp.up_next_box.set_visible(imp.up_next_store.n_items() > 0);
+                        #[cfg(feature = "dev-hooks")]
+                        imp.dev_hooks_after_up_next();
                         // Kinora: get the likely next video ready, so it starts at once.
                         if let Some(next) = imp.up_next_store.item(0).and_downcast::<Video>() {
                             client.prepare_playback(&next);
@@ -519,6 +521,45 @@ pub mod imp {
             }
             obj.set_window_mode(window_mode);
             obj.set_fullscreened(true);
+        }
+
+        /// Kinora: test hooks (feature `dev-hooks`): open the first Up next video
+        /// (`KH_NEXT_AFTER=seconds`), scroll to Up next (`KH_SCROLL_AFTER`).
+        #[cfg(feature = "dev-hooks")]
+        fn dev_hooks_after_up_next(&self) {
+            use std::sync::atomic::{AtomicBool, Ordering};
+            static NEXT_DONE: AtomicBool = AtomicBool::new(false);
+            let obj = self.obj().clone();
+            if let Ok(secs) = std::env::var("KH_NEXT_AFTER") {
+                if !NEXT_DONE.swap(true, Ordering::SeqCst) {
+                    let o = obj.clone();
+                    glib::timeout_add_local_once(
+                        std::time::Duration::from_secs(secs.parse().unwrap_or(15)),
+                        move || {
+                            if let Some(v) = o.imp().up_next_store.item(0).and_downcast::<Video>() {
+                                log::info!("DEV: opening Up next video {}", v.id().id);
+                                o.emit_by_name::<()>("play-video", &[&v, &PlayType::Default]);
+                            }
+                        },
+                    );
+                }
+            }
+            if let Ok(secs) = std::env::var("KH_SCROLL_AFTER") {
+                let o = obj.clone();
+                glib::timeout_add_local_once(
+                    std::time::Duration::from_secs(secs.parse().unwrap_or(10)),
+                    move || {
+                        let b = &o.imp().up_next_box;
+                        let sw = &o.imp().page_scroller;
+                        let y = b
+                            .compute_point(&**sw, &gtk::graphene::Point::new(0.0, 0.0))
+                            .map(|p| p.y())
+                            .unwrap_or(0.0);
+                        let adj = sw.vadjustment();
+                        adj.set_value(adj.value() + y as f64 - 40.0);
+                    },
+                );
+            }
         }
 
         /// Kinora: back to the top; again shortly after, because focus moving into

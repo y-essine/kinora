@@ -11,6 +11,12 @@ license = "GPL-3.0-or-later"
 [profile.dev]
 debug = false
 
+[features]
+# Kinora: test hooks for development builds (see .dev/ and CONTRIBUTING-KINORA.md).
+# They let a test session drive the app with environment variables (KH_*);
+# never enabled in release builds.
+dev-hooks = []
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

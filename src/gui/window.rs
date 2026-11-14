@@ -897,6 +897,42 @@ pub mod imp {
             obj.show_toast(toast);
         }
 
+        /// Kinora: test hooks (feature `dev-hooks`, development only): drive the
+        /// app with environment variables, since a test session can't click.
+        #[cfg(feature = "dev-hooks")]
+        fn dev_hooks(&self) {
+            let obj = self.obj().clone();
+            if let Ok(page) = std::env::var("KH_PAGE") {
+                self.main_stack.set_visible_child_name(&page);
+            }
+            if let Ok(q) = std::env::var("KH_SEARCH") {
+                self.main_stack.set_visible_child_name("search");
+                self.search_entry.set_text(&q);
+                self.search();
+            }
+            if let Ok(n) = std::env::var("KH_OPEN") {
+                let n: u32 = n.parse().unwrap_or(0);
+                if let Some(v) = obj.client().home_store().item(n).and_downcast::<Video>() {
+                    self.play_video(v, PlayType::Default);
+                }
+            }
+            if let Ok(list) = std::env::var("KH_ACTION") {
+                for item in list.split(',') {
+                    let (name, secs) = item.split_once('@').unwrap_or((item, "1"));
+                    let secs: u64 = secs.parse().unwrap_or(1);
+                    let (o, name) = (obj.clone(), name.to_owned());
+                    glib::timeout_add_local_once(std::time::Duration::from_secs(secs), move || {
+                        log::info!("DEV: action win.{name}");
+                        let _ = gtk::prelude::WidgetExt::activate_action(
+                            &o,
+                            &format!("win.{name}"),
+                            None,
+                        );
+                    });
+                }
+            }
+        }
+
         fn visible_video_page(&self) -> Option<VideoPage> {
             let page = self.main_navigation.visible_page();
             let child = page.and_then(|p| p.child());
@@ -1748,6 +1784,8 @@ pub mod imp {
                     }
                     // Kinora: load the account's home feed.
                     s.obj().client().refresh_home().await;
+                    #[cfg(feature = "dev-hooks")]
+                    s.dev_hooks();
                 }
             ));
         }

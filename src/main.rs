@@ -49,10 +49,34 @@ macro_rules! tspawn {
 }
 
 fn init_resources() {
+    // Kinora: development builds can load the UI from the build folder instead
+    // of the copy compiled into the program, so a layout change needs only the
+    // Blueprint compile and a restart, not a Rust rebuild.
+    if let Some(path) = dev_path("KINORA_DEV_RESOURCES") {
+        match gtk::gio::Resource::load(&path) {
+            Ok(resource) => {
+                log::info!("Development: UI from {}", path.display());
+                gtk::gio::resources_register(&resource);
+                return;
+            }
+            Err(e) => log::warn!("Development: could not load {}: {e}", path.display()),
+        }
+    }
     let gbytes = gtk::glib::Bytes::from_static(RESOURCES_BYTES);
     let resource = gtk::gio::Resource::from_data(&gbytes).unwrap();
 
     gtk::gio::resources_register(&resource);
+}
+
+/// Kinora: a file named by an environment variable, honoured only in
+/// development builds.
+fn dev_path(var: &str) -> Option<std::path::PathBuf> {
+    if config::PROFILE != "Devel" {
+        return None;
+    }
+    std::env::var_os(var)
+        .map(std::path::PathBuf::from)
+        .filter(|p| p.exists())
 }
 
 fn init_folders() {
@@ -89,7 +113,31 @@ fn init_icons<P: IsA<gdk::Display>>(display: &P) {
 
 fn init_css() {
     let provider = CssProvider::new();
-    provider.load_from_resource(&format!("{RESOURCES_PATH}style.css"));
+    // Kinora: development builds can style from the source file and reload it
+    // whenever it is saved: live CSS editing while the app runs.
+    if let Some(path) = dev_path("KINORA_DEV_CSS") {
+        let file = gtk::gio::File::for_path(&path);
+        provider.load_from_file(&file);
+        use gtk::gio::prelude::FileExt;
+        if let Ok(monitor) = file.monitor_file(
+            gtk::gio::FileMonitorFlags::NONE,
+            gtk::gio::Cancellable::NONE,
+        ) {
+            let p = provider.clone();
+            use gtk::gio::prelude::FileMonitorExt;
+            monitor.connect_changed(move |_, file, _, event| {
+                if event == gtk::gio::FileMonitorEvent::ChangesDoneHint {
+                    log::info!("Development: reloading CSS");
+                    p.load_from_file(file);
+                }
+            });
+            // Keep the monitor alive for the life of the app.
+            std::mem::forget(monitor);
+        }
+        log::info!("Development: live CSS from {}", path.display());
+    } else {
+        provider.load_from_resource(&format!("{RESOURCES_PATH}style.css"));
+    }
 
     // Add the provider to the default screen
     gtk::style_context_add_provider_for_display(
