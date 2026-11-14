@@ -24,20 +24,33 @@ anti-bot token, so the account is only used to read recommendations and to mark 
 > Using an account from an unofficial client is against YouTube's terms and can get the account
 > flagged. Use a separate (burner) account.
 
-## Setup
+## Connecting an account (optional)
 
-1. Sign in to YouTube with your account in a Chromium profile.
-2. Find the profile's folder name in `~/.config/chromium` (`Default`, `Profile 1`, ...).
-3. Point Pipeline Home at it:
+Pipeline Home starts **fully anonymous**. To add your Home feed and personal Up next:
 
-   ```sh
-   gsettings set de.schmidhuberj.tubefeeder account-cookies-command "yt-account-cookies 'Profile 3'"
-   ```
+1. Sign in to YouTube in your browser: Chromium, Chrome, Brave, Vivaldi, Edge, Firefox or LibreWolf.
+2. In Pipeline Home, press **Connect Account** on the Home page (or *Preferences → YouTube Account*).
+3. Pick the browser profile from the list. That's it.
 
-`account-cookies-command` is any command that prints the path to a Netscape `cookies.txt` of the
-account. The bundled `yt-account-cookies` exports it from a Chromium profile through the GNOME keyring
-(it needs `python-secretstorage` and `yt-dlp`). An empty command turns the account features off; Up
-next then falls back to anonymous related videos.
+You can also use an exported `cookies.txt` file. *Disconnect* in the preferences goes back to fully
+anonymous.
+
+<details>
+<summary>How it works, and the command line</summary>
+
+The bundled `yt-account-cookies` finds browser profiles that are signed in to YouTube (it only checks
+for the login cookie's presence, nothing is decrypted to list them) and exports the chosen one's
+YouTube cookies to a private file in `~/.cache/pipeline-home`. Chromium-family browsers keep their
+cookie key in the GNOME keyring; Firefox-family browsers need no keyring.
+
+```sh
+yt-account-cookies --list
+gsettings set de.schmidhuberj.tubefeeder account-cookies-command \
+  "yt-account-cookies --browser chromium --profile 'Profile 3'"
+```
+
+`account-cookies-command` can be any command that prints the path of a Netscape `cookies.txt`.
+</details>
 
 ## Install (Arch Linux)
 
