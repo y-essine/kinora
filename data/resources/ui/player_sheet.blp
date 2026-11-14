@@ -1,0 +1,128 @@
+using Gtk 4.0;
+using Gdk 4.0;
+
+// Kinora: the player sheet (see docs/design.md, "Player"). The video page is
+// added in code; here are the dim behind it and the mini-player it shrinks into.
+template $TFPlayerSheet: Gtk.Widget {
+  Box backdrop {
+    styles [
+      "k-sheet-backdrop",
+    ]
+
+    can-target: false;
+  }
+
+  Overlay mini {
+    styles [
+      "k-mini",
+    ]
+
+    overflow: hidden;
+    accessible-role: group;
+    tooltip-text: bind $expand_tooltip(template.video-page as <$TFVideoPage>.video as <$TFVideo>.title) as <string>;
+
+    // The video's own colours, as on the video page.
+    Picture {
+      styles [
+        "k-glow",
+        "k-mini-glow",
+      ]
+
+      content-fit: fill;
+      can-shrink: true;
+      accessible-role: presentation;
+      paintable: bind $pixbuf_to_ambient(template.video-page as <$TFVideoPage>.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+    }
+
+    [overlay]
+    Box mini_layout {
+      orientation: vertical;
+
+      // The live video is drawn here by the sheet.
+      Box mini_slot {}
+
+      Box mini_info {
+        styles [
+          "k-mini-info",
+        ]
+
+        spacing: 2;
+        hexpand: true;
+
+        Box {
+          orientation: vertical;
+          valign: center;
+          hexpand: true;
+          spacing: 1;
+
+          Label {
+            styles [
+              "k-mini-title",
+            ]
+
+            xalign: 0;
+            ellipsize: end;
+            label: bind template.video-page as <$TFVideoPage>.video as <$TFVideo>.title;
+          }
+
+          Label {
+            styles [
+              "k-mini-channel",
+            ]
+
+            xalign: 0;
+            ellipsize: end;
+            label: bind template.video-page as <$TFVideoPage>.video as <$TFVideo>.uploader as <$TFChannel>.name;
+          }
+        }
+
+        Button {
+          styles [
+            "flat",
+            "circular",
+          ]
+
+          valign: center;
+          icon-name: bind $play_pause_icon(template.video-page as <$TFVideoPage>.state) as <string>;
+          tooltip-text: bind $play_pause_tooltip(template.video-page as <$TFVideoPage>.state) as <string>;
+          clicked => $play_pause() swapped;
+        }
+
+        Button {
+          styles [
+            "flat",
+            "circular",
+          ]
+
+          valign: center;
+          icon-name: "media-skip-forward-symbolic";
+          tooltip-text: _("Next Video");
+          clicked => $next() swapped;
+        }
+
+        Button {
+          styles [
+            "flat",
+            "circular",
+          ]
+
+          valign: center;
+          icon-name: "window-close-symbolic";
+          tooltip-text: _("Close Player");
+          clicked => $close_clicked() swapped;
+        }
+      }
+    }
+
+    [overlay]
+    ProgressBar mini_progress {
+      styles [
+        "k-mini-progress",
+      ]
+
+      valign: end;
+      can-target: false;
+      accessible-role: presentation;
+    }
+  }
+}

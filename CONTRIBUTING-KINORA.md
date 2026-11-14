@@ -15,6 +15,7 @@ Upstream Pipeline's guide is in [CONTRIBUTING.md](CONTRIBUTING.md); this is the 
 - **Inspect live**: `GTK_DEBUG=interactive dev/run.sh` (or Ctrl+Shift+D) opens the GTK Inspector: widget tree, properties, live CSS.
 - **Test hooks** (`dev-hooks` feature, never in release builds) drive the app without clicking:
   `KH_PAGE=feed`, `KH_SEARCH=lofi`, `KH_OPEN=0` (Nth Home video), `KH_ACTION=settings@5,connect-account@20`, `KH_NEXT_AFTER=15`, `KH_SCROLL_AFTER=12`, `KH_HOME_SCROLL=600@12` (scroll Home down 600 px after 12 s).
+  The player sheet is driven by actions: `KH_ACTION=minimize-player@12,expand-player@18,player-next@22,close-player@30` (also `toggle-player`, `player-previous`); `KH_SHEET_PROGRESS=0.6@12` holds it between minimized (0) and expanded (1), `KH_MINI_DOCK=left` docks the mini-player on the left.
 - **Side by side**: development builds do not hand over to an instance that is already running, so builds from several checkouts (or two windows of one, to compare states) run next to each other.
 - **Design**: the look is described in [docs/design.md](docs/design.md); new interface parts use its tokens and components.
 - **Faster builds**: `dev/build.sh` links with `mold` when it's installed, and uses `sccache` in linked git worktrees so parallel checkouts share compiled dependencies (in the main checkout sccache would add ~1 s to every small rebuild). Measured: a one-file Rust change rebuilds in about 3 s.

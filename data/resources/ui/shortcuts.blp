@@ -37,6 +37,30 @@ Adw.ShortcutsDialog help_overlay {
   }
 
   Adw.ShortcutsSection {
+    title: _("Player");
+
+    Adw.ShortcutsItem {
+      accelerator: 'Escape i';
+      title: _("Minimize Player");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: '<Control>i';
+      title: _("Minimize or Expand Player");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: '<Shift>n';
+      title: _("Next Video");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: '<Shift>p';
+      title: _("Previous Video");
+    }
+  }
+
+  Adw.ShortcutsSection {
     title: _("Pages");
 
     Adw.ShortcutsItem {

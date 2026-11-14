@@ -614,6 +614,62 @@ button.k-glass:hover {
   outline-offset: -2px;
 }
 
+/* --- Player sheet --------------------------------------------------------------
+   The video page lies over the window and shrinks into the mini-player
+   (see docs/design.md, "Player"). The motion itself is in player_sheet.rs. */
+.k-sheet-backdrop {
+  background-color: var(--k-bg);
+}
+
+.k-mini {
+  border-radius: var(--k-radius-m);
+  background-color: var(--k-surface-2);
+  box-shadow: var(--k-shadow-2), 0 0 0 1px var(--k-line);
+}
+
+.k-mini-glow {
+  opacity: 0.55;
+}
+
+.k-mini-info {
+  padding: 0 6px 3px 14px;
+}
+
+.k-mini.bar .k-mini-info {
+  padding: 0 4px 3px 12px;
+}
+
+.k-mini-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.k-mini-channel {
+  font-size: 12px;
+  color: var(--k-text-dim);
+}
+
+/* How far the video is: one thin line in the accent. */
+.k-mini-progress,
+.k-mini-progress > trough,
+.k-mini-progress > trough > progress {
+  min-height: 3px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.k-mini-progress > trough {
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+.k-mini-progress > trough > progress {
+  background-color: var(--k-accent);
+}
+
 /* --- Lite: effects off (the reduce-effects setting) ------------------------- */
 window.reduce-effects * {
   transition: none;

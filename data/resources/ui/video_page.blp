@@ -33,6 +33,22 @@ template $TFVideoPage: Adw.Bin {
       action: "action(video.toggle-mute)";
     }
 
+    // Kinora: the sheet and the queue (see docs/design.md, "Player").
+    Shortcut {
+      trigger: "i";
+      action: "action(win.minimize-player)";
+    }
+
+    Shortcut {
+      trigger: "<Shift>n";
+      action: "action(win.player-next)";
+    }
+
+    Shortcut {
+      trigger: "<Shift>p";
+      action: "action(win.player-previous)";
+    }
+
     Shortcut {
       trigger: "space";
       action: "action(video.play-pause)";
@@ -112,8 +128,16 @@ template $TFVideoPage: Adw.Bin {
 
   Adw.ToolbarView {
     [top]
-    Adw.HeaderBar {
+    Adw.HeaderBar header_bar {
       visible: bind template.fullscreened inverted;
+
+      // Kinora: shrink the page into the mini-player.
+      [start]
+      Gtk.Button {
+        icon-name: "go-down-symbolic";
+        tooltip-text: _("Minimize Player (Esc)");
+        action-name: "win.minimize-player";
+      }
 
       [start]
       Gtk.ToggleButton main_toggle_sidebar {
@@ -155,7 +179,7 @@ template $TFVideoPage: Adw.Bin {
           "k-stage",
         ]
 
-        Picture {
+        Picture stage_glow {
           styles [
             "k-glow",
             "k-stage-glow",
@@ -169,7 +193,7 @@ template $TFVideoPage: Adw.Bin {
         }
 
         [overlay]
-        Box {
+        Box stage_scrim {
           styles [
             "k-stage-scrim",
           ]
@@ -228,6 +252,8 @@ template $TFVideoPage: Adw.Bin {
                   [fading-overlay]
                   ClapperGtk.SimpleControls {
                     valign: end;
+                    // Kinora: the mini-player has its own controls.
+                    visible: bind template.minimized inverted;
                   }
 
                   // Kinora: fill the window (not the screen) with the video.
@@ -237,6 +263,7 @@ template $TFVideoPage: Adw.Bin {
                     valign: start;
                     margin-top: 8;
                     margin-end: 8;
+                    visible: bind template.minimized inverted;
                     icon-name: bind $window_fullscreen_icon(template.fullscreened, template.window-mode) as <string>;
                     tooltip-text: bind $window_fullscreen_tooltip(template.fullscreened, template.window-mode) as <string>;
                     clicked => $toggle_window_fullscreen() swapped;
@@ -248,7 +275,9 @@ template $TFVideoPage: Adw.Bin {
                   }
 
                   [overlay]
-                  ClapperGtk.Billboard billboard {}
+                  ClapperGtk.Billboard billboard {
+                    visible: bind template.minimized inverted;
+                  }
 
                   toggle-fullscreen => $toggle_fullscreen() swapped;
                 }

@@ -9,6 +9,14 @@ gtk::glib::wrapper! {
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
+impl FeaturedBanner {
+    /// The picture, for the player to grow out of (see `player_sheet.rs`).
+    pub fn picture_widget(&self) -> gtk::Picture {
+        use gtk::subclass::prelude::ObjectSubclassIsExt;
+        self.imp().picture.get()
+    }
+}
+
 pub mod imp {
     use adw::subclass::breakpoint_bin::BreakpointBinImpl;
     use glib::Properties;
@@ -32,7 +40,7 @@ pub mod imp {
     #[properties(wrapper_type = super::FeaturedBanner)]
     pub struct FeaturedBanner {
         #[template_child]
-        picture: TemplateChild<gtk::Picture>,
+        pub(super) picture: TemplateChild<gtk::Picture>,
 
         #[property(get, set = Self::set_video, nullable)]
         video: RefCell<Option<Video>>,

@@ -37,35 +37,30 @@ template $TFWindow: Adw.ApplicationWindow {
   content: Adw.OverlaySplitView split_view {
     content: Adw.NavigationPage {
       Adw.ToastOverlay toast_overlay {
-        child: Adw.ToolbarView {
-          styles [
-            "main-toolbar",
-          ]
+        // Kinora: the player sheet lies over everything but the sidebar
+        // (see docs/design.md, "Player").
+        child: Overlay player_overlay {
+          child: Adw.ToolbarView {
+            styles [
+              "main-toolbar",
+            ]
 
-          bottom-bar-style: bind $bottom_bar_style_for_video_bar_visible(
-            video_action_bar.reveal-child
-            ) as <Adw.ToolbarStyle>;
+            content: Adw.NavigationView main_navigation {
+              popped => $navigation_popped() swapped;
+            };
 
-          content: Adw.NavigationView main_navigation {
-            popped => $navigation_popped() swapped;
+            [bottom]
+            Adw.ViewSwitcherBar view_switcher {
+              stack: main_stack;
+            }
           };
 
-          [bottom]
-          Gtk.Revealer video_action_bar {
-            reveal-child: bind $is_some(template.video_page_for_bottom_bar) as <bool>;
-
-            $TFBottomBar bottom_bar {
-              video_page: bind template.video_page_for_bottom_bar as <Adw.NavigationPage>.child;
-              compact: bind template.breakpoint_collapsed;
-              activated => $bottom_bar_clicked() swapped;
-              dismissed => $bottom_bar_dismissed() swapped;
-              play-pause => $bottom_bar_play_pause() swapped;
-            }
-          }
-
-          [bottom]
-          Adw.ViewSwitcherBar view_switcher {
-            stack: main_stack;
+          [overlay]
+          $TFPlayerSheet player_sheet {
+            visible: false;
+            compact: bind template.breakpoint_collapsed;
+            closed => $player_closed() swapped;
+            skip => $player_skip() swapped;
           }
         };
       }

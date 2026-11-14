@@ -23,6 +23,8 @@ impl Window {
         app.set_accels_for_action("window.close", &["<Control>q", "<Control>w"]);
         app.set_accels_for_action("win.reload", &["<Control>r", "F5"]);
         app.set_accels_for_action("win.toggle-sidebar", &["F9"]);
+        // Kinora: minimize or bring back the player.
+        app.set_accels_for_action("win.toggle-player", &["<Control>i"]);
 
         app.set_accels_for_action("win.tab-feed", &["<Alt>1"]);
         app.set_accels_for_action("win.tab-watch-later", &["<Alt>3"]);
@@ -193,7 +195,6 @@ pub mod imp {
         Channel, Client, PlayType, SearchStream, SubscriptionsStore, Video, VideoFetcherStream,
     };
     use crate::config::{self, BASE_ID, PROFILE};
-    use crate::gui::bottom_bar::BottomBar;
     use crate::gui::channel_item::ChannelItem;
     use crate::gui::channel_page::ChannelPage;
     use crate::gui::error_dialog::ErrorDialog;
@@ -201,6 +202,7 @@ pub mod imp {
     use crate::gui::filter_dialog::FilterDialog;
     use crate::gui::finite_video_list::FiniteVideoList;
     use crate::gui::import_dialog::ImportDialog;
+    use crate::gui::player_sheet::PlayerSheet;
     use crate::gui::preferences_dialog::PreferencesDialog;
     use crate::gui::privacy_notice::PrivacyNotice;
     use crate::gui::search_list::SearchList;
@@ -277,8 +279,13 @@ pub mod imp {
         label_splash: TemplateChild<Label>,
         #[template_child]
         overlay_videos: TemplateChild<Overlay>,
+        // Kinora: the player sheet and what it lies over (see docs/design.md).
         #[template_child]
-        bottom_bar: TemplateChild<BottomBar>,
+        player_sheet: TemplateChild<PlayerSheet>,
+        #[template_child]
+        player_overlay: TemplateChild<Overlay>,
+        /// Videos played before the current one in this sitting ("previous").
+        player_history: RefCell<Vec<Video>>,
 
         #[template_child]
         menubar: TemplateChild<MenuModel>,
@@ -299,9 +306,6 @@ pub mod imp {
 
         #[property(get)]
         client: RefCell<Client>,
-
-        #[property(get, set = Self::set_video_page_for_bottom_bar, nullable)]
-        video_page_for_bottom_bar: RefCell<Option<NavigationPage>>,
 
         #[property(get, set)]
         split_view_collapsed_before_fullscreen: Cell<bool>,
@@ -339,7 +343,9 @@ pub mod imp {
                 overlay_videos: Default::default(),
                 toast_overlay: Default::default(),
                 toast_error: Default::default(),
-                bottom_bar: Default::default(),
+                player_sheet: Default::default(),
+                player_overlay: Default::default(),
+                player_history: Default::default(),
                 menubar: Default::default(),
                 progress_feed: Default::default(),
                 home_view: Default::default(),
@@ -353,8 +359,6 @@ pub mod imp {
                 sidebar_pinned: Default::default(),
                 main_show_sidebar_visible: Default::default(),
                 watch_history_enabled: Default::default(),
-
-                video_page_for_bottom_bar: Default::default(),
 
                 client: Default::default(),
             }
@@ -394,15 +398,6 @@ pub mod imp {
         }
 
         #[template_callback(function)]
-        fn bottom_bar_style_for_video_bar_visible(visible: bool) -> adw::ToolbarStyle {
-            if visible {
-                adw::ToolbarStyle::Raised
-            } else {
-                adw::ToolbarStyle::Flat
-            }
-        }
-
-        #[template_callback(function)]
         fn pin_label(pinned: bool) -> String {
             if pinned {
                 gettextrs::gettext("Unpin Sidebar")
@@ -411,124 +406,141 @@ pub mod imp {
             }
         }
 
+        /// Kinora: the player was closed from its mini-player.
         #[template_callback]
-        fn bottom_bar_clicked(&self) {
-            let obj = self.obj();
-            let page = obj
-                .video_page_for_bottom_bar()
-                .expect("There is a video page in the bottom bar if it was clicked");
+        fn player_closed(&self, page: VideoPage) {
+            if let Some(video) = page.video() {
+                self.obj().client().watched(video, Utc::now());
+            }
+            self.player_history.borrow_mut().clear();
+        }
 
-            // If it already was in the navigation view, remove it as it cannot be added multiple times.
-            // Ideally, we would also keep the old one to allow going back, but that would require one Clapper instance with the same player, which is currently not possible (but will maybe be implemented in the future).
-            let current_pages = self
-                .main_navigation
-                .navigation_stack()
-                .iter::<NavigationPage>()
-                .map(|p| p.expect("NavigationView pages to only be NavigationPage"))
-                .filter(|p| *p != page)
-                .collect::<Vec<_>>();
-            self.main_navigation.replace(&current_pages);
-
-            self.main_navigation_pre_push();
-            self.main_navigation.push(&page);
-
-            obj.set_video_page_for_bottom_bar(None::<NavigationPage>);
-
-            // For some reason, immediately grabbing focus does not work.
-            // Waiting a bit before grabbing focus seems to work.
-            gspawn!(clone!(
-                #[weak]
-                page,
-                async move {
-                    glib::timeout_future(std::time::Duration::from_millis(50)).await;
-                    page.child()
-                        .expect("NavigationPage to have a child")
-                        .grab_focus();
+        /// Kinora: the next video (the first of "Up next") or the one before.
+        #[template_callback]
+        fn player_skip(&self, forward: bool) {
+            let Some(page) = self.player_sheet.video_page() else {
+                return;
+            };
+            if forward {
+                if let Some(next) = page.next_video() {
+                    self.open_video(next, PlayType::Default, true, true);
                 }
-            ));
-        }
-
-        #[template_callback]
-        fn bottom_bar_dismissed(&self) {
-            let obj = self.obj();
-            if let Some(page) = obj
-                .video_page_for_bottom_bar()
-                .and_then(|p| p.child())
-                .and_dynamic_cast_ref::<VideoPage>()
-            {
-                page.pause();
-                obj.set_video_page_for_bottom_bar(None::<NavigationPage>);
+            } else {
+                let previous = self.player_history.borrow_mut().pop();
+                if let Some(previous) = previous {
+                    self.open_video(previous, PlayType::Default, true, false);
+                }
             }
         }
 
-        #[template_callback]
-        fn bottom_bar_play_pause(&self) {
-            let obj = self.obj();
-            if let Some(page) = obj
-                .video_page_for_bottom_bar()
-                .and_then(|p| p.child())
-                .and_dynamic_cast_ref::<VideoPage>()
-            {
-                page.play_pause();
+        /// Kinora: where a video's picture is shown behind the sheet (its card
+        /// or the banner), in the sheet's coordinates: the player grows out of it.
+        fn card_rect(&self, video: &Video) -> Option<gtk::graphene::Rect> {
+            use crate::gui::featured_banner::FeaturedBanner;
+            let overlay = self.player_overlay.get();
+            let area =
+                gtk::graphene::Rect::new(0.0, 0.0, overlay.width() as f32, overlay.height() as f32);
+            let mut found = None;
+            let mut pending = vec![self.main_navigation.get().upcast::<gtk::Widget>()];
+            while let Some(widget) = pending.pop() {
+                if !widget.is_mapped() {
+                    continue;
+                }
+                let picture = if let Some(item) = widget.downcast_ref::<VideoItem>() {
+                    (item.video().as_ref() == Some(video)).then(|| item.thumbnail_widget())
+                } else if let Some(banner) = widget.downcast_ref::<FeaturedBanner>() {
+                    (banner.video().as_ref() == Some(video)).then(|| banner.picture_widget())
+                } else {
+                    let mut child = widget.first_child();
+                    while let Some(c) = child {
+                        child = c.next_sibling();
+                        pending.push(c);
+                    }
+                    continue;
+                };
+                let Some(bounds) = picture.and_then(|p| p.compute_bounds(&overlay)) else {
+                    continue;
+                };
+                // On screen for the most part.
+                let visible = bounds
+                    .intersection(&area)
+                    .is_some_and(|i| i.area() > bounds.area() * 0.6);
+                if !visible || bounds.width() < 40.0 {
+                    continue;
+                }
+                // The same video can be in several rows: the one under the pointer.
+                if widget.state_flags().contains(gtk::StateFlags::PRELIGHT) {
+                    return Some(bounds);
+                }
+                found.get_or_insert(bounds);
             }
+            found
         }
 
         #[template_callback]
         fn play_video(&self, video: Video, play_type: PlayType) {
+            self.open_video(video, play_type, false, true);
+        }
+
+        /// Kinora: play a video in the player sheet (see docs/design.md, "Player").
+        /// There is one player: a new video takes the place of the current one.
+        ///
+        /// `from_player`: asked for by the player itself (Up next, autoplay,
+        /// next or previous), so a minimized player stays minimized.
+        /// `remember`: the current video becomes the "previous" one.
+        fn open_video(&self, video: Video, play_type: PlayType, from_player: bool, remember: bool) {
             let obj = self.obj();
+            let sheet = self.player_sheet.get();
 
             let play_is_default = play_type == PlayType::Default;
             let play_external_default = self.settings.boolean("play-external-default");
             let play_internal = play_is_default ^ play_external_default;
 
-            // If the same video is already playing from the bottom bar, expand it instead of starting the video again.
-            if obj
-                .video_page_for_bottom_bar()
-                .and_then(|p| p.child().and_dynamic_cast::<VideoPage>().ok())
-                .and_then(|p| p.video())
-                .is_some_and(|v| v == video)
+            let current = sheet.video_page();
+
+            // If the same video is already playing, bring it back instead of starting it again.
+            if let Some(page) = &current
+                && page.video().as_ref() == Some(&video)
+                && play_internal
+                && !page.external()
+                && !page.finished()
             {
-                if play_internal {
-                    self.bottom_bar_clicked();
-                    return;
-                } else {
-                    self.bottom_bar_dismissed();
-                }
+                sheet.expand();
+                return;
             }
 
-            if let Some(page) = obj
-                .video_page_for_bottom_bar()
-                .and_then(|p| p.child())
-                .and_dynamic_cast_ref::<VideoPage>()
-            {
-                page.pause();
-                obj.set_video_page_for_bottom_bar(None::<NavigationPage>);
+            // The old one counts as watched.
+            let mut carry_fullscreen = None;
+            if let Some(old) = &current {
+                if let Some(old_video) = old.video() {
+                    obj.client().watched(old_video.clone(), Utc::now());
+                    if from_player && remember {
+                        self.player_history.borrow_mut().push(old_video);
+                    }
+                }
+                if old.fullscreened() {
+                    carry_fullscreen = Some(old.window_mode());
+                }
             }
+            if !from_player {
+                self.player_history.borrow_mut().clear();
+            }
+
+            let was_minimized = current.is_some() && !sheet.expanded();
+            let expand = !(from_player && was_minimized);
+            let origin = if expand && !from_player {
+                self.card_rect(&video)
+            } else {
+                None
+            };
+
+            log::debug!(
+                "Player: opening {} (expand: {expand}, out of a card: {})",
+                video.id().id,
+                origin.is_some()
+            );
 
             let video_page = VideoPage::new(&video, &obj.client());
-            let page = NavigationPage::new(&video_page, &video.title());
-
-            // Kinora: a video opened from a video page (Up next, autoplay) replaces
-            // it, like on YouTube: one player, and Back returns to where you came
-            // from instead of through every video. The old one counts as watched.
-            if let Some(old) = self.visible_video_page() {
-                if let Some(old_video) = old.video() {
-                    obj.client().watched(old_video, Utc::now());
-                }
-                old.stop();
-                let mut stack: Vec<NavigationPage> = self
-                    .main_navigation
-                    .navigation_stack()
-                    .iter::<NavigationPage>()
-                    .flatten()
-                    .collect();
-                stack.pop();
-                stack.push(page.clone());
-                self.main_navigation.replace(&stack);
-            } else {
-                self.main_navigation_pre_push();
-                self.main_navigation.push(&page);
-            }
 
             obj.announce(
                 &gettextrs::gettext("Switched to video page {}").replace("{}", &video.title()),
@@ -632,7 +644,7 @@ pub mod imp {
                         let play_type: PlayType = args[2]
                             .get()
                             .expect("play-video argument to be of type PlayType");
-                        obj.imp().play_video(video, play_type);
+                        obj.imp().open_video(video, play_type, true, true);
                         None
                     }
                 ),
@@ -664,7 +676,21 @@ pub mod imp {
                 }
             ));
 
-            video_page.grab_focus();
+            // The old page is paused and let go, and has to be gone before the
+            // new player starts: an old player ending while a new one starts
+            // has frozen the app (see also VideoPage::stop).
+            sheet.open(&video_page, origin, expand);
+            drop(current);
+
+            // Autoplay in fullscreen stays in fullscreen.
+            if let Some(window_mode) = carry_fullscreen {
+                video_page.set_window_mode(window_mode);
+                video_page.set_fullscreened(true);
+            }
+
+            if expand {
+                video_page.grab_focus();
+            }
 
             if play_internal {
                 video_page.play();
@@ -676,6 +702,9 @@ pub mod imp {
         #[template_callback]
         fn display_channel(&self, channel: Channel) {
             let obj = self.obj();
+
+            // Kinora: the channel opens behind the player, which steps aside.
+            self.player_sheet.minimize();
 
             let channel_page = ChannelPage::new(&channel, &obj.client());
             channel_page.reload();
@@ -854,6 +883,19 @@ pub mod imp {
                     home.scroll_to(y);
                 });
             }
+            // `KH_SHEET_PROGRESS=0.5@12`: hold the player sheet halfway between
+            // minimized (0) and expanded (1). `KH_MINI_DOCK=left`: dock it left.
+            if let Ok(spec) = std::env::var("KH_SHEET_PROGRESS") {
+                let (p, secs) = spec.split_once('@').unwrap_or((&spec, "1"));
+                let (p, secs): (f64, u64) = (p.parse().unwrap_or(0.5), secs.parse().unwrap_or(1));
+                let sheet = self.player_sheet.get();
+                glib::timeout_add_local_once(std::time::Duration::from_secs(secs), move || {
+                    sheet.dev_set_progress(p);
+                });
+            }
+            if let Ok(side) = std::env::var("KH_MINI_DOCK") {
+                self.player_sheet.dev_set_dock_right(side != "left");
+            }
             if let Ok(list) = std::env::var("KH_ACTION") {
                 for item in list.split(',') {
                     let (name, secs) = item.split_once('@').unwrap_or((item, "1"));
@@ -871,10 +913,9 @@ pub mod imp {
             }
         }
 
+        /// Kinora: the video page lives in the player sheet, expanded or not.
         fn visible_video_page(&self) -> Option<VideoPage> {
-            let page = self.main_navigation.visible_page();
-            let child = page.and_then(|p| p.child());
-            child.and_dynamic_cast::<VideoPage>().ok()
+            self.player_sheet.video_page()
         }
 
         fn visible_channel_page(&self) -> Option<ChannelPage> {
@@ -884,17 +925,8 @@ pub mod imp {
         }
 
         fn main_navigation_pre_push(&self) {
-            let obj = self.obj();
-
-            if let Some(video_page) = self.visible_video_page() {
-                if let Some(video) = video_page.video() {
-                    self.obj().client().watched(video, Utc::now());
-                }
-
-                if !video_page.finished() {
-                    obj.set_video_page_for_bottom_bar(self.main_navigation.visible_page());
-                }
-            }
+            // Kinora: whatever opens, opens behind the player.
+            self.player_sheet.minimize();
         }
 
         #[template_callback]
@@ -991,6 +1023,8 @@ pub mod imp {
             );
 
             self.main_navigation.pop_to_tag("root");
+            // Kinora: going somewhere else keeps the video, as a mini-player.
+            self.player_sheet.minimize();
 
             let obj = self.obj();
             obj.action_set_enabled("win.filter-enabled", is_feed_page);
@@ -1014,26 +1048,8 @@ pub mod imp {
         }
 
         #[template_callback]
-        fn navigation_popped(&self, page: NavigationPage) {
+        fn navigation_popped(&self, _page: NavigationPage) {
             let obj = self.obj();
-
-            if let Some(video_page) = page.child().and_dynamic_cast_ref::<VideoPage>() {
-                if let Some(video) = video_page.video() {
-                    self.obj().client().watched(video, Utc::now());
-                }
-
-                if video_page.fullscreened() {
-                    video_page.set_fullscreened(false);
-                }
-
-                if !video_page.finished() {
-                    obj.set_video_page_for_bottom_bar(Some(page));
-                }
-            }
-
-            if self.main_navigation.visible_page() == obj.video_page_for_bottom_bar() {
-                obj.set_video_page_for_bottom_bar(None::<NavigationPage>);
-            }
 
             if self.main_navigation.visible_page_tag().as_deref() == Some("root") {
                 let is_feed_page = self.main_stack.visible_child_name() == Some("feed".into());
@@ -1200,13 +1216,6 @@ pub mod imp {
                     video.set_downloading(false);
                 }
             ));
-        }
-
-        fn set_video_page_for_bottom_bar(&self, page: Option<NavigationPage>) {
-            if page.is_none() {
-                self.bottom_bar.set_video_page(None::<VideoPage>);
-            }
-            self.video_page_for_bottom_bar.replace(page);
         }
 
         fn set_breakpoint_collapsed(&self, value: bool) {
@@ -1676,6 +1685,25 @@ pub mod imp {
 
             let actions = SimpleActionGroup::new();
             obj.insert_action_group("win", Some(&actions));
+
+            // Kinora: the player sheet (see docs/design.md, "Player").
+            let player_actions: [(&str, fn(&Self)); 6] = [
+                ("minimize-player", |s| s.player_sheet.minimize()),
+                ("expand-player", |s| s.player_sheet.expand()),
+                ("toggle-player", |s| s.player_sheet.toggle()),
+                ("close-player", |s| s.player_sheet.close()),
+                ("player-next", |s| s.player_skip(true)),
+                ("player-previous", |s| s.player_skip(false)),
+            ];
+            for (name, activate) in player_actions {
+                let action = SimpleAction::new(name, None);
+                action.connect_activate(clone!(
+                    #[weak]
+                    obj,
+                    move |_, _| activate(obj.imp())
+                ));
+                actions.add_action(&action);
+            }
             actions.add_action(&action_settings);
             actions.add_action(&action_toggle_filter);
             actions.add_action(&action_filter_dialog);
@@ -1795,6 +1823,31 @@ pub mod imp {
             ));
         }
 
+        /// Kinora: the mini-player sits above the narrow window's bottom bar.
+        fn setup_player_sheet(&self) {
+            let obj = self.obj();
+            let update = clone!(
+                #[weak]
+                obj,
+                move || {
+                    let imp = obj.imp();
+                    let bar = &imp.view_switcher;
+                    let inset = if bar.reveals() {
+                        bar.height()
+                            .max(bar.measure(gtk::Orientation::Vertical, -1).1)
+                    } else {
+                        0
+                    };
+                    imp.player_sheet.set_bottom_inset(inset);
+                }
+            );
+            self.view_switcher.connect_reveal_notify(move |_| {
+                update();
+                // Again once the bar has finished sliding in or out.
+                glib::timeout_add_local_once(std::time::Duration::from_millis(350), update.clone());
+            });
+        }
+
         fn allow_all_clapper_enhancers(&self) {
             for proxy in clapper::global_enhancer_proxies()
                 .iter()
@@ -1831,7 +1884,7 @@ pub mod imp {
             SubscriptionsStore::ensure_type();
             SearchList::ensure_type();
             SearchStream::ensure_type();
-            BottomBar::ensure_type();
+            PlayerSheet::ensure_type();
             Self::bind_template(klass);
             Self::bind_template_callbacks(klass);
             Utility::bind_template_callbacks(klass);
@@ -1855,6 +1908,7 @@ pub mod imp {
             self.setup_filter_icon();
             self.setup_search_source();
             self.setup_fullscreen();
+            self.setup_player_sheet();
             self.allow_all_clapper_enhancers();
 
             self.setup_client();
@@ -1918,8 +1972,11 @@ pub mod imp {
                 log::warn!("Failed to save window state, {}", err);
             }
 
-            // In particular, this marks all videos currently in the navigation as watched.
             self.main_navigation.pop_to_tag("root");
+            // Kinora: the video in the player counts as watched.
+            if let Some(video) = self.visible_video_page().and_then(|p| p.video()) {
+                obj.client().watched(video, Utc::now());
+            }
 
             let _ = obj.client().cleanup();
 

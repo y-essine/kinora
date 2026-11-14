@@ -18,6 +18,12 @@ impl VideoItem {
         let s: Self = Object::builder::<Self>().build();
         s
     }
+
+    /// Kinora: the picture, for the player to grow out of (see `player_sheet.rs`).
+    pub fn thumbnail_widget(&self) -> gtk::Picture {
+        use gtk::subclass::prelude::ObjectSubclassIsExt;
+        self.imp().thumbnail.get()
+    }
 }
 
 pub mod imp {
@@ -71,7 +77,7 @@ pub mod imp {
         #[template_child]
         slot_image_wide: TemplateChild<adw::LayoutSlot>,
         #[template_child]
-        thumbnail: TemplateChild<gtk::Picture>,
+        pub(super) thumbnail: TemplateChild<gtk::Picture>,
 
         /// Kinora: width of the poster card (the "wide" layout); 16:9 follows.
         #[property(get, set = Self::set_card_width, default = 288)]
