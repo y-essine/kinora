@@ -122,7 +122,7 @@ use. Built-in extensions are trusted Rust code, so for them this is discipline, 
 | Feed filters | `FeedFilter::filter(ctx, &mut HomePage)` | every Home page |
 | Player hooks | `PlayerHook { on_watched, on_ended, choose_next, transition }` | `on_watched` (30 s into a video, or opened externally) |
 | Menu items | `MenuItem { id, label, location: Main \| Home \| Video }` + `Extension::activate` → `ActionOutcome` (`Done`, `Message`, `Subscribe`, `Play`) | "Import subscriptions" runs through `activate`; the menus themselves are still hand-written |
-| Settings panel | `Setting { key, title, subtitle, kind: Toggle \| Choice \| Text }` → `SettingsPanel` | Preferences → Extensions (`src/gui/extension_settings.rs`) |
+| Settings panel | `Setting { key, title, subtitle, kind: Toggle \| Choice \| Number \| Text }` → `SettingsPanel` | Preferences → Extensions (`src/gui/extension_settings.rs`) |
 
 **Registry**: `ExtensionRegistry` keeps extensions in registration order, rejects invalid or
 duplicate manifests, and holds the disabled list and stored setting values (values that don't
@@ -135,7 +135,7 @@ on change:
 
 - `disabled-extensions` (`as`): ids that are off; everything else is on.
 - `extension-settings` (`a{sv}`): `"EXTENSION.SETTING"` → boolean (toggle) or string (choice,
-  text); `extension::value_key(ext, key)` builds the key.
+  number in decimal, text); `extension::value_key(ext, key)` builds the key.
 
 A Preferences page lists `client.core().extensions().settings_panels()` (title, description,
 permissions, enabled, settings with current values), renders a switch per extension and a row
@@ -148,7 +148,7 @@ list to store. Labels in manifests are English; translate them in the frontend.
 |---|---|---|---|
 | `account` (Network, Account) | `youtube-home` main feed source; `on_watched` marks the video watched on YouTube; menu item `import-subscriptions` (Home) | `personal-up-next`, `mark-watched` (both on) | Fully anonymous: no Home, anonymous Up next, nothing sent to the account. `Core::account_active` and the Client's `has-account` are false |
 | `home-chips` | a feed filter that hides the playlist-only Mixes/Playlists chips | `hide-playlist-chips` (on) | Home is one feed without a chip bar |
-| `dj` (Network, Account, PlayerControl) | nothing to the fixed points: frontends call `Core::dj_*` (see *The DJ*) | `crossfade-seconds` (choice `"0"`..`"12"`, `"6"`), `avoid-repeats` (on), `start-from` (`current-video` \| `my-mix`) | `Core::dj_*` fail; nothing is fetched |
+| `dj` (Network, Account, PlayerControl) | nothing to the fixed points: frontends call `Core::dj_*` (see *The DJ*) | `crossfade-seconds` (number 0..12, 6; stored as text), `avoid-repeats` (on), `start-from` (`current-video` \| `my-mix`) | `Core::dj_*` fail; nothing is fetched |
 
 What stays in the core on purpose: anonymous Up next (it works without an account; the account
 extension only personalises it), prepared/fast-start playback, and connecting an account (the
@@ -160,6 +160,8 @@ take autoplay over: a DJ session is started on purpose and has its own queue.
 Experiences are sets of extensions: **Private** = `account` off; **Lite** = `home-chips` off
 (later: other heavy extensions); **Connected** = all on; **Fun** = opt-in extensions like a DJ.
 Extensions that should start *off* need an `enabled-extensions` list too (not added yet).
+The GTK app offers the four as presets on its first launch (`src/gui/first_run.rs`; the table is
+in docs/design.md, "First run"): they write `disabled-extensions` and `reduce-effects`.
 
 ## The DJ
 
@@ -229,9 +231,10 @@ would ship them next to the app).
 - Move the SQLite store, the `papi` provider setup (Piped/RustyPipe/PeerTube) and import/export
   into the core. The store uses the GObject `Filter`, so it needs a plain filter type first.
 - A `ClapperPlayer` implementing `Player`, and autoplay through `choose_next`/`play_next`.
-- The DJ's UI and its crossfading playback (two players, volumes from `TransitionPlan`). A number
-  setting kind would suit `crossfade-seconds` better than a choice. The DJ is on by default but
-  idle until started; for the Fun experience it could move to the opt-in list.
+- The DJ is on by default but idle until started; for the Fun experience it could move to the
+  opt-in list. (Its UI is `src/gui/dj.rs`: the session on the UI thread, two video pages
+  crossfaded by volume. It drives Clapper directly rather than through `Player::crossfade_to`,
+  because a track there is a whole page with its own player and stream fallbacks.)
 - Render menus from the registry in the GTK app (settings panels already are; the account menu is still
   hand-written in `window.rs`).
 - Third-party extensions: load manifests from files and run their code sandboxed (e.g. WASM),
