@@ -1,0 +1,202 @@
+using Gtk 4.0;
+using Adw 1;
+using Gdk 4.0;
+
+// Kinora: the featured banner on top of Home. One video, full bleed, its
+// picture melting into the page; the text sits on a scrim so it stays readable
+// on any picture (see docs/design.md).
+template $TFFeaturedBanner: Adw.BreakpointBin {
+  width-request: 200;
+  height-request: 390;
+  accessible-role: group;
+
+  accessibility {
+    label: _("Featured video");
+  }
+
+  Adw.Breakpoint {
+    condition ("max-width: 760sp")
+
+    setters {
+      template.height-request: 350;
+      frame.halign: fill;
+      frame.width-request: -1;
+    }
+  }
+
+  Adw.Breakpoint {
+    condition ("max-width: 560sp")
+
+    setters {
+      template.height-request: 300;
+      frame.halign: fill;
+      frame.width-request: -1;
+      content.margin-start: 16;
+      content.margin-end: 16;
+      content.margin-bottom: 12;
+    }
+  }
+
+  Overlay {
+    styles [
+      "k-banner",
+    ]
+
+    overflow: hidden;
+
+    GestureClick {
+      button: 1;
+      released => $banner_clicked() swapped;
+    }
+
+    // The picture's colours, soft and dim, behind everything (free: see
+    // Utility::ambient_texture).
+    Picture {
+      styles [
+        "k-glow",
+        "k-banner-glow",
+      ]
+
+      content-fit: fill;
+      can-shrink: true;
+      accessible-role: presentation;
+      paintable: bind $pixbuf_to_ambient(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+    }
+
+    // Wide: the whole 16:9 picture on the right. Narrow: it fills the banner.
+    [overlay]
+    Overlay frame {
+      halign: end;
+      width-request: 693;
+
+      [overlay]
+      Box {
+        styles [
+          "k-banner-edge",
+        ]
+
+        can-target: false;
+      }
+
+      Picture picture {
+        styles [
+          "k-banner-picture",
+        ]
+
+        content-fit: cover;
+        can-shrink: true;
+        accessible-role: presentation;
+        paintable: bind $pixbuf_to_paintable(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+      }
+    }
+
+    [overlay]
+    Box {
+      styles [
+        "k-banner-scrim",
+      ]
+
+      can-target: false;
+    }
+
+    [overlay]
+    Box content {
+      orientation: vertical;
+      spacing: 8;
+      valign: end;
+      halign: start;
+      margin-start: 24;
+      margin-end: 24;
+      margin-bottom: 20;
+
+      Label {
+        styles [
+          "k-kicker",
+        ]
+
+        label: bind template.kicker;
+        xalign: 0;
+      }
+
+      Label {
+        styles [
+          "k-display",
+        ]
+
+        label: bind template.video as <$TFVideo>.title;
+        accessible-role: heading;
+        wrap: true;
+        wrap-mode: word_char;
+        ellipsize: end;
+        lines: 2;
+        xalign: 0;
+        max-width-chars: 34;
+      }
+
+      Box {
+        spacing: 8;
+
+        Adw.Avatar {
+          styles [
+            "k-avatar",
+          ]
+
+          custom-image: bind $pixbuf_to_paintable(
+            template.video as <$TFVideo>.uploader as <$TFChannel>.avatar
+            ) as <Gdk.Paintable>;
+          text: bind template.video as <$TFVideo>.uploader as <$TFChannel>.name;
+          size: 24;
+        }
+
+        Label {
+          styles [
+            "k-banner-meta",
+          ]
+
+          label: bind $banner_meta(
+            template.video as <$TFVideo>.uploader as <$TFChannel>.name,
+            template.video as <$TFVideo>.uploaded-label,
+            template.video as <$TFVideo>.duration-label
+            ) as <string>;
+          ellipsize: end;
+          xalign: 0;
+        }
+      }
+
+      Box {
+        spacing: 8;
+        margin-top: 6;
+
+        Button btn_play {
+          styles [
+            "pill",
+            "suggested-action",
+            "k-play",
+          ]
+
+          clicked => $play() swapped;
+
+          Adw.ButtonContent {
+            icon-name: "media-playback-start-symbolic";
+            label: _("Play");
+          }
+        }
+
+        Button {
+          styles [
+            "pill",
+            "k-glass",
+          ]
+
+          tooltip-text: bind $watch_later_tooltip_text(template.video as <$TFVideo>.watch-later) as <string>;
+          clicked => $watch_later() swapped;
+
+          Adw.ButtonContent {
+            icon-name: bind $watch_later_icon_name(template.video as <$TFVideo>.watch-later) as <string>;
+            label: _("Watch Later");
+          }
+        }
+      }
+    }
+  }
+}

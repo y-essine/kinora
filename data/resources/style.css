@@ -322,6 +322,198 @@ headerbar {
   outline-color: var(--k-accent);
 }
 
+/* --- Video card (TFVideoItem) ---------------------------------------------- */
+.k-thumb-frame {
+  border-radius: var(--k-radius-m);
+  background-color: var(--k-surface-2);
+}
+
+.k-thumb {
+  opacity: 0;
+  transition: opacity var(--k-dur-slow) var(--k-ease),
+              transform var(--k-dur-slow) var(--k-ease);
+}
+
+.k-thumb.loaded {
+  opacity: 1;
+}
+
+/* The picture grows inside its frame; the card itself never moves. */
+.k-card.hovering .k-thumb.loaded {
+  transform: scale(1.04);
+}
+
+.k-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--k-text);
+}
+
+.k-card.compact .k-card-title {
+  font-size: 14px;
+}
+
+.k-card-meta {
+  font-size: 13px;
+  color: var(--k-text-dim);
+}
+
+.k-badge {
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: var(--k-scrim);
+}
+
+.k-card-actions {
+  opacity: 0;
+  transition: opacity var(--k-dur-fast) var(--k-ease);
+}
+
+.k-card.hovering .k-card-actions,
+.k-card-actions:focus-within {
+  opacity: 1;
+}
+
+.k-avatar,
+.k-avatar > image {
+  border-radius: 50%;
+  background-color: var(--k-surface-3);
+}
+
+/* Cells of the grids and lists that hold cards. */
+gridview.background-view > child,
+listview.k-row-list > row {
+  padding: 6px;
+  border-radius: var(--k-radius-l);
+  background: none;
+  transition: background-color var(--k-dur-fast) var(--k-ease);
+}
+
+gridview.background-view > child:hover,
+listview.k-row-list > row:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+gridview.background-view > child:focus-visible,
+listview.k-row-list > row:focus-visible {
+  outline: 2px solid var(--k-accent);
+  outline-offset: -2px;
+}
+
+/* --- Row of cards (TFVideoRow) ---------------------------------------------- */
+.k-rows {
+  border-spacing: var(--k-space-4);
+}
+
+.k-row-header {
+  margin: 0 var(--k-gutter);
+  min-height: 34px;
+}
+
+.k-row-title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.k-row-subtitle {
+  font-size: 13px;
+  color: var(--k-text-dim);
+}
+
+.k-row-nav {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  color: var(--k-text-dim);
+}
+
+.k-row-nav:disabled {
+  opacity: 0.3;
+}
+
+listview.k-row-list {
+  background: none;
+  /* Cards line up with the row title: gutter minus the cell padding. */
+  padding: 0 18px;
+}
+
+.k-row-placeholder {
+  margin: 6px var(--k-gutter) 64px;
+}
+
+.k-skeleton {
+  border-radius: var(--k-radius-m);
+  background-color: var(--k-surface-1);
+}
+
+/* --- Featured banner (TFFeaturedBanner) ------------------------------------- */
+.k-banner {
+  background-color: var(--k-surface-1);
+}
+
+.k-banner-picture {
+  opacity: 0;
+  transition: opacity var(--k-dur-slow) var(--k-ease);
+}
+
+.k-banner-picture.loaded {
+  opacity: 1;
+}
+
+.k-banner-glow {
+  opacity: 0.85;
+}
+
+/* The picture's left edge dissolves into the glow. */
+.k-banner-edge {
+  background-image: linear-gradient(to right, var(--k-bg) 0%, rgba(11, 12, 15, 0.55) 22%, rgba(11, 12, 15, 0) 50%);
+}
+
+/* Text stays readable on any picture, and the banner melts into the page. */
+.k-banner-scrim {
+  background-image: linear-gradient(to top, var(--k-bg) 0%, rgba(11, 12, 15, 0.82) 22%, rgba(11, 12, 15, 0.25) 55%, rgba(11, 12, 15, 0) 78%);
+}
+
+.k-banner-meta {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+button.k-play {
+  font-weight: 700;
+  padding-left: 22px;
+  padding-right: 26px;
+}
+
+button.k-glass {
+  color: #ffffff;
+  background-color: var(--k-glass);
+  transition: background-color var(--k-dur-fast) var(--k-ease);
+}
+
+button.k-glass:hover {
+  background-color: var(--k-glass-hover);
+}
+
+/* --- Home ------------------------------------------------------------------- */
+.k-home.compact {
+  --k-gutter: 16px;
+}
+
+.k-home.compact listview.k-row-list {
+  padding: 0 10px;
+}
+
+.k-home.compact .k-display {
+  font-size: 24px;
+}
+
 /* --- Lite: effects off (the reduce-effects setting) ------------------------- */
 window.reduce-effects * {
   transition: none;

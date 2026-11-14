@@ -1,0 +1,45 @@
+using Gtk 4.0;
+using Adw 1;
+
+// Kinora: Home. A featured banner, then rows of videos (see docs/design.md).
+template $TFHomeView: Adw.Bin {
+  styles [
+    "k-home",
+  ]
+
+  vexpand: true;
+  hexpand: true;
+
+  ScrolledWindow scroller {
+    hscrollbar-policy: never;
+
+    Box content {
+      orientation: vertical;
+
+      $TFFeaturedBanner banner {
+        client: bind template.client;
+        kicker: _("Featured");
+        play-video => $forward_play() swapped;
+      }
+
+      // The built-in rows ("For you", "Watch again", ...).
+      Box rows {
+        styles [
+          "k-rows",
+        ]
+
+        orientation: vertical;
+      }
+
+      // One row per topic of the account's Home ("Music", "Gaming", ...).
+      Box topic_rows {
+        styles [
+          "k-rows",
+        ]
+
+        orientation: vertical;
+        margin-bottom: 48;
+      }
+    }
+  }
+}

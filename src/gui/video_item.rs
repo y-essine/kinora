@@ -64,6 +64,18 @@ pub mod imp {
         multi_layout_view: TemplateChild<MultiLayoutView>,
         #[template_child]
         label_title: TemplateChild<Label>,
+        #[template_child]
+        avatar: TemplateChild<adw::Avatar>,
+        #[template_child]
+        clamp_wide: TemplateChild<adw::Clamp>,
+        #[template_child]
+        slot_image_wide: TemplateChild<adw::LayoutSlot>,
+        #[template_child]
+        thumbnail: TemplateChild<gtk::Picture>,
+
+        /// Kinora: width of the poster card (the "wide" layout); 16:9 follows.
+        #[property(get, set = Self::set_card_width, default = 288)]
+        card_width: Cell<i32>,
 
         #[property(get, set)]
         video: RefCell<Option<Video>>,
@@ -87,6 +99,11 @@ pub mod imp {
                 btn_more_actions: Default::default(),
                 multi_layout_view: Default::default(),
                 label_title: Default::default(),
+                avatar: Default::default(),
+                clamp_wide: Default::default(),
+                slot_image_wide: Default::default(),
+                thumbnail: Default::default(),
+                card_width: Cell::new(288),
                 filter_out_similar_enabled: Default::default(),
                 compact: Default::default(),
                 hovering: Default::default(),
@@ -104,18 +121,54 @@ pub mod imp {
 
             if compact {
                 self.multi_layout_view.set_layout_name("compact");
-                self.label_title.remove_css_class("title-4");
-                self.label_title.add_css_class("heading");
+                self.obj().add_css_class("compact");
+                self.avatar.set_size(20);
             } else {
                 self.multi_layout_view.set_layout_name("wide");
-                self.label_title.add_css_class("title-4");
-                self.label_title.remove_css_class("heading");
+                self.obj().remove_css_class("compact");
+                self.avatar.set_size(32);
             }
+        }
+
+        fn set_card_width(&self, width: i32) {
+            let width = width.max(120);
+            self.card_width.set(width);
+            self.clamp_wide.set_maximum_size(width);
+            self.slot_image_wide
+                .set_size_request(width, (width as f64 * 9.0 / 16.0).round() as i32);
+        }
+
+        /// The date after the channel name ("· 3 weeks ago"); on its own line
+        /// in the compact layout.
+        #[template_callback(function)]
+        fn meta_date(date: &str, compact: bool) -> String {
+            if date.is_empty() || compact {
+                date.to_owned()
+            } else {
+                format!("· {date}")
+            }
+        }
+
+        /// Fade a thumbnail in when it arrives (the CSS class carries the
+        /// transition); a card that already has one shows it at once.
+        fn setup_thumbnail_fade(&self) {
+            self.thumbnail.connect_paintable_notify(|thumbnail| {
+                if thumbnail.paintable().is_some() {
+                    thumbnail.add_css_class("loaded");
+                } else {
+                    thumbnail.remove_css_class("loaded");
+                }
+            });
         }
 
         #[template_callback]
         pub fn handle_hover_enter(&self) {
             self.obj().set_hovering(true);
+            self.obj().add_css_class("hovering");
+            // Lite mode: nothing is fetched before a click.
+            if self.settings.boolean("reduce-effects") {
+                return;
+            }
             // Kinora: a pointer resting on a video for a moment usually means a
             // click is coming; prepare it so it starts in a second or two.
             let item = glib::prelude::ObjectExt::downgrade(&*self.obj());
@@ -134,6 +187,7 @@ pub mod imp {
             let popover_visible = self.popover_menu.is_visible();
             if !popover_visible {
                 self.obj().set_hovering(false);
+                self.obj().remove_css_class("hovering");
             }
         }
 
@@ -427,6 +481,7 @@ pub mod imp {
             self.parent_constructed();
             self.setup_actions();
             self.setup_leave_on_popover_close();
+            self.setup_thumbnail_fade();
         }
 
         fn signals() -> &'static [Signal] {

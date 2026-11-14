@@ -119,6 +119,81 @@ impl Utility {
         pixbuf.as_ref().map(gdk::Texture::for_pixbuf)
     }
 
+    /// Kinora: the "ambient glow" of a picture, as a paintable (see `ambient_texture`).
+    #[template_callback]
+    fn pixbuf_to_ambient(pixbuf: Option<gtk::gdk_pixbuf::Pixbuf>) -> Option<gdk::Texture> {
+        pixbuf.as_ref().and_then(Self::ambient_texture)
+    }
+
+    /// Kinora: a picture reduced to soft patches of its colours, to be stretched
+    /// large behind the player. It is blurred once, here, at a tiny size, so
+    /// showing it costs the same as any small image: no blur runs on screen.
+    pub fn ambient_texture(pixbuf: &gtk::gdk_pixbuf::Pixbuf) -> Option<gdk::Texture> {
+        use gtk::gdk_pixbuf::InterpType;
+        const W: usize = 64;
+        const H: usize = 36;
+        // Average the picture down to a few colour patches, then back up a little.
+        let small = pixbuf
+            .scale_simple(16, 9, InterpType::Bilinear)?
+            .scale_simple(W as i32, H as i32, InterpType::Bilinear)?;
+        let channels = small.n_channels() as usize;
+        let stride = small.rowstride() as usize;
+        let bytes = small.read_pixel_bytes();
+        let mut rgb = vec![[0f32; 3]; W * H];
+        for y in 0..H {
+            for x in 0..W {
+                let p = y * stride + x * channels;
+                for c in 0..3 {
+                    rgb[y * W + x][c] = bytes[p + c] as f32;
+                }
+            }
+        }
+        // Two box blurs (about a Gaussian) remove the patches' edges.
+        let radius = 5i32;
+        for _ in 0..2 {
+            for horizontal in [true, false] {
+                let source = rgb.clone();
+                for y in 0..H as i32 {
+                    for x in 0..W as i32 {
+                        let mut sum = [0f32; 3];
+                        for d in -radius..=radius {
+                            let (sx, sy) = if horizontal {
+                                ((x + d).clamp(0, W as i32 - 1), y)
+                            } else {
+                                (x, (y + d).clamp(0, H as i32 - 1))
+                            };
+                            let s = source[sy as usize * W + sx as usize];
+                            for c in 0..3 {
+                                sum[c] += s[c];
+                            }
+                        }
+                        let n = (2 * radius + 1) as f32;
+                        rgb[y as usize * W + x as usize] = [sum[0] / n, sum[1] / n, sum[2] / n];
+                    }
+                }
+            }
+        }
+        // More colour and less light than the picture: a glow must never be
+        // bright enough to hurt the contrast of text that lies on it.
+        let data: Vec<u8> = rgb
+            .iter()
+            .flat_map(|p| {
+                let luma = 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
+                p.map(|c| ((luma + (c - luma) * 1.6) * 0.8).clamp(0.0, 255.0) as u8)
+            })
+            .collect();
+        Some(
+            gdk::MemoryTexture::new(
+                W as i32,
+                H as i32,
+                gdk::MemoryFormat::R8g8b8,
+                &glib::Bytes::from_owned(data),
+                W * 3,
+            )
+            .into(),
+        )
+    }
+
     #[template_callback]
     fn icon_name_for_platform(platform: Option<String>) -> Option<String> {
         platform.map(|p| format!("{p}-symbolic"))

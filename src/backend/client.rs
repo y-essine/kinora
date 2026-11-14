@@ -743,6 +743,34 @@ impl Client {
         }
     }
 
+    /// Kinora: the first videos of a chip's feed, without showing them in Home
+    /// (Home's topic rows). Empty for "All", an unknown chip, or on an error.
+    pub async fn home_chip_videos(&self, index: u32) -> Vec<Video> {
+        let Some((_, Some(token))) = self.home_chip(index) else {
+            return Vec::new();
+        };
+        let command = self.account_cookies_command();
+        let result = tspawn!(async move {
+            let cookies = super::account::cookies_file(&command)
+                .await?
+                .ok_or("No YouTube account is set up.")?;
+            super::account::home_continuation(&cookies, &token).await
+        })
+        .await
+        .expect("Failed to spawn tokio");
+        match result {
+            Ok(page) => page
+                .videos
+                .into_iter()
+                .map(|v| self.construct_video(v))
+                .collect(),
+            Err(e) => {
+                log::warn!("Failed to load a Home topic: {e}");
+                Vec::new()
+            }
+        }
+    }
+
     /// Load the first page of Home: the plain home page, or a chip's feed.
     /// A load started while another is running replaces it.
     async fn load_home(&self, chip: Option<(u32, String)>) {

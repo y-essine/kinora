@@ -22,6 +22,9 @@
     <file preprocess="xml-stripblanks">ui/account_dialog.ui</file>
     <file preprocess="xml-stripblanks">ui/subscription_item.ui</file>
     <file preprocess="xml-stripblanks">ui/bottom_bar.ui</file>
+    <file preprocess="xml-stripblanks">ui/video_row.ui</file>
+    <file preprocess="xml-stripblanks">ui/featured_banner.ui</file>
+    <file preprocess="xml-stripblanks">ui/home_view.ui</file>
   </gresource>
   <gresource prefix="/io/github/y_essine/Kinora/icons/">
     <file alias="icon-non-symbolic.svg">../icons/io.github.y_essine.Kinora.svg</file>
