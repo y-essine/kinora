@@ -46,7 +46,7 @@ impl VideoPage {
                 &self.convert_to_clapper_playable_url(&video),
             ));
             player.play();
-            // Pipeline Home: count it on the YouTube account.
+            // Kinora: count it on the YouTube account.
             self.client().mark_watched_on_account(&video);
         } else {
             self.pause();
@@ -103,7 +103,7 @@ impl VideoPage {
 
         if let Some(video) = self.video() {
             let imp = self.imp();
-            // Pipeline Home: count it on the YouTube account.
+            // Kinora: count it on the YouTube account.
             self.client().mark_watched_on_account(&video);
 
             let player = imp.settings.string("player");
@@ -171,7 +171,7 @@ impl VideoPage {
             .and_then(|q| q.current_item())
             .map(|i| i.duration())
         {
-            // Pipeline Home: the player can stop a hair past the duration.
+            // Kinora: the player can stop a hair past the duration.
             player.position() >= duration - 0.75
         } else {
             true
@@ -292,7 +292,7 @@ pub mod imp {
         #[template_child]
         billboard: TemplateChild<clapper_gtk::Billboard>,
 
-        // Pipeline Home: "Up next"
+        // Kinora: "Up next"
         #[template_child]
         up_next_box: TemplateChild<gtk::Box>,
         #[template_child]
@@ -304,7 +304,7 @@ pub mod imp {
 
         #[property(get, set)]
         fullscreened: Cell<bool>,
-        /// Pipeline Home: while fullscreened, fill the window instead of the screen.
+        /// Kinora: while fullscreened, fill the window instead of the screen.
         #[property(get, set)]
         window_mode: Cell<bool>,
         #[property(get, set)]
@@ -358,7 +358,7 @@ pub mod imp {
                 let obj = self.obj();
                 let client = obj.client();
 
-                // Pipeline Home: load "Up next" alongside the video information.
+                // Kinora: load "Up next" alongside the video information.
                 self.autoplay_done.set(false);
                 self.up_next_store.clear();
                 self.up_next_box.set_visible(false);
@@ -423,7 +423,7 @@ pub mod imp {
             }
         }
 
-        /// Pipeline Home: toggle screen (`window_mode == false`) or window fullscreen.
+        /// Kinora: toggle screen (`window_mode == false`) or window fullscreen.
         /// Pressing the other mode's button switches straight over.
         pub(super) fn toggle_fullscreen_mode(&self, window_mode: bool) {
             let obj = self.obj();
@@ -539,7 +539,7 @@ pub mod imp {
             self.toggle_fullscreen_mode(false);
         }
 
-        /// Pipeline Home: the video fills the window, not the screen.
+        /// Kinora: the video fills the window, not the screen.
         #[template_callback]
         fn toggle_window_fullscreen(&self) {
             self.toggle_fullscreen_mode(true);
@@ -728,7 +728,7 @@ pub mod imp {
                 ))),
             );
 
-            // Pipeline Home: "T" fills the window, like YouTube's theater mode.
+            // Kinora: "T" fills the window, like YouTube's theater mode.
             let shortcut_window_fullscreen = Shortcut::new(
                 Some(ShortcutTrigger::parse_string("T").expect("T to be a valid shortcut trigger")),
                 Some(CallbackAction::new(clone!(
@@ -760,12 +760,12 @@ pub mod imp {
                     (
                         "own-name",
                         &format!(
-                            "org.mpris.MediaPlayer2.tubefeeder.instance{}",
+                            "org.mpris.MediaPlayer2.kinora.instance{}",
                             INSTANCE_COUNT.fetch_add(1, Ordering::Relaxed)
                         )
                         .to_value(),
                     ),
-                    ("identity", &gettextrs::gettext("Pipeline Home").to_value()),
+                    ("identity", &gettextrs::gettext("Kinora").to_value()),
                     ("desktop-entry", &APP_ID.to_value()),
                 ]));
                 mpris.set_target_creation_allowed(true);
@@ -780,7 +780,7 @@ pub mod imp {
                 }
             ));
 
-            // Pipeline Home: the player lives in the page's scrolling column, where
+            // Kinora: the player lives in the page's scrolling column, where
             // it gets no height of its own; size it 16:9 to the page width (at most
             // 70% of the page height). Fullscreen lifts this and lets it fill.
             self.clapper.add_tick_callback(clone!(
@@ -803,7 +803,7 @@ pub mod imp {
                 }
             ));
 
-            // Pipeline Home: "Up next" list and autoplay.
+            // Kinora: "Up next" list and autoplay.
             self.up_next_list.bind_model(
                 Some(&self.up_next_store),
                 clone!(
@@ -965,7 +965,7 @@ pub mod imp {
                     Signal::builder("copy-video-url-to-clipboard")
                         .param_types([Video::static_type()])
                         .build(),
-                    // Pipeline Home: play a video from "Up next" (or autoplay).
+                    // Kinora: play a video from "Up next" (or autoplay).
                     Signal::builder("play-video")
                         .param_types([Video::static_type(), PlayType::static_type()])
                         .build(),

@@ -8,6 +8,7 @@ use gtk::{CssProvider, prelude::GtkWindowExt, prelude::RootExt};
 use std::sync::LazyLock;
 
 mod config;
+mod migrate;
 use crate::config::BASE_ID;
 
 use self::config::{APP_ID, GETTEXT_PACKAGE, LOCALEDIR, RESOURCES_BYTES, RESOURCES_PATH};
@@ -56,14 +57,14 @@ fn init_resources() {
 
 fn init_folders() {
     let mut user_cache_dir = gtk::glib::user_cache_dir();
-    user_cache_dir.push("tubefeeder");
+    user_cache_dir.push(migrate::DIR);
 
     if !user_cache_dir.exists() {
         std::fs::create_dir_all(&user_cache_dir).expect("could not create user cache dir");
     }
 
     let mut user_data_dir = gtk::glib::user_data_dir();
-    user_data_dir.push("tubefeeder");
+    user_data_dir.push(migrate::DIR);
 
     if !user_data_dir.exists() {
         std::fs::create_dir_all(user_data_dir.clone()).expect("could not create user data dir");
@@ -83,12 +84,12 @@ fn init_internationalization() -> Result<(), Box<dyn std::error::Error>> {
 fn init_icons<P: IsA<gdk::Display>>(display: &P) {
     let icon_theme = gtk::IconTheme::for_display(display);
 
-    icon_theme.add_resource_path("/de/schmidhuberj/tubefeeder/icons/");
+    icon_theme.add_resource_path(&format!("{RESOURCES_PATH}icons/"));
 }
 
 fn init_css() {
     let provider = CssProvider::new();
-    provider.load_from_resource("/de/schmidhuberj/tubefeeder/style.css");
+    provider.load_from_resource(&format!("{RESOURCES_PATH}style.css"));
 
     // Add the provider to the default screen
     gtk::style_context_add_provider_for_display(
@@ -100,6 +101,8 @@ fn init_css() {
 
 fn main() {
     env_logger::init();
+    // Kinora: bring over the library and settings from Pipeline, once.
+    migrate::from_pipeline();
 
     // Before version 4.18, the NGL renderer is not so good, and Pipeline defaults to the old GL renderer.
     // Since 4.18, the old renderer was removed, and we will have to use the default.
@@ -162,8 +165,8 @@ fn build_ui(app: &gtk::Application) {
     let window = crate::gui::window::Window::new(app);
     init_icons(&window.display());
 
-    glib::set_prgname(Some("tubefeeder"));
-    glib::set_application_name(&gettextrs::gettext("Pipeline Home"));
+    glib::set_prgname(Some("kinora"));
+    glib::set_application_name(&gettextrs::gettext("Kinora"));
     window.set_icon_name(Some(APP_ID));
 
     window.present();

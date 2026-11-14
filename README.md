@@ -1,12 +1,13 @@
 <div align="center">
- <h1>🏠 Pipeline Home</h1>
- <strong>Pipeline, with your YouTube account's Home feed and Up next</strong>
+ <h1>🎞️ Kinora</h1>
+ <strong>Watch YouTube and PeerTube your way: fully anonymous, lightweight, or with your account</strong>
 </div>
 <br>
 
-Pipeline Home is a spin-off of [Pipeline](https://gitlab.com/schmiddi-on-mobile/pipeline) by Julian
-Schmidhuber and contributors, a GTK app for watching YouTube and PeerTube without the website. It keeps
-everything Pipeline does and adds the parts of YouTube that need an account:
+Kinora is a GTK app for Linux for watching YouTube and PeerTube without the website. It starts out
+fully anonymous, and can optionally use a YouTube account for the things that need one. It is based
+on [Pipeline](https://gitlab.com/schmiddi-on-mobile/pipeline) by Julian Schmidhuber and contributors
+(and can be installed next to it), and adds:
 
 - **Home**: your account's YouTube home feed, in YouTube's own order, as the first page.
 - **Up next**: under every video, the recommendations YouTube would show you for it.
@@ -26,10 +27,10 @@ anti-bot token, so the account is only used to read recommendations and to mark 
 
 ## Connecting an account (optional)
 
-Pipeline Home starts **fully anonymous**. To add your Home feed and personal Up next:
+Kinora starts **fully anonymous**. To add your Home feed and personal Up next:
 
 1. Sign in to YouTube in your browser: Chromium, Chrome, Brave, Vivaldi, Edge, Firefox or LibreWolf.
-2. In Pipeline Home, press **Connect Account** on the Home page (or *Preferences → YouTube Account*).
+2. In Kinora, press **Connect Account** on the Home page (or *Preferences → YouTube Account*).
 3. Pick the browser profile from the list. That's it.
 
 You can also use an exported `cookies.txt` file. *Disconnect* in the preferences goes back to fully
@@ -38,15 +39,15 @@ anonymous.
 <details>
 <summary>How it works, and the command line</summary>
 
-The bundled `yt-account-cookies` finds browser profiles that are signed in to YouTube (it only checks
+The bundled `kinora-account` finds browser profiles that are signed in to YouTube (it only checks
 for the login cookie's presence, nothing is decrypted to list them) and exports the chosen one's
-YouTube cookies to a private file in `~/.cache/pipeline-home`. Chromium-family browsers keep their
+YouTube cookies to a private file in `~/.cache/kinora`. Chromium-family browsers keep their
 cookie key in the GNOME keyring; Firefox-family browsers need no keyring.
 
 ```sh
-yt-account-cookies --list
-gsettings set de.schmidhuberj.tubefeeder account-cookies-command \
-  "yt-account-cookies --browser chromium --profile 'Profile 3'"
+kinora-account --list
+gsettings set io.github.y_essine.Kinora account-cookies-command \
+  "kinora-account --browser chromium --profile 'Profile 3'"
 ```
 
 `account-cookies-command` can be any command that prints the path of a Netscape `cookies.txt`.
@@ -55,13 +56,13 @@ gsettings set de.schmidhuberj.tubefeeder account-cookies-command \
 ## Install (Arch Linux)
 
 ```sh
-git clone https://github.com/y-essine/pipeline-home
-cd pipeline-home/packaging/arch
+git clone https://github.com/y-essine/kinora
+cd kinora/packaging/arch
 makepkg -si
 ```
 
-It replaces `pipeline-gtk` and keeps the same app ID, so your subscriptions, watch later and
-history carry over.
+Kinora has its own app ID, so it installs next to Pipeline. On first start it copies Pipeline's
+library (subscriptions, watch later, history) and settings, leaving Pipeline's own files as they are.
 
 ## Building
 
@@ -83,7 +84,11 @@ The account code is kept apart so the patch stays easy to rebase onto new Pipeli
 - `src/gui/video_page.rs`, `data/resources/ui/video_page.blp`: Up next, autoplay, window
   fullscreen, single scrolling page.
 
-The first commit is upstream Pipeline 4.1.1; everything after it is Pipeline Home.
+The first commit is upstream Pipeline 4.1.1; everything after it is Kinora.
+
+## The name
+
+A *kinora* was an 1890s hand-cranked flip-book movie viewer: a small, personal way to watch moving pictures.
 
 ## License
 

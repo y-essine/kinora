@@ -25,7 +25,7 @@ pub enum VideoSort {
     UploadedDescending,
     WatchedAscending,
     WatchedDescending,
-    /// Keep the order videos were added in (Pipeline Home: YouTube's own ranking).
+    /// Keep the order videos were added in (Kinora: YouTube's own ranking).
     AsAdded,
 }
 

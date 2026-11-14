@@ -5,7 +5,7 @@ template $TFWindow: Adw.ApplicationWindow {
   can-focus: true;
   width-request: 360;
   height-request: 300;
-  title: _("Pipeline Home");
+  title: _("Kinora");
 
   Adw.Breakpoint {
     condition ("max-width: 600sp")
@@ -148,6 +148,61 @@ Adw.NavigationPage main_page {
         icon-name: 'open-menu-symbolic';
       }
 
+      // Kinora: the connected YouTube account, with switching and disconnecting.
+      [end]
+      MenuButton btn_account {
+        visible: bind $and(
+          $home_visible(main_stack.visible-child-name) as <bool>,
+          template.client as <$TFClient>.has-account
+          ) as <bool>;
+        icon-name: "avatar-default-symbolic";
+        tooltip-text: bind template.client as <$TFClient>.account-label;
+
+        popover: Popover {
+          child: Box {
+            orientation: vertical;
+            spacing: 6;
+            margin-top: 6;
+            margin-bottom: 6;
+            margin-start: 6;
+            margin-end: 6;
+
+            Label {
+              label: bind template.client as <$TFClient>.account-label;
+              xalign: 0;
+              margin-start: 6;
+              margin-end: 6;
+              margin-bottom: 4;
+              ellipsize: end;
+              max-width-chars: 28;
+
+              styles [
+                "heading",
+              ]
+            }
+
+            Button {
+              label: _("Switch Account…");
+              action-name: "win.connect-account";
+
+              styles [
+                "flat",
+              ]
+            }
+
+            Button {
+              label: _("Disconnect");
+              action-name: "win.disconnect-account";
+
+              styles [
+                "flat",
+                "destructive-action",
+              ]
+            }
+          };
+        };
+      }
+
       [end]
       Button btn_filter_menu {
         visible: bind $feed_visible(main_stack.visible-child-name) as <bool>;
@@ -166,7 +221,7 @@ Adw.NavigationPage main_page {
 Adw.ViewStack main_stack {
   notify::visible-child-name => $sidebar_child_changed() swapped;
 
-  // Pipeline Home: the YouTube account's home feed.
+  // Kinora: the YouTube account's home feed.
   Adw.ViewStackPage {
     name: "home";
     title: _("Home");
@@ -559,7 +614,7 @@ Adw.NavigationPage sidebar_page {
 
       title-widget: Gtk.Box {
         Adw.WindowTitle sidebar_title {
-          title: _("Pipeline Home");
+          title: _("Kinora");
         }
       };
     }

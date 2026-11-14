@@ -1,7 +1,7 @@
 project(
-  'tubefeeder',
+  'kinora',
   'rust',
-  version: '4.1.1',
+  version: '0.1.0',
   meson_version: '>= 0.59',
   license: 'GPL-3.0-or-later',
 )
@@ -9,9 +9,9 @@ project(
 i18n = import('i18n')
 gnome = import('gnome')
 
-base_id = 'de.schmidhuberj.tubefeeder'
-application_id = 'de.schmidhuberj.tubefeeder'
-resources_path = '/de/schmidhuberj/tubefeeder/'
+base_id = 'io.github.y_essine.Kinora'
+application_id = 'io.github.y_essine.Kinora'
+resources_path = '/io/github/y_essine/Kinora/'
 
 dependency('glib-2.0', version: '>= 2.66')
 dependency('gio-2.0', version: '>= 2.66')

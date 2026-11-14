@@ -1,4 +1,4 @@
-//! Pipeline Home: the signed-in YouTube account behind the Home page, the
+//! Kinora: the signed-in YouTube account behind the Home page, the
 //! "Up next" list and YouTube watch history.
 //!
 //! The account's cookies come from a user-configured command (the
@@ -62,10 +62,10 @@ pub async fn cookies_file(command: &str) -> Result<Option<PathBuf>, Error> {
 }
 
 /// A browser profile that is signed in to YouTube, as found by
-/// `yt-account-cookies --list`.
+/// `kinora-account --list`.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct BrowserProfile {
-    /// Browser id understood by `yt-account-cookies --browser`.
+    /// Browser id understood by `kinora-account --browser`.
     pub browser: String,
     /// Human name of the browser, e.g. "Chromium".
     pub browser_name: String,
@@ -79,7 +79,7 @@ impl BrowserProfile {
     /// The `account-cookies-command` that signs in through this profile.
     pub fn command(&self) -> String {
         format!(
-            "yt-account-cookies --browser {} --profile {}",
+            "kinora-account --browser {} --profile {}",
             shell_quote(&self.browser),
             shell_quote(&self.profile)
         )
@@ -93,18 +93,16 @@ impl BrowserProfile {
 
 /// Browser profiles signed in to YouTube.
 pub async fn browser_profiles() -> Result<Vec<BrowserProfile>, Error> {
-    let out = Command::new("yt-account-cookies")
+    let out = Command::new("kinora-account")
         .arg("--list")
         .output()
         .await
         .map_err(|e| {
-            format!(
-                "Could not run yt-account-cookies ({e}). Is Pipeline Home installed completely?"
-            )
+            format!("Could not run kinora-account ({e}). Is Kinora installed completely?")
         })?;
     if !out.status.success() {
         return Err(last_line(&out.stderr)
-            .unwrap_or_else(|| "yt-account-cookies --list failed".to_owned())
+            .unwrap_or_else(|| "kinora-account --list failed".to_owned())
             .into());
     }
     Ok(serde_json::from_slice(&out.stdout)?)
@@ -113,7 +111,7 @@ pub async fn browser_profiles() -> Result<Vec<BrowserProfile>, Error> {
 /// The `account-cookies-command` for an exported cookies.txt file.
 pub fn file_command(path: &Path) -> String {
     format!(
-        "yt-account-cookies --file {}",
+        "kinora-account --file {}",
         shell_quote(&path.to_string_lossy())
     )
 }

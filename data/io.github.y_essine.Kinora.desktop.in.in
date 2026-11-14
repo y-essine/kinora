@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Icon=@app-id@
+Name=Kinora
+Comment=Watch YouTube and PeerTube your way
+StartupWMClass=Kinora
+StartupNotify=true
+Exec=@bindir@/kinora
+Categories=Video;AudioVideo
+X-Purism-FormFactor=Workstation;Mobile;
+Keywords=youtube;peertube;video;pipeline;privacy;

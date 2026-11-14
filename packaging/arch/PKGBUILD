@@ -1,11 +1,11 @@
 # Maintainer: y-essine
 # Based on the AUR pipeline-gtk PKGBUILD by Mark Wagie and contributors.
-pkgname=pipeline-home
-pkgver=4.1.1.r3
+pkgname=kinora
+pkgver=0.1.0
 pkgrel=1
-pkgdesc="Pipeline with your YouTube account's Home feed, Up next with autoplay, and window fullscreen"
+pkgdesc="Watch YouTube and PeerTube your way: fully anonymous, lightweight, or with your account"
 arch=('x86_64' 'aarch64')
-url="https://github.com/y-essine/pipeline-home"
+url="https://github.com/y-essine/kinora"
 license=('GPL-3.0-or-later')
 depends=(
   'clapper-enhancers'
@@ -32,8 +32,9 @@ optdepends=(
   'gst-libav: more video formats'
   'gst-plugin-va: hardware video decoding'
 )
-provides=('pipeline-gtk' 'tubefeeder')
-conflicts=('pipeline-gtk' 'tubefeeder')
+# Kinora has its own app ID, so it installs next to upstream Pipeline.
+conflicts=('pipeline-home')
+replaces=('pipeline-home')
 source=("git+$url.git")
 sha256sums=('SKIP')
 
@@ -66,5 +67,5 @@ check() {
 
 package() {
   meson install -C build --no-rebuild --destdir "$pkgdir"
-  install -Dm755 "$pkgname/extras/yt-account-cookies" "$pkgdir/usr/bin/yt-account-cookies"
+  install -Dm755 "$pkgname/extras/kinora-account" "$pkgdir/usr/bin/kinora-account"
 }

@@ -116,7 +116,7 @@ pub mod imp {
     #[properties(wrapper_type = super::PreferencesDialog)]
     #[template(resource = "/ui/preferences_dialog.ui")]
     pub struct PreferencesDialog {
-        // Pipeline Home
+        // Kinora
         #[template_child]
         row_account: TemplateChild<ActionRow>,
         #[template_child]
@@ -599,7 +599,7 @@ pub mod imp {
             }
         }
 
-        /// Pipeline Home: show which YouTube account is connected.
+        /// Kinora: show which YouTube account is connected.
         fn init_account(&self) {
             let update = clone!(
                 #[weak(rename_to = s)]

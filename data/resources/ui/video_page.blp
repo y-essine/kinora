@@ -138,7 +138,7 @@ template $TFVideoPage: Adw.Bin {
       title-widget: Adw.WindowTitle main_title {};
     }
 
-    // Pipeline Home: one scrolling column, so the player scrolls away with the
+    // Kinora: one scrolling column, so the player scrolls away with the
     // page like on YouTube. In fullscreen only the player is left, filling it.
     ScrolledWindow page_scroller {
     hscrollbar-policy: never;
@@ -167,7 +167,7 @@ template $TFVideoPage: Adw.Bin {
           valign: end;
         }
 
-        // Pipeline Home: fill the window (not the screen) with the video.
+        // Kinora: fill the window (not the screen) with the video.
         [fading-overlay]
         Gtk.Button {
           halign: end;
@@ -517,7 +517,7 @@ template $TFVideoPage: Adw.Bin {
               }
             }
 
-            // Pipeline Home: YouTube's "Up next", personalised by the account.
+            // Kinora: YouTube's "Up next", personalised by the account.
             Gtk.Box up_next_box {
               orientation: vertical;
               spacing: 6;

@@ -1,7 +1,7 @@
 using Gtk 4.0;
 using Adw 1;
 
-// Pipeline Home: connect a YouTube account by picking a signed-in browser profile.
+// Kinora: connect a YouTube account by picking a signed-in browser profile.
 template $TFAccountDialog: Adw.Dialog {
   title: _("Connect YouTube Account");
   content-width: 480;
@@ -32,7 +32,7 @@ template $TFAccountDialog: Adw.Dialog {
 
           child: Adw.PreferencesPage {
             Adw.PreferencesGroup {
-              description: _("Pick a browser profile that is signed in to YouTube. Pipeline Home then shows that account's Home feed and Up next, and marks the videos you play as watched on it. Videos themselves still play without signing in.");
+              description: _("Pick a browser profile that is signed in to YouTube. Kinora then shows that account's Home feed and Up next, and marks the videos you play as watched on it. Videos themselves still play without signing in.");
             }
 
             Adw.PreferencesGroup group_profiles {

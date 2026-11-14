@@ -3,18 +3,25 @@
   <id>@app-id@</id>
   <project_license>GPL-3.0-or-later</project_license>
   <metadata_license>FSFAP</metadata_license>
-  <name>Pipeline Home</name>
-  <summary>Follow video creators</summary>
+  <name>Kinora</name>
+  <summary>Watch YouTube and PeerTube your way</summary>
   <launchable type="desktop-id">@app-id@.desktop</launchable>
   <content_rating type="oars-1.1"/>
-  <developer_name translate="no">Julian Schmidhuber</developer_name>
-  <developer id="de.schmidhuberj.mobile">
-    <name translate="no">Julian Schmidhuber</name>
+  <developer_name translate="no">y-essine</developer_name>
+  <developer id="io.github.y_essine">
+    <name translate="no">y-essine</name>
   </developer>
+  <url type="homepage">https://github.com/y-essine/kinora</url>
+  <url type="bugtracker">https://github.com/y-essine/kinora/issues</url>
+  <url type="vcs-browser">https://github.com/y-essine/kinora</url>
   <translation type="gettext">@gettext-package@</translation>
-  <update_contact>flatpak@schmidhuberj.de</update_contact>
 
   <releases>
+    <release version="0.1.0" date="2026-11-14">
+      <description translate="no">
+        <p>First Kinora release, based on Pipeline 4.1.1.</p> <ul> <li>Optional YouTube account: Home feed, personal Up next, watch history on the account.</li> <li>Autoplay of the next video.</li> <li>Window fullscreen next to screen fullscreen.</li> <li>The player scrolls with the video page.</li> </ul>
+      </description>
+    </release>
     <release version="4.1.1" date="2026-10-11">
       <description translate="no">
         <p>Fixed</p> <ul> <li>Fetching Piped instance list timing out, preventing loading the feed.</li> </ul>

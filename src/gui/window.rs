@@ -360,6 +360,11 @@ pub mod imp {
         }
 
         #[template_callback(function)]
+        fn home_visible(page: Option<&str>) -> bool {
+            page == Some("home")
+        }
+
+        #[template_callback(function)]
         fn reload_visible(page: Option<&str>) -> bool {
             page == Some("feed") || page == Some("home")
         }
@@ -583,7 +588,7 @@ pub mod imp {
                 ),
             );
 
-            // Pipeline Home: a video picked from "Up next", or autoplay.
+            // Kinora: a video picked from "Up next", or autoplay.
             video_page.connect_local(
                 "play-video",
                 false,
@@ -610,7 +615,7 @@ pub mod imp {
                 #[upgrade_or_default]
                 move |page| {
                     let fullscreen = page.fullscreened();
-                    // Pipeline Home: window fullscreen keeps the window as it is.
+                    // Kinora: window fullscreen keeps the window as it is.
                     obj.set_fullscreened(fullscreen && !page.window_mode());
                     if fullscreen {
                         obj.set_split_view_collapsed_before_fullscreen(
@@ -1299,11 +1304,11 @@ pub mod imp {
 
                     about_dialog.set_comments(concat!(
                         env!("CARGO_PKG_DESCRIPTION"),
-                        "\n\nPipeline Home adds your YouTube account's Home feed, Up next with autoplay, and window fullscreen. A spin-off of Pipeline by Julian Schmidhuber and contributors."
+                        "\n\nKinora is based on Pipeline by Julian Schmidhuber and contributors."
                     ));
                     about_dialog.add_credit_section(
-                        Some("Pipeline Home"),
-                        &["y-essine https://github.com/y-essine/pipeline-home"],
+                        Some("Pipeline"),
+                        &["Julian Schmidhuber and contributors https://gitlab.com/schmiddi-on-mobile/pipeline"],
                     );
 
                     // translators: One per line: How you want to be credited as a translator, e.g. by the name you use, and optionally an email address ("Edgar Allan Poe <edgar@poe.com>")
@@ -1318,7 +1323,7 @@ pub mod imp {
                 }
             ));
 
-            // Pipeline Home: connect or disconnect the YouTube account.
+            // Kinora: connect or disconnect the YouTube account.
             let action_connect_account = SimpleAction::new("connect-account", None);
             action_connect_account.connect_activate(clone!(
                 #[weak]
@@ -1536,7 +1541,7 @@ pub mod imp {
                     if s.settings.boolean("reload-on-startup") {
                         s.video_list.reload();
                     }
-                    // Pipeline Home: load the account's home feed.
+                    // Kinora: load the account's home feed.
                     s.obj().client().refresh_home().await;
                 }
             ));

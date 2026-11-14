@@ -1481,6 +1481,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "kinora"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "clapper-player",
+ "clapper-player-gtk",
+ "csv",
+ "env_logger",
+ "futures",
+ "gdk4",
+ "gettext-rs",
+ "glib",
+ "gtk4",
+ "libadwaita",
+ "log",
+ "pipeline-api",
+ "pipeline-core",
+ "pipeline-provider-peertube",
+ "pipeline-provider-piped",
+ "pipeline-provider-rustypipe",
+ "pipeline-provider-youtube-rss",
+ "pipeline-provider-yt-dlp",
+ "rand",
+ "regex",
+ "reqwest",
+ "rusqlite",
+ "rusqlite_migration",
+ "rustypipe",
+ "serde",
+ "serde_json",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "kstring"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3018,41 +3053,6 @@ name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
-
-[[package]]
-name = "tubefeeder"
-version = "4.1.1"
-dependencies = [
- "chrono",
- "clapper-player",
- "clapper-player-gtk",
- "csv",
- "env_logger",
- "futures",
- "gdk4",
- "gettext-rs",
- "glib",
- "gtk4",
- "libadwaita",
- "log",
- "pipeline-api",
- "pipeline-core",
- "pipeline-provider-peertube",
- "pipeline-provider-piped",
- "pipeline-provider-rustypipe",
- "pipeline-provider-youtube-rss",
- "pipeline-provider-yt-dlp",
- "rand",
- "regex",
- "reqwest",
- "rusqlite",
- "rusqlite_migration",
- "rustypipe",
- "serde",
- "serde_json",
- "tokio",
- "url",
-]
 
 [[package]]
 name = "typenum"

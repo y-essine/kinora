@@ -1,4 +1,4 @@
-//! Pipeline Home: connect a YouTube account by picking a browser profile that is
+//! Kinora: connect a YouTube account by picking a browser profile that is
 //! signed in to YouTube (or an exported cookies.txt). The choice is tested before
 //! it is saved, and saving it makes the Home page load.
 

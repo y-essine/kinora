@@ -23,9 +23,9 @@
     <file preprocess="xml-stripblanks">ui/subscription_item.ui</file>
     <file preprocess="xml-stripblanks">ui/bottom_bar.ui</file>
   </gresource>
-  <gresource prefix="/de/schmidhuberj/tubefeeder/icons/">
-    <file alias="icon-non-symbolic.svg">../icons/de.schmidhuberj.tubefeeder.svg</file>
-    <file alias="scalable/actions/icon-symbolic.svg">../icons/de.schmidhuberj.tubefeeder-symbolic.svg</file>
+  <gresource prefix="/io/github/y_essine/Kinora/icons/">
+    <file alias="icon-non-symbolic.svg">../icons/io.github.y_essine.Kinora.svg</file>
+    <file alias="scalable/actions/icon-symbolic.svg">../icons/io.github.y_essine.Kinora-symbolic.svg</file>
     <file preprocess="xml-stripblanks" alias="scalable/actions/funnel-symbolic.svg">../icons/funnel-symbolic.svg</file>
     <file preprocess="xml-stripblanks" alias="scalable/actions/funnel-outline-symbolic.svg">../icons/funnel-outline-symbolic.svg</file>
     <file preprocess="xml-stripblanks" alias="scalable/actions/library-artists-symbolic.svg">../icons/library-artists-symbolic.svg</file>
@@ -42,7 +42,7 @@
     <file preprocess="xml-stripblanks" alias="scalable/actions/peertube-symbolic.svg">../icons/third-party/peertube-symbolic.svg</file>
     <file preprocess="xml-stripblanks" alias="scalable/actions/youtube-symbolic.svg">../icons/third-party/youtube-symbolic.svg</file>
   </gresource>
-  <gresource prefix="/de/schmidhuberj/tubefeeder/">
+  <gresource prefix="/io/github/y_essine/Kinora/">
     <file compressed="true">style.css</file>
 
     <file preprocess="xml-stripblanks">@app-id@.metainfo.xml</file>

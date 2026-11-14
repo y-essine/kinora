@@ -150,7 +150,7 @@ mod imp {
         #[property(name = "downloaded", type = bool, get = |d: &Self| d.downloaded_path.borrow().is_some())]
         downloaded_path: RefCell<Option<String>>,
 
-        // Pipeline Home: settable, so a video first seen without its channel
+        // Kinora: settable, so a video first seen without its channel
         // ("Up next") can take the real one once it is known.
         #[property(get, set)]
         uploader: RefCell<Channel>,

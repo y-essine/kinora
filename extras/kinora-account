@@ -1,14 +1,14 @@
 #!/usr/bin/python3
 """Find and export the YouTube login of a browser profile.
 
-Pipeline Home runs this to use your YouTube account (the "account-cookies-command"
+Kinora runs this to use your YouTube account (the "account-cookies-command"
 setting). It prints the path of a private Netscape cookies.txt.
 
-  yt-account-cookies --list                                # signed-in profiles, as JSON
-  yt-account-cookies --browser chromium --profile "Profile 3"
-  yt-account-cookies --browser firefox --profile abcd1234.default-release
-  yt-account-cookies --file ~/Downloads/cookies.txt        # use an exported file
-  yt-account-cookies "Profile 3"                           # old form: a Chromium profile
+  kinora-account --list                                # signed-in profiles, as JSON
+  kinora-account --browser chromium --profile "Profile 3"
+  kinora-account --browser firefox --profile abcd1234.default-release
+  kinora-account --file ~/Downloads/cookies.txt        # use an exported file
+  kinora-account "Profile 3"                           # old form: a Chromium profile
 
 --list never decrypts anything: it only checks whether a profile holds YouTube's
 login cookie. Chromium-family browsers keep their cookie key in the GNOME
@@ -27,7 +27,7 @@ import tempfile
 
 HOME = os.path.expanduser("~")
 CONFIG = os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
-CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")), "pipeline-home")
+CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")), "kinora")
 
 # id: (display name, yt-dlp browser name, user data dir, keyring application attribute)
 CHROMIUM_FAMILY = {
@@ -101,7 +101,7 @@ def out_path(*parts):
 
 def save(jar, out):
     if not any(c.name == "LOGIN_INFO" and "youtube.com" in c.domain for c in jar):
-        sys.exit("yt-account-cookies: this profile is not signed in to YouTube")
+        sys.exit("kinora-account: this profile is not signed in to YouTube")
     OUT = out
     os.makedirs(os.path.dirname(OUT), mode=0o700, exist_ok=True)
     old = os.umask(0o077)
@@ -120,7 +120,7 @@ def export(browser, profile):
         _, ytdlp_name, _ = FIREFOX_FAMILY[browser]
         return save(cookies.extract_cookies_from_browser(ytdlp_name, profile), out_path(browser, profile))
     if browser not in CHROMIUM_FAMILY:
-        sys.exit(f"yt-account-cookies: unknown browser {browser!r}")
+        sys.exit(f"kinora-account: unknown browser {browser!r}")
     _, ytdlp_name, _, app = CHROMIUM_FAMILY[browser]
     original = cookies._get_gnome_keyring_password
 
@@ -149,7 +149,7 @@ def use_file(path):
     try:
         jar.load(os.path.expanduser(path), ignore_discard=True, ignore_expires=True)
     except (OSError, ValueError) as e:
-        sys.exit(f"yt-account-cookies: can't read {path}: {e}")
+        sys.exit(f"kinora-account: can't read {path}: {e}")
     save(jar, out_path("file", path))
 
 
@@ -169,7 +169,7 @@ def main():
     elif a.browser:
         export(a.browser, a.profile or "Default")
     else:
-        export("chromium", a.legacy_profile or os.environ.get("PIPELINE_HOME_CHROMIUM_PROFILE", "Default"))
+        export("chromium", a.legacy_profile or os.environ.get("KINORA_CHROMIUM_PROFILE", "Default"))
 
 
 if __name__ == "__main__":

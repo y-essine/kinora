@@ -1,9 +1,9 @@
 # fd -t f -e blp . data/
 # fd -t f -e rs . src/
 
-data/de.schmidhuberj.tubefeeder.desktop.in.in
-data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in
-data/de.schmidhuberj.tubefeeder.gschema.xml
+data/io.github.y_essine.Kinora.desktop.in.in
+data/io.github.y_essine.Kinora.metainfo.xml.in.in
+data/io.github.y_essine.Kinora.gschema.xml
 
 data/resources/ui/bottom_bar.blp
 data/resources/ui/channel_item.blp

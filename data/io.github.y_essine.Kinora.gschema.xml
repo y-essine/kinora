@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <schemalist>
-  <schema path="/de/schmidhuberj/tubefeeder/" id="de.schmidhuberj.tubefeeder" gettext-domain="tubefeeder">
+  <schema path="/io/github/y_essine/Kinora/" id="io.github.y_essine.Kinora" gettext-domain="kinora">
     <key name="window-width" type="i">
       <default>1230</default>
       <summary>Window width</summary>
@@ -135,7 +135,7 @@
       <default>1600000</default>
       <summary>Stores initial adaptive streaming bitrate to apply on startup</summary>
     </key>
-    <!-- Pipeline Home -->
+    <!-- Kinora -->
     <key name="account-cookies-command" type="s">
       <default>''</default>
       <summary>Command that prints the path to a Netscape cookies.txt of the YouTube account used for Home, Up next and watch history. Empty (the default) means no account: fully anonymous.</summary>

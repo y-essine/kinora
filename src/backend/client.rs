@@ -49,14 +49,14 @@ impl Client {
         self.imp().reqwest_client.borrow_mut().replace(client);
 
         let mut sqlite_path = glib::user_data_dir();
-        sqlite_path.push("tubefeeder");
+        sqlite_path.push(crate::migrate::DIR);
         sqlite_path.push("data.sqlite");
         let store = Store::new(sqlite_path)?;
         self.imp().store.borrow_mut().replace(store);
         self.load_data()?;
 
         let mut cache_path = glib::user_cache_dir();
-        cache_path.push("tubefeeder");
+        cache_path.push(crate::migrate::DIR);
         let cache = Cache::new(cache_path);
         self.imp().cache.borrow_mut().replace(cache);
 
@@ -111,13 +111,14 @@ impl Client {
                 }
             ),
         );
-        // Pipeline Home: follow the YouTube account being connected or disconnected.
+        // Kinora: follow the YouTube account being connected or disconnected.
         let update_account = clone!(
             #[weak(rename_to = s)]
             self,
             move |settings: &gdk::gio::Settings, _: &str| {
                 let connected = !settings.string("account-cookies-command").trim().is_empty();
                 let changed = connected != s.has_account();
+                s.set_account_label(account_label(settings));
                 s.set_has_account(connected);
                 if changed || connected {
                     s.home_store().clear();
@@ -128,8 +129,17 @@ impl Client {
                 }
             }
         );
+        self.set_account_label(account_label(settings));
         self.set_has_account(!settings.string("account-cookies-command").trim().is_empty());
         settings.connect_changed(Some("account-cookies-command"), update_account);
+        settings.connect_changed(
+            Some("account-label"),
+            clone!(
+                #[weak(rename_to = s)]
+                self,
+                move |settings, _| s.set_account_label(account_label(settings))
+            ),
+        );
 
         settings
             .bind("only-videos-yesterday", &self.filter_store(), "hide-today")
@@ -315,7 +325,7 @@ impl Client {
             );
 
             let mut rustypipe_path = glib::user_data_dir();
-            rustypipe_path.push("tubefeeder");
+            rustypipe_path.push(crate::migrate::DIR);
             rustypipe_path.push("rustypipe");
             // TODO: Error
             let _ = std::fs::create_dir_all(&rustypipe_path);
@@ -536,7 +546,7 @@ impl Client {
 
                 cached.update(video);
 
-                // Pipeline Home: "Up next" videos can arrive without their channel.
+                // Kinora: "Up next" videos can arrive without their channel.
                 if !new_uploader.id.id.is_empty() && cached.uploader().id() != new_uploader.id {
                     cached.set_uploader(self.construct_channel(new_uploader));
                 }
@@ -643,7 +653,7 @@ impl Client {
         Ok(())
     }
 
-    // ---- Pipeline Home: the signed-in YouTube account ----
+    // ---- Kinora: the signed-in YouTube account ----
 
     fn account_cookies_command(&self) -> String {
         self.imp()
@@ -730,7 +740,7 @@ impl Client {
         }
         let command = self.account_cookies_command();
         let mut storage_dir = glib::user_cache_dir();
-        storage_dir.push("tubefeeder");
+        storage_dir.push(crate::migrate::DIR);
         storage_dir.push("account");
         let id = video.id().id;
 
@@ -1059,7 +1069,7 @@ mod imp {
         #[property(get, set)]
         pub(super) filter_store: RefCell<FilterStore>,
 
-        // Pipeline Home
+        // Kinora
         #[property(get, set)]
         pub(super) home_store: RefCell<FiniteVideoStore>,
         #[property(get, set)]
@@ -1068,6 +1078,8 @@ mod imp {
         pub(super) home_error: RefCell<String>,
         #[property(get, set)]
         pub(super) has_account: Cell<bool>,
+        #[property(get, set)]
+        pub(super) account_label: RefCell<String>,
 
         pub(super) setup_finished_watch_channel: tokio::sync::watch::Sender<bool>,
 
@@ -1094,6 +1106,7 @@ mod imp {
                 home_loading: Default::default(),
                 home_error: Default::default(),
                 has_account: Default::default(),
+                account_label: Default::default(),
                 watched_store: RefCell::new(FiniteVideoStore::with_sort(
                     crate::backend::finite_video_store::VideoSort::WatchedDescending,
                 )),
@@ -1111,4 +1124,14 @@ mod imp {
 
     #[glib::derived_properties]
     impl ObjectImpl for Client {}
+}
+
+/// Kinora: how the connected YouTube account is shown.
+fn account_label(settings: &gdk::gio::Settings) -> String {
+    let label = settings.string("account-label");
+    if label.is_empty() {
+        gettextrs::gettext("YouTube account")
+    } else {
+        label.to_string()
+    }
 }
