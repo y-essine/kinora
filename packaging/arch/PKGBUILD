@@ -1,7 +1,7 @@
 # Maintainer: y-essine
 # Based on the AUR pipeline-gtk PKGBUILD by Mark Wagie and contributors.
 pkgname=kinora
-pkgver=0.1.0beta.3
+pkgver=0.1.0beta.4
 pkgrel=1
 pkgdesc="Watch YouTube and PeerTube your way: fully anonymous, lightweight, or with your account"
 arch=('x86_64' 'aarch64')
