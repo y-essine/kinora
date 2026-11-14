@@ -13,6 +13,11 @@
   <translation type="gettext">@gettext-package@</translation>
 
   <releases>
+    <release version="0.1.0-beta.3" date="2026-11-14" type="development">
+      <description translate="no">
+        <p>Faster and more complete Home and playback.</p> <ul> <li>Home loads straight from YouTube in about two seconds, with topic chips and more videos as you scroll.</li> <li>The next video is prepared in the background, so Up next and autoplay start in about a second.</li> <li>A thumbnail and spinner while a video starts, a collapsed description, and video pages that open at the top.</li> <li>Search can be limited to YouTube or PeerTube, and dates read like "4 years ago".</li> <li>Import your subscriptions from the connected YouTube account in one click.</li> </ul>
+      </description>
+    </release>
     <release version="0.1.0-beta.2" date="2026-11-14" type="development">
       <description translate="no">
         <p>First Kinora release, based on Pipeline 4.1.1.</p> <ul> <li>Optional YouTube account: Home feed, personal Up next, watch history on the account.</li> <li>Autoplay of the next video.</li> <li>Window fullscreen next to screen fullscreen.</li> <li>The player scrolls with the video page.</li> </ul>

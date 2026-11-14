@@ -337,9 +337,17 @@ fn parse_home(json: &Value) -> HomePage {
     page
 }
 
+/// Home chips whose feeds hold only playlists (Mixes), which Home skips.
+const PLAYLIST_ONLY_CHIPS: &[&str] = &["Mixes", "Playlists"];
+
 fn parse_chip(chip: &Value) -> Option<HomeChip> {
     let chip = chip.get("chipCloudChipRenderer")?;
     let title = text_of(&chip["text"])?;
+    // Kinora shows plain videos only; these chips lead to playlists alone.
+    // (Requests ask for English, so the titles are stable.)
+    if PLAYLIST_ONLY_CHIPS.contains(&title.as_str()) {
+        return None;
+    }
     let token = chip["navigationEndpoint"]["continuationCommand"]["token"]
         .as_str()
         .map(str::to_owned);
@@ -956,6 +964,22 @@ mod tests {
         assert_eq!(v.uploader.id.id, "UC9");
         assert_eq!(v.duration, Some(TimeDelta::seconds(768)));
         assert_eq!(v.views, Some(1234));
+    }
+
+    #[test]
+    fn playlist_only_chips_are_skipped() {
+        let chip = |t: &str| {
+            json!({ "chipCloudChipRenderer": {
+                "text": { "runs": [{ "text": t }] },
+                "navigationEndpoint": { "continuationCommand": { "token": "tok" } }
+            }})
+        };
+        assert!(parse_chip(&chip("Mixes")).is_none());
+        assert!(parse_chip(&chip("Playlists")).is_none());
+        assert_eq!(
+            parse_chip(&chip("Music")).map(|c| c.title),
+            Some("Music".to_owned())
+        );
     }
 
     #[test]
