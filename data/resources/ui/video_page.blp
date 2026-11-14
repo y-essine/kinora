@@ -148,101 +148,145 @@ template $TFVideoPage: Adw.Bin {
       orientation: vertical;
       valign: fill;
       vexpand: true;
-      // The player for playing internally.
-      ClapperGtk.Video clapper {
-        focusable: true;
-        auto-inhibit: true;
-        visible: bind template.external inverted;
-        valign: fill;
-        vexpand: bind template.fullscreened;
+      // Kinora: the stage. Behind the player, the video's own colours as a
+      // soft light (its thumbnail, blurred once: see Utility::ambient_texture).
+      Overlay stage {
+        styles [
+          "k-stage",
+        ]
 
-        // Kinora: while the video starts, its thumbnail and a spinner instead
-        // of a black player.
+        Picture {
+          styles [
+            "k-glow",
+            "k-stage-glow",
+          ]
+
+          content-fit: fill;
+          can-shrink: true;
+          accessible-role: presentation;
+          visible: bind template.fullscreened inverted;
+          paintable: bind $pixbuf_to_ambient(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+        }
+
         [overlay]
-        Overlay {
-          visible: bind template.loading;
+        Box {
+          styles [
+            "k-stage-scrim",
+          ]
+
           can-target: false;
+          visible: bind template.fullscreened inverted;
+        }
 
-          [overlay]
-          Adw.Spinner {
-            width-request: 48;
-            height-request: 48;
-            halign: center;
-            valign: center;
+        // Sized in `setup`: 16:9, as large as the window allows.
+        [overlay]
+        Adw.Clamp stage_clamp {
+          Box player_frame {
+            styles [
+              "k-player",
+            ]
+
+            orientation: vertical;
+            overflow: hidden;
+
+                // The player for playing internally.
+                ClapperGtk.Video clapper {
+                  focusable: true;
+                  auto-inhibit: true;
+                  visible: bind template.external inverted;
+                  valign: fill;
+                  vexpand: bind template.fullscreened;
+
+                  // Kinora: while the video starts, its thumbnail and a spinner instead
+                  // of a black player.
+                  [overlay]
+                  Overlay {
+                    visible: bind template.loading;
+                    can-target: false;
+
+                    [overlay]
+                    Adw.Spinner {
+                      width-request: 48;
+                      height-request: 48;
+                      halign: center;
+                      valign: center;
+                    }
+
+                    Picture {
+                      content-fit: contain;
+                      opacity: 0.6;
+                      paintable: bind $pixbuf_to_paintable(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+                    }
+                  }
+
+                  [fading-overlay]
+                  ClapperGtk.TitleHeader {
+                    valign: start;
+                    visible: bind template.fullscreened;
+                  }
+
+                  [fading-overlay]
+                  ClapperGtk.SimpleControls {
+                    valign: end;
+                  }
+
+                  // Kinora: fill the window (not the screen) with the video.
+                  [fading-overlay]
+                  Gtk.Button {
+                    halign: end;
+                    valign: start;
+                    margin-top: 8;
+                    margin-end: 8;
+                    icon-name: bind $window_fullscreen_icon(template.fullscreened, template.window-mode) as <string>;
+                    tooltip-text: bind $window_fullscreen_tooltip(template.fullscreened, template.window-mode) as <string>;
+                    clicked => $toggle_window_fullscreen() swapped;
+
+                    styles [
+                      "osd",
+                      "circular",
+                    ]
+                  }
+
+                  [overlay]
+                  ClapperGtk.Billboard billboard {}
+
+                  toggle-fullscreen => $toggle_fullscreen() swapped;
+                }
+
+                // The image for playing externally
+                Overlay {
+                  visible: bind template.external;
+                  valign: start;
+                  vexpand: false;
+
+                  [overlay]
+                  Label {
+                    styles [
+                      "osd",
+                      "title-1",
+                    ]
+
+                    label: _("Video is Playing Externally");
+                    valign: fill;
+                    halign: fill;
+                  }
+
+                  [overlay]
+                  Button {
+                    valign: fill;
+                    halign: fill;
+                    clicked => $play_external() swapped;
+                  }
+
+                  Picture thumbnail {
+                    halign: fill;
+                    valign: start;
+                    hexpand: true;
+                    vexpand: true;
+                    paintable: bind $pixbuf_to_paintable(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+                  }
+                }
           }
-
-          Picture {
-            content-fit: contain;
-            opacity: 0.6;
-            paintable: bind $pixbuf_to_paintable(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
-          }
-        }
-
-        [fading-overlay]
-        ClapperGtk.TitleHeader {
-          valign: start;
-          visible: bind template.fullscreened;
-        }
-
-        [fading-overlay]
-        ClapperGtk.SimpleControls {
-          valign: end;
-        }
-
-        // Kinora: fill the window (not the screen) with the video.
-        [fading-overlay]
-        Gtk.Button {
-          halign: end;
-          valign: start;
-          margin-top: 8;
-          margin-end: 8;
-          icon-name: bind $window_fullscreen_icon(template.fullscreened, template.window-mode) as <string>;
-          tooltip-text: bind $window_fullscreen_tooltip(template.fullscreened, template.window-mode) as <string>;
-          clicked => $toggle_window_fullscreen() swapped;
-
-          styles [
-            "osd",
-            "circular",
-          ]
-        }
-
-        [overlay]
-        ClapperGtk.Billboard billboard {}
-
-        toggle-fullscreen => $toggle_fullscreen() swapped;
-      }
-
-      // The image for playing externally
-      Overlay {
-        visible: bind template.external;
-        valign: start;
-        vexpand: false;
-
-        [overlay]
-        Label {
-          styles [
-            "osd",
-            "title-1",
-          ]
-
-          label: _("Video is Playing Externally");
-          valign: fill;
-          halign: fill;
-        }
-
-        [overlay]
-        Button {
-          valign: fill;
-          halign: fill;
-          clicked => $play_external() swapped;
-        }
-
-        Picture thumbnail {
-          halign: fill;
-          valign: start;
-          hexpand: true;
-          vexpand: true;
-          paintable: bind $pixbuf_to_paintable(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
         }
       }
 
@@ -250,20 +294,27 @@ template $TFVideoPage: Adw.Bin {
         orientation: vertical;
         visible: bind template.fullscreened inverted;
 
-        Adw.Clamp {
+        Adw.Clamp body_clamp {
+          styles [
+            "k-video-body",
+          ]
+
           maximum-size: 850;
-          margin-top: 18;
-          margin-bottom: 12;
-          margin-start: 6;
-          margin-end: 6;
+
+          Box body {
+            orientation: vertical;
+            spacing: 24;
 
           Box {
             orientation: vertical;
             spacing: 12;
+            hexpand: true;
+            valign: start;
 
             Label label_title {
               styles [
-                "title-1",
+                "k-display",
+                "k-video-title",
               ]
 
               label: bind template.video as <$TFVideo>.title;
@@ -432,7 +483,7 @@ template $TFVideoPage: Adw.Bin {
               spacing: 5;
 
               styles [
-                "card",
+                "k-panel",
                 "video-description",
               ]
 
@@ -551,49 +602,64 @@ template $TFVideoPage: Adw.Bin {
               }
             }
 
-            // Kinora: YouTube's "Up next", personalised by the account.
-            Gtk.Box up_next_box {
-              orientation: vertical;
-              spacing: 6;
-              visible: false;
+          }
 
-              Gtk.Box {
-                spacing: 8;
-                margin-top: 6;
+            // Kinora: YouTube's "Up next", personalised by the account. Below
+            // the details, or a column beside them in wide windows.
+            // (The clamp gives the column its fixed width.)
+            Adw.Clamp up_next_clamp {
+              maximum-size: 10000;
+              tightening-threshold: 10000;
+              valign: start;
 
-                Label {
-                  label: _("Up next");
-                  halign: start;
-                  hexpand: true;
-
-                  styles [
-                    "title-4",
-                  ]
-                }
-
-                Label {
-                  label: _("Autoplay");
-
-                  styles [
-                    "dim-label",
-                  ]
-                }
-
-                Switch autoplay_switch {
-                  valign: center;
-                  tooltip-text: _("Play the first Up next video when this one ends");
-                }
-              }
-
-              // A plain list, laid out in full inside the page's scrolling.
-              Gtk.ListBox up_next_list {
-                selection-mode: none;
-                activate-on-single-click: true;
-                row-activated => $up_next_row_activated() swapped;
-
+              Gtk.Box up_next_box {
                 styles [
-                  "background",
+                  "k-upnext",
                 ]
+
+                orientation: vertical;
+                spacing: 6;
+                visible: false;
+                valign: start;
+
+                Gtk.Box {
+                  spacing: 8;
+
+                  Label {
+                    label: _("Up next");
+                    accessible-role: heading;
+                    halign: start;
+                    hexpand: true;
+
+                    styles [
+                      "k-row-title",
+                    ]
+                  }
+
+                  Label {
+                    label: _("Autoplay");
+
+                    styles [
+                      "dim-label",
+                    ]
+                  }
+
+                  Switch autoplay_switch {
+                    valign: center;
+                    tooltip-text: _("Play the first Up next video when this one ends");
+                  }
+                }
+
+                // A plain list, laid out in full inside the page's scrolling.
+                Gtk.ListBox up_next_list {
+                  selection-mode: none;
+                  activate-on-single-click: true;
+                  row-activated => $up_next_row_activated() swapped;
+
+                  styles [
+                    "k-upnext-list",
+                  ]
+                }
               }
             }
           }

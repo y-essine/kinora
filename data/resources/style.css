@@ -514,6 +514,101 @@ button.k-glass:hover {
   font-size: 24px;
 }
 
+/* --- Video page: the stage --------------------------------------------------
+   The player sits on a soft light in the video's own colours. The light is
+   one tiny pre-blurred image stretched by the GPU: it costs nothing to show. */
+.k-stage-glow {
+  opacity: 0.95;
+}
+
+/* The light is strongest around and below the player, and gone at the edges
+   of the page. */
+.k-stage-scrim {
+  background-image:
+    linear-gradient(to bottom, var(--k-bg), rgba(11, 12, 15, 0)),
+    linear-gradient(to top, var(--k-bg), rgba(11, 12, 15, 0)),
+    linear-gradient(to right, var(--k-bg) 0%, rgba(11, 12, 15, 0) 10%, rgba(11, 12, 15, 0) 90%, var(--k-bg) 100%);
+  background-size: 100% 28px, 100% 120px, 100% 100%;
+  background-position: top, bottom, center;
+  background-repeat: no-repeat;
+}
+
+.k-stage > clamp {
+  margin: 20px 24px 76px;
+}
+
+.k-player {
+  border-radius: var(--k-radius-l);
+  background-color: #000000;
+  box-shadow: var(--k-shadow-2);
+}
+
+/* Narrow windows: the player runs edge to edge, the light spills below it. */
+.k-stage.edge > clamp {
+  margin: 0 0 68px;
+}
+
+.k-stage.edge .k-player {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.k-stage.fullscreen > clamp {
+  margin: 0;
+}
+
+.k-stage.fullscreen .k-player {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Player controls: a quiet glass bar that fades away with the pointer
+   (Clapper hides it; here it only gets Kinora's look). */
+.k-player clapper-gtk-simple-controls .mainbox,
+.k-player clapper-gtk-simple-controls .fullscreenbutton,
+.k-player clapper-gtk-title-header {
+  background-color: rgba(11, 12, 15, 0.66);
+  color: #ffffff;
+}
+
+.k-player clapper-gtk-simple-controls .mainbox {
+  border-radius: var(--k-radius-m);
+}
+
+/* The title rises a little into the light. */
+.k-video-body {
+  margin: -56px var(--k-gutter) var(--k-space-7);
+}
+
+.k-video-title {
+  font-size: 26px;
+}
+
+.k-panel {
+  border-radius: var(--k-radius-l);
+  background-color: var(--k-surface-1);
+}
+
+/* Up next: the same cards, as a list. */
+.k-upnext-list {
+  background: none;
+}
+
+.k-upnext-list > row {
+  padding: 8px;
+  border-radius: var(--k-radius-l);
+  transition: background-color var(--k-dur-fast) var(--k-ease);
+}
+
+.k-upnext-list > row:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.k-upnext-list > row:focus-visible {
+  outline: 2px solid var(--k-accent);
+  outline-offset: -2px;
+}
+
 /* --- Lite: effects off (the reduce-effects setting) ------------------------- */
 window.reduce-effects * {
   transition: none;
