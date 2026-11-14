@@ -1,0 +1,29 @@
+[package]
+name = "kinora-core"
+description = "Kinora's brain without a face: YouTube Home, Up next, the account, playback preparation and extensions, with no GUI toolkit"
+version = "0.1.0-beta.3"
+authors = ["y-essine"]
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+# No gtk, gdk, glib or adw here: frontends (the GTK app today) depend on this
+# crate, never the other way round. See docs/architecture.md.
+[dependencies]
+pcore = { workspace = true }
+# Signed-in Up next recommendations and the account's subscriptions (userdata).
+rustypipe = { workspace = true }
+
+tokio = { version = "1.48.0", features = ["fs", "process", "rt", "sync", "time"] }
+futures = "0.3.31"
+chrono = { version = "0.4.42" }
+reqwest = { version = "0.12.26", features = ["gzip"] } # gzip for the 1 MB Home response
+url = { version = "2.5", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4.29"
+# The SAPISIDHASH header of the direct Home feed request.
+sha1 = "0.10"
+
+[dev-dependencies]
+tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread"] }

@@ -1,35 +1,25 @@
-//! Kinora: the signed-in YouTube account behind the Home page, the
-//! "Up next" list and YouTube watch history.
+//! Kinora: the account's YouTube Home page, with its filter chips.
 //!
-//! The account's cookies come from a user-configured command (the
-//! `account-cookies-command` setting) that prints the path to a Netscape
-//! cookies.txt. The account is only used for reading recommendations and for
-//! marking videos as watched; playback stays anonymous, because YouTube
-//! refuses signed-in stream requests that lack an extra anti-bot token.
-//!
-//! The Home page is read straight from YouTube's InnerTube API (one request,
-//! about a second); yt-dlp is the fallback when that fails.
+//! Read straight from YouTube's InnerTube API (one request, about a second);
+//! yt-dlp is the fallback when that fails.
 
-use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::path::Path;
+use std::time::Duration;
 
 use chrono::TimeDelta;
-use pcore::{Channel, ChannelId, Video, VideoId};
-use rustypipe::client::RustyPipe;
+use pcore::{Channel, Video, VideoId};
 use serde_json::{Value, json};
 use sha1::{Digest, Sha1};
 use tokio::process::Command;
-use tokio::sync::{Mutex, OnceCell};
+use tokio::sync::OnceCell;
 use url::Url;
 
-pub type Error = Box<dyn std::error::Error + Send + Sync>;
+use crate::Error;
+use crate::youtube::{PLATFORM, channel, last_line, watch_url};
 
-const PLATFORM: &str = "youtube";
 const HOME_URL: &str = "https://www.youtube.com/feed/recommended";
 /// How many videos the Home page asks for.
 const HOME_SIZE: u32 = 60;
-/// Reuse the cookies file this long before asking the command for a fresh one.
-const COOKIES_TTL: Duration = Duration::from_secs(10 * 60);
 
 const YOUTUBE_ORIGIN: &str = "https://www.youtube.com";
 const BROWSE_URL: &str = "https://www.youtube.com/youtubei/v1/browse?prettyPrint=false";
@@ -40,112 +30,33 @@ const WEB_USER_AGENT: &str =
 /// How many continuation requests Home makes to get past pages without plain videos.
 const HOME_EMPTY_PAGE_RETRIES: usize = 2;
 
-/// Path to the account's cookies.txt, or `None` if no account is set up.
-pub async fn cookies_file(command: &str) -> Result<Option<PathBuf>, Error> {
-    let command = command.trim();
-    if command.is_empty() {
-        return Ok(None);
+/// The first page of Home: the plain home page, or a chip's feed when
+/// `chip_token` is given. The plain page falls back to yt-dlp (slower) when the
+/// direct request fails or comes back without videos.
+pub async fn load(cookies: &Path, chip_token: Option<&str>) -> Result<HomePage, Error> {
+    if let Some(token) = chip_token {
+        return continuation(cookies, token).await;
     }
-
-    static CACHE: Mutex<Option<(String, Instant, PathBuf)>> = Mutex::const_new(None);
-    let mut cache = CACHE.lock().await;
-    if let Some((cmd, at, path)) = cache.as_ref() {
-        if cmd == command && at.elapsed() < COOKIES_TTL && path.exists() {
-            return Ok(Some(path.clone()));
+    match first_page(cookies).await {
+        Ok(page) if !page.videos.is_empty() => Ok(page),
+        // The direct request failed or came back empty: ask yt-dlp (slower).
+        direct => {
+            match direct {
+                Ok(_) => log::warn!("Home: YouTube sent no videos, trying yt-dlp"),
+                Err(e) => log::warn!("Home: direct request failed, trying yt-dlp: {e}"),
+            }
+            ytdlp_feed(cookies).await.map(|videos| HomePage {
+                videos,
+                ..Default::default()
+            })
         }
     }
-
-    let out = Command::new("sh").arg("-c").arg(command).output().await?;
-    if !out.status.success() {
-        return Err(format!(
-            "The account cookies command failed: {}",
-            last_line(&out.stderr)
-                .unwrap_or_else(|| format!("`{command}` exited with {}", out.status))
-        )
-        .into());
-    }
-    let path = last_line(&out.stdout)
-        .map(PathBuf::from)
-        .ok_or_else(|| format!("`{command}` printed no cookies file path"))?;
-    if !path.exists() {
-        return Err(format!("The account cookies file {} does not exist", path.display()).into());
-    }
-
-    *cache = Some((command.to_owned(), Instant::now(), path.clone()));
-    Ok(Some(path))
-}
-
-/// A browser profile that is signed in to YouTube, as found by
-/// `kinora-account --list`.
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct BrowserProfile {
-    /// Browser id understood by `kinora-account --browser`.
-    pub browser: String,
-    /// Human name of the browser, e.g. "Chromium".
-    pub browser_name: String,
-    /// Profile folder (Chromium family) or path (Firefox family).
-    pub profile: String,
-    /// The profile's own name, as shown in the browser.
-    pub name: String,
-}
-
-impl BrowserProfile {
-    /// The `account-cookies-command` that signs in through this profile.
-    pub fn command(&self) -> String {
-        format!(
-            "kinora-account --browser {} --profile {}",
-            shell_quote(&self.browser),
-            shell_quote(&self.profile)
-        )
-    }
-
-    /// How the account is shown once connected.
-    pub fn label(&self) -> String {
-        format!("{} · {}", self.name, self.browser_name)
-    }
-}
-
-/// Browser profiles signed in to YouTube.
-pub async fn browser_profiles() -> Result<Vec<BrowserProfile>, Error> {
-    let out = Command::new("kinora-account")
-        .arg("--list")
-        .output()
-        .await
-        .map_err(|e| {
-            format!("Could not run kinora-account ({e}). Is Kinora installed completely?")
-        })?;
-    if !out.status.success() {
-        return Err(last_line(&out.stderr)
-            .unwrap_or_else(|| "kinora-account --list failed".to_owned())
-            .into());
-    }
-    Ok(serde_json::from_slice(&out.stdout)?)
-}
-
-/// The `account-cookies-command` for an exported cookies.txt file.
-pub fn file_command(path: &Path) -> String {
-    format!(
-        "kinora-account --file {}",
-        shell_quote(&path.to_string_lossy())
-    )
-}
-
-/// Run a cookies command once to check that it really yields a YouTube login.
-pub async fn test_command(command: &str) -> Result<(), Error> {
-    cookies_file(command)
-        .await?
-        .map(|_| ())
-        .ok_or_else(|| "No command given".into())
-}
-
-fn shell_quote(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "'\\''"))
 }
 
 /// The account's YouTube home page through yt-dlp, in YouTube's order: the slow
-/// fallback for `home_page`. Upload dates and view counts are not part of the
+/// fallback for `first_page`. Upload dates and view counts are not part of the
 /// listing; fill them in with the regular video information lookup.
-pub async fn home_feed(cookies: &Path) -> Result<Vec<Video>, Error> {
+pub async fn ytdlp_feed(cookies: &Path) -> Result<Vec<Video>, Error> {
     let out = Command::new("yt-dlp")
         .arg("--cookies")
         .arg(cookies)
@@ -186,7 +97,7 @@ pub struct HomePage {
 /// The account's YouTube home page, in YouTube's order, straight from the
 /// InnerTube API. Upload dates are not part of it; fill them in with the
 /// regular video information lookup.
-pub async fn home_page(cookies: &Path) -> Result<HomePage, Error> {
+pub async fn first_page(cookies: &Path) -> Result<HomePage, Error> {
     let json = browse(cookies, json!({ "browseId": "FEwhat_to_watch" })).await?;
     let mut page = parse_home(&json);
     if page.videos.is_empty() && page.chips.is_empty() {
@@ -197,7 +108,7 @@ pub async fn home_page(cookies: &Path) -> Result<HomePage, Error> {
 }
 
 /// A later page of the Home feed, or a chip's feed, from a continuation token.
-pub async fn home_continuation(cookies: &Path, token: &str) -> Result<HomePage, Error> {
+pub async fn continuation(cookies: &Path, token: &str) -> Result<HomePage, Error> {
     let json = browse(cookies, json!({ "continuation": token })).await?;
     let mut page = parse_continuation(&json);
     skip_empty_pages(cookies, &mut page).await;
@@ -337,17 +248,9 @@ fn parse_home(json: &Value) -> HomePage {
     page
 }
 
-/// Home chips whose feeds hold only playlists (Mixes), which Home skips.
-const PLAYLIST_ONLY_CHIPS: &[&str] = &["Mixes", "Playlists"];
-
 fn parse_chip(chip: &Value) -> Option<HomeChip> {
     let chip = chip.get("chipCloudChipRenderer")?;
     let title = text_of(&chip["text"])?;
-    // Kinora shows plain videos only; these chips lead to playlists alone.
-    // (Requests ask for English, so the titles are stable.)
-    if PLAYLIST_ONLY_CHIPS.contains(&title.as_str()) {
-        return None;
-    }
     let token = chip["navigationEndpoint"]["continuationCommand"]["token"]
         .as_str()
         .map(str::to_owned);
@@ -622,118 +525,6 @@ fn parse_count(text: &str) -> Option<u64> {
     Some((number * scale).round() as u64)
 }
 
-/// YouTube's "Up next" for a video: personalised when an account is set up,
-/// otherwise the anonymous related videos.
-pub async fn up_next(
-    storage_dir: PathBuf,
-    cookies: Option<PathBuf>,
-    video_id: String,
-) -> Result<Vec<Video>, Error> {
-    let rp = rusty_pipe(storage_dir).await?;
-
-    let mut signed_in = false;
-    if let Some(path) = cookies {
-        match sign_in(&rp, &path).await {
-            Ok(()) => signed_in = true,
-            Err(e) => log::warn!("Up next: signing in failed, falling back to anonymous: {e}"),
-        }
-    }
-
-    // One retry: a single dropped request shouldn't leave "Up next" empty.
-    let mut attempt = 0;
-    let details = loop {
-        let query = if signed_in {
-            rp.query().authenticated()
-        } else {
-            rp.query().unauthenticated()
-        };
-        match query.video_details(&video_id).await {
-            Ok(details) => break details,
-            Err(e) if attempt == 0 => {
-                log::warn!("Up next: retrying after: {e}");
-                attempt += 1;
-                tokio::time::sleep(Duration::from_secs(1)).await;
-            }
-            Err(e) => return Err(e.into()),
-        }
-    };
-    Ok(details
-        .recommended
-        .items
-        .iter()
-        .filter(|v| v.id != video_id && !v.is_short && !v.is_upcoming)
-        .filter_map(video_item_to_video)
-        .collect())
-}
-
-/// Every channel the account is subscribed to on YouTube, in YouTube's order.
-pub async fn subscriptions(storage_dir: PathBuf, cookies: PathBuf) -> Result<Vec<Channel>, Error> {
-    let rp = rusty_pipe(storage_dir).await?;
-    sign_in(&rp, &cookies)
-        .await
-        .map_err(|e| format!("Signing in to YouTube failed: {e}"))?;
-
-    let query = rp.query().authenticated();
-    let mut channels = query.subscriptions().await?;
-    channels.extend_all(&query).await?;
-
-    Ok(channels
-        .items
-        .iter()
-        .map(|c| {
-            let mut channel = channel(&c.id, &c.name);
-            channel.avatar = c.avatar.iter().rev().find_map(|t| Url::parse(&t.url).ok());
-            channel.subscribers = c.subscriber_count;
-            channel
-        })
-        .collect())
-}
-
-/// Mark a video as watched on the account, so its recommendations learn from it.
-pub async fn mark_watched(cookies: &Path, video_id: &str) -> Result<(), Error> {
-    let out = Command::new("yt-dlp")
-        .arg("--cookies")
-        .arg(cookies)
-        .args(["--mark-watched", "--simulate", "--quiet", "--no-warnings"])
-        .arg(format!("https://www.youtube.com/watch?v={video_id}"))
-        .output()
-        .await?;
-    if out.status.success() {
-        Ok(())
-    } else {
-        Err(last_line(&out.stderr)
-            .unwrap_or_else(|| "yt-dlp could not mark the video watched".to_owned())
-            .into())
-    }
-}
-
-pub(crate) async fn rusty_pipe(storage_dir: PathBuf) -> Result<RustyPipe, Error> {
-    static RP: OnceCell<RustyPipe> = OnceCell::const_new();
-    RP.get_or_try_init(|| async move {
-        std::fs::create_dir_all(&storage_dir)?;
-        Ok::<_, Error>(
-            RustyPipe::builder()
-                .storage_dir(storage_dir)
-                .no_reporter()
-                .build()?,
-        )
-    })
-    .await
-    .cloned()
-}
-
-/// Hand the account's cookies to RustyPipe, again only when they changed.
-async fn sign_in(rp: &RustyPipe, cookies: &Path) -> Result<(), Error> {
-    static CURRENT: Mutex<Option<String>> = Mutex::const_new(None);
-    let txt = tokio::fs::read_to_string(cookies).await?;
-    let mut current = CURRENT.lock().await;
-    if current.as_deref() != Some(txt.as_str()) {
-        rp.user_auth_set_cookie_txt(&txt).await?;
-        *current = Some(txt);
-    }
-    Ok(())
-}
-
 fn feed_entry_to_video(e: &serde_json::Value) -> Option<Video> {
     let id = e["id"].as_str()?;
     // Only plain videos: Mixes and playlists ("YoutubeTab") are not playable as
@@ -776,74 +567,6 @@ fn feed_entry_to_video(e: &serde_json::Value) -> Option<Video> {
         is_live: Some(e["live_status"].as_str() == Some("is_live")),
         requires_payment: Some(false),
     })
-}
-
-fn video_item_to_video(v: &rustypipe::model::VideoItem) -> Option<Video> {
-    // YouTube's newer "lockup" layout leaves the channel out of the Up next
-    // items; the caller fills it in afterwards from the video information.
-    let uploader = match v.channel.as_ref() {
-        Some(c) => {
-            let mut uploader = channel(&c.id, &c.name);
-            uploader.avatar = c.avatar.iter().rev().find_map(|t| Url::parse(&t.url).ok());
-            uploader.subscribers = c.subscriber_count;
-            uploader
-        }
-        None => channel("", ""),
-    };
-
-    Some(Video {
-        id: VideoId {
-            id: v.id.clone(),
-            platform: PLATFORM.into(),
-        },
-        playable_url: watch_url(&v.id),
-        uploader,
-        title: v.name.clone(),
-        uploaded: v
-            .publish_date
-            .and_then(|d| chrono::DateTime::from_timestamp(d.unix_timestamp(), 0))
-            .unwrap_or(chrono::DateTime::UNIX_EPOCH),
-        duration: v.duration.map(|s| TimeDelta::seconds(s as i64)),
-        thumbnail: v
-            .thumbnail
-            .iter()
-            .rev()
-            .find_map(|t| Url::parse(&t.url).ok()),
-        description: v.short_description.clone(),
-        views: v.view_count,
-        likes: None,
-        dislikes: None,
-        is_live: Some(v.is_live),
-        requires_payment: Some(false),
-    })
-}
-
-fn channel(id: &str, name: &str) -> Channel {
-    Channel {
-        id: ChannelId {
-            id: id.to_owned(),
-            platform: PLATFORM.into(),
-        },
-        name: name.to_owned(),
-        avatar: None,
-        banner: None,
-        description: None,
-        subscribers: None,
-    }
-}
-
-fn watch_url(id: &str) -> Url {
-    Url::parse_with_params("https://youtube.com/watch", &[("v", id)])
-        .expect("YouTube URL parseable with video ID")
-}
-
-fn last_line(bytes: &[u8]) -> Option<String> {
-    String::from_utf8_lossy(bytes)
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty())
-        .last()
-        .map(str::to_owned)
 }
 
 #[cfg(test)]
@@ -967,19 +690,19 @@ mod tests {
     }
 
     #[test]
-    fn playlist_only_chips_are_skipped() {
+    fn chips_are_parsed_with_their_token() {
+        // Skipping the playlist-only chips (Mixes) is the home-chips
+        // extension's job, not the parser's.
         let chip = |t: &str| {
             json!({ "chipCloudChipRenderer": {
                 "text": { "runs": [{ "text": t }] },
                 "navigationEndpoint": { "continuationCommand": { "token": "tok" } }
             }})
         };
-        assert!(parse_chip(&chip("Mixes")).is_none());
-        assert!(parse_chip(&chip("Playlists")).is_none());
-        assert_eq!(
-            parse_chip(&chip("Music")).map(|c| c.title),
-            Some("Music".to_owned())
-        );
+        let music = parse_chip(&chip("Music")).unwrap();
+        assert_eq!(music.title, "Music");
+        assert_eq!(music.token.as_deref(), Some("tok"));
+        assert!(parse_chip(&chip("Mixes")).is_some());
     }
 
     #[test]

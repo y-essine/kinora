@@ -1,4 +1,4 @@
-pub mod account;
+pub use kinora_core::account;
 mod channel;
 mod client;
 mod filter;
@@ -6,7 +6,6 @@ mod filter_store;
 mod finite_video_store;
 mod search_item;
 mod search_stream;
-mod streams;
 mod subscriptions_store;
 mod video;
 mod video_fetcher_stream;

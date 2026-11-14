@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::pin::Pin;
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
@@ -59,6 +60,9 @@ impl Client {
 
         let mut cache_path = glib::user_cache_dir();
         cache_path.push(crate::migrate::DIR);
+        // Kinora: the core keeps its files next to the thumbnail cache.
+        let core = kinora_core::Core::new(kinora_core::Paths::new(cache_path.clone()));
+        self.imp().core.borrow_mut().replace(Arc::new(core));
         let cache = Cache::new(cache_path);
         self.imp().cache.borrow_mut().replace(cache);
 
@@ -113,26 +117,33 @@ impl Client {
                 }
             ),
         );
-        // Kinora: follow the YouTube account being connected or disconnected.
-        let update_account = clone!(
-            #[weak(rename_to = s)]
-            self,
-            move |settings: &gdk::gio::Settings, _: &str| {
-                let connected = !settings.string("account-cookies-command").trim().is_empty();
-                let changed = connected != s.has_account();
-                s.set_account_label(account_label(settings));
-                s.set_has_account(connected);
-                if changed || connected {
-                    s.reset_home();
-                    if connected {
-                        gspawn!(async move { s.refresh_home().await });
+        // Kinora: the extensions that are switched off, and their settings.
+        self.load_extension_settings();
+        for key in ["disabled-extensions", "extension-settings"] {
+            settings.connect_changed(
+                Some(key),
+                clone!(
+                    #[weak(rename_to = s)]
+                    self,
+                    move |_, _| {
+                        s.load_extension_settings();
+                        // The account or the chips may have been switched on or off.
+                        s.account_changed();
                     }
-                }
-            }
-        );
+                ),
+            );
+        }
+        // Kinora: follow the YouTube account being connected or disconnected.
         self.set_account_label(account_label(settings));
-        self.set_has_account(!settings.string("account-cookies-command").trim().is_empty());
-        settings.connect_changed(Some("account-cookies-command"), update_account);
+        self.set_has_account(self.core().account_active(&self.account_config()));
+        settings.connect_changed(
+            Some("account-cookies-command"),
+            clone!(
+                #[weak(rename_to = s)]
+                self,
+                move |_, _| s.account_changed()
+            ),
+        );
         settings.connect_changed(
             Some("account-label"),
             clone!(
@@ -669,11 +680,48 @@ impl Client {
 
     // ---- Kinora: the signed-in YouTube account ----
 
-    fn account_cookies_command(&self) -> String {
-        self.imp()
-            .settings
-            .string("account-cookies-command")
-            .to_string()
+    /// The core (see `crates/kinora-core`), shared with tokio tasks. The
+    /// preferences list the extensions with `core().extensions().settings_panels()`
+    /// and switch them through the `disabled-extensions` and
+    /// `extension-settings` settings, which the Client passes on.
+    pub fn core(&self) -> Arc<kinora_core::Core> {
+        self.imp().core.borrow().clone().expect("Core to be set up")
+    }
+
+    /// Hand the extension settings from GSettings to the core.
+    fn load_extension_settings(&self) {
+        let settings = &self.imp().settings;
+        let core = self.core();
+        core.extensions()
+            .set_disabled(settings.strv("disabled-extensions"));
+        core.extensions()
+            .set_values(extension_values(&settings.value("extension-settings")));
+    }
+
+    /// The account was connected or disconnected, or its extension (or the
+    /// chips) switched on or off: update the account state and reload Home.
+    fn account_changed(&self) {
+        let connected = self.core().account_active(&self.account_config());
+        let changed = connected != self.has_account();
+        self.set_account_label(account_label(&self.imp().settings));
+        self.set_has_account(connected);
+        if changed || connected {
+            self.reset_home();
+            if connected {
+                let s = self.clone();
+                gspawn!(async move { s.refresh_home().await });
+            }
+        }
+    }
+
+    fn account_config(&self) -> kinora_core::AccountConfig {
+        kinora_core::AccountConfig::new(self.imp().settings.string("account-cookies-command"))
+    }
+
+    fn playback_config(&self) -> kinora_core::PlaybackConfig {
+        kinora_core::PlaybackConfig {
+            fast_start: self.imp().settings.boolean("fast-start"),
+        }
     }
 
     /// Forget everything Home shows, and drop loads that are still running.
@@ -689,7 +737,7 @@ impl Client {
     }
 
     /// Show the filter bar's chips; the first one ("All") is selected.
-    fn set_home_chips_list(&self, chips: &[super::account::HomeChip]) {
+    fn set_home_chips_list(&self, chips: &[kinora_core::HomeChip]) {
         let imp = self.imp();
         *imp.home_chip_tokens.borrow_mut() = chips.iter().map(|c| c.token.clone()).collect();
         self.set_home_chip_selected(0);
@@ -758,34 +806,11 @@ impl Client {
         }
         let started = std::time::Instant::now();
 
-        let command = self.account_cookies_command();
+        let (core, account) = (self.core(), self.account_config());
         let token = chip.as_ref().map(|(_, token)| token.clone());
-        let result = tspawn!(async move {
-            let cookies = super::account::cookies_file(&command).await?.ok_or(
-                "No YouTube account is set up. Set the account cookies command in the preferences.",
-            )?;
-            if let Some(token) = token {
-                return super::account::home_continuation(&cookies, &token).await;
-            }
-            match super::account::home_page(&cookies).await {
-                Ok(page) if !page.videos.is_empty() => Ok(page),
-                // The direct request failed or came back empty: ask yt-dlp (slower).
-                direct => {
-                    match direct {
-                        Ok(_) => log::warn!("Home: YouTube sent no videos, trying yt-dlp"),
-                        Err(e) => log::warn!("Home: direct request failed, trying yt-dlp: {e}"),
-                    }
-                    super::account::home_feed(&cookies).await.map(|videos| {
-                        super::account::HomePage {
-                            videos,
-                            ..Default::default()
-                        }
-                    })
-                }
-            }
-        })
-        .await
-        .expect("Failed to spawn tokio");
+        let result = tspawn!(async move { core.home(&account, token.as_deref()).await })
+            .await
+            .expect("Failed to spawn tokio");
 
         // Superseded by another load (or the account changed) meanwhile.
         if imp.home_gen.get() != generation {
@@ -848,15 +873,10 @@ impl Client {
         let generation = imp.home_gen.get();
         let started = std::time::Instant::now();
 
-        let command = self.account_cookies_command();
-        let result = tspawn!(async move {
-            let cookies = super::account::cookies_file(&command)
-                .await?
-                .ok_or("No YouTube account is set up.")?;
-            super::account::home_continuation(&cookies, &token).await
-        })
-        .await
-        .expect("Failed to spawn tokio");
+        let (core, account) = (self.core(), self.account_config());
+        let result = tspawn!(async move { core.home_more(&account, &token).await })
+            .await
+            .expect("Failed to spawn tokio");
 
         if imp.home_gen.get() != generation {
             return;
@@ -926,24 +946,30 @@ impl Client {
         }
         self.set_importing_subscriptions(true);
 
-        let command = self.account_cookies_command();
-        let mut storage_dir = glib::user_cache_dir();
-        storage_dir.push(crate::migrate::DIR);
-        storage_dir.push("account");
+        // The account extension's menu item does the YouTube part.
+        use kinora_core::extension::{ActionOutcome, MenuTarget, builtin::account};
+        let (core, config) = (self.core(), self.account_config());
         let result = tspawn!(async move {
-            let cookies = super::account::cookies_file(&command).await?.ok_or(
-                "No YouTube account is set up. Set the account cookies command in the preferences.",
-            )?;
-            super::account::subscriptions(storage_dir, cookies).await
+            core.activate(
+                &config,
+                account::ID,
+                account::IMPORT_SUBSCRIPTIONS,
+                MenuTarget::None,
+            )
+            .await
         })
         .await
         .expect("Failed to spawn tokio");
         self.set_importing_subscriptions(false);
 
-        let channels = result.map_err(|e| {
-            log::error!("Failed to load the account's subscriptions: {e}");
-            e.to_string()
-        })?;
+        let channels = match result {
+            Ok(ActionOutcome::Subscribe(channels)) => channels,
+            Ok(_) => Vec::new(),
+            Err(e) => {
+                log::error!("Failed to load the account's subscriptions: {e}");
+                return Err(e.to_string());
+            }
+        };
         let total = channels.len();
         let known: std::collections::HashSet<pcore::ChannelId> = self
             .subscriptions()
@@ -966,23 +992,11 @@ impl Client {
         if video.platform() != "youtube" {
             return Vec::new();
         }
-        let command = self.account_cookies_command();
-        let mut storage_dir = glib::user_cache_dir();
-        storage_dir.push(crate::migrate::DIR);
-        storage_dir.push("account");
-        let id = video.id().id;
-
-        let result = tspawn!(async move {
-            let cookies = super::account::cookies_file(&command)
-                .await
-                .unwrap_or_else(|e| {
-                    log::warn!("Up next: {e}");
-                    None
-                });
-            super::account::up_next(storage_dir, cookies, id).await
-        })
-        .await
-        .expect("Failed to spawn tokio");
+        let (core, account) = (self.core(), self.account_config());
+        let id = video.id();
+        let result = tspawn!(async move { core.up_next(&account, &id).await })
+            .await
+            .expect("Failed to spawn tokio");
 
         match result {
             Ok(videos) => {
@@ -1003,19 +1017,18 @@ impl Client {
     }
 
     /// Kinora: fast start. A URI Clapper can play right away for a YouTube
-    /// video (see `streams.rs`), or `None` when the caller should fall back to
+    /// video (see `kinora_core::streams`), or `None` when the caller should fall back to
     /// the yt-dlp path (setting off, other platform, or the lookup failed).
     pub async fn fast_playback_uri(&self, video: &Video) -> Option<String> {
-        if video.platform() != "youtube" || !self.imp().settings.boolean("fast-start") {
+        if video.platform() != "youtube" || !self.playback_config().fast_start {
             return None;
         }
-        let (storage_dir, cache_dir) = Self::stream_dirs();
-        let id = video.id().id;
+        let core = self.core();
+        let id = video.id();
         let started = std::time::Instant::now();
-        let result =
-            tspawn!(async move { super::streams::playback_uri(storage_dir, cache_dir, id).await })
-                .await
-                .expect("Failed to spawn tokio");
+        let result = tspawn!(async move { core.fast_playback_uri(&id).await })
+            .await
+            .expect("Failed to spawn tokio");
         match result {
             Ok(uri) => {
                 log::info!(
@@ -1038,58 +1051,34 @@ impl Client {
         if video.platform() != "youtube" {
             return;
         }
-        let (storage_dir, cache_dir) = Self::stream_dirs();
-        let id = video.id().id;
-        if self.imp().settings.boolean("fast-start") {
-            tspawn!(async move {
-                if let Err(e) =
-                    super::streams::playback_uri(storage_dir, cache_dir, id.clone()).await
-                {
-                    log::debug!("Could not prepare {id}: {e}");
+        let (core, playback) = (self.core(), self.playback_config());
+        let id = video.id();
+        tspawn!(async move {
+            if let Err(e) = core.prepare(&playback, &id).await {
+                // The fast-start lookup failing is expected while it is experimental.
+                if playback.fast_start {
+                    log::debug!("Could not prepare {}: {e}", id.id);
+                } else {
+                    log::warn!("Could not prepare {}: {e}", id.id);
                 }
-            });
-        } else {
-            tspawn!(async move {
-                if let Err(e) = super::streams::prepare_with_ytdlp(cache_dir, id.clone()).await {
-                    log::warn!("Could not prepare {id}: {e}");
-                }
-            });
-        }
+            }
+        });
     }
 
     /// Kinora: a prepared playback URI for this video (see `prepare_playback`).
     pub fn prepared_playback_uri(&self, video: &Video) -> Option<String> {
-        if video.platform() != "youtube" {
-            return None;
-        }
-        super::streams::prepared(&video.id().id)
+        self.core().prepared_uri(&video.id())
     }
 
-    fn stream_dirs() -> (PathBuf, PathBuf) {
-        let base = glib::user_cache_dir().join(crate::migrate::DIR);
-        (base.join("account"), base.join("streams"))
-    }
-
-    /// Mark a video as watched on the YouTube account (in the background).
+    /// The video has really been watched: tell the extensions (in the
+    /// background). The account extension marks it watched on YouTube.
     pub fn mark_watched_on_account(&self, video: &Video) {
         if video.platform() != "youtube" {
             return;
         }
-        let command = self.account_cookies_command();
-        let id = video.id().id;
-        tspawn!(async move {
-            let result = async {
-                if let Some(cookies) = super::account::cookies_file(&command).await? {
-                    super::account::mark_watched(&cookies, &id).await?;
-                    log::info!("Marked {id} watched on the YouTube account");
-                }
-                Ok::<_, super::account::Error>(())
-            }
-            .await;
-            if let Err(e) = result {
-                log::warn!("Could not mark {id} watched on the YouTube account: {e}");
-            }
-        });
+        let (core, account) = (self.core(), self.account_config());
+        let video = video.video();
+        tspawn!(async move { core.watched(&account, &video).await });
     }
 
     pub fn toggle_subscription(&self, channel: Channel) {
@@ -1366,6 +1355,8 @@ mod imp {
         pub(super) filter_store: RefCell<FilterStore>,
 
         // Kinora
+        /// The UI-independent core: Home, Up next, the account, playback preparation.
+        pub(super) core: RefCell<Option<Arc<kinora_core::Core>>>,
         #[property(get, set)]
         pub(super) home_store: RefCell<FiniteVideoStore>,
         #[property(get, set)]
@@ -1411,6 +1402,7 @@ mod imp {
                 watch_later_store: Default::default(),
                 downloaded_store: Default::default(),
                 filter_store: Default::default(),
+                core: Default::default(),
                 home_store: RefCell::new(FiniteVideoStore::with_sort(
                     crate::backend::finite_video_store::VideoSort::AsAdded,
                 )),
@@ -1454,6 +1446,35 @@ fn account_label(settings: &gdk::gio::Settings) -> String {
     }
 }
 
+/// Kinora: the `extension-settings` dictionary (`a{sv}`, booleans and strings)
+/// as the core's setting values. Other value types are skipped.
+fn extension_values(
+    dict: &glib::Variant,
+) -> std::collections::HashMap<String, kinora_core::extension::SettingValue> {
+    use kinora_core::extension::SettingValue;
+    let mut values = std::collections::HashMap::new();
+    if !dict.is_container() {
+        return values;
+    }
+    for entry in dict.iter() {
+        let (Some(key), Some(value)) = (
+            entry.child_value(0).str().map(str::to_owned),
+            entry.child_value(1).as_variant(),
+        ) else {
+            continue;
+        };
+        let value = if let Some(b) = value.get::<bool>() {
+            SettingValue::Bool(b)
+        } else if let Some(s) = value.str() {
+            SettingValue::Text(s.to_owned())
+        } else {
+            continue;
+        };
+        values.insert(key, value);
+    }
+    values
+}
+
 /// Kinora: whether a search stream event belongs to the given platform.
 fn search_result_on(result: &pcore::SearchStreamResult, platform: &str) -> bool {
     match result {
@@ -1472,6 +1493,22 @@ fn search_result_on(result: &pcore::SearchStreamResult, platform: &str) -> bool 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn extension_settings_dictionary_becomes_values() {
+        use glib::prelude::ToVariant;
+        use kinora_core::extension::SettingValue;
+        let dict: std::collections::HashMap<String, glib::Variant> = [
+            ("account.mark-watched".to_owned(), false.to_variant()),
+            ("dj.pick".to_owned(), "last".to_variant()),
+            ("dj.count".to_owned(), 3i32.to_variant()),
+        ]
+        .into();
+        let values = extension_values(&dict.to_variant());
+        assert_eq!(values.len(), 2);
+        assert_eq!(values["account.mark-watched"], SettingValue::Bool(false));
+        assert_eq!(values["dj.pick"], SettingValue::Text("last".into()));
+    }
 
     #[test]
     fn search_filter_matches_platform_events() {
