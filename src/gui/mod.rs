@@ -1,5 +1,4 @@
 mod account_dialog;
-mod bottom_bar;
 mod channel_item;
 mod channel_page;
 mod error_dialog;
@@ -10,6 +9,7 @@ mod filter_similar_dialog;
 mod finite_video_list;
 mod home_view;
 mod import_dialog;
+mod player_sheet;
 mod preferences_dialog;
 mod privacy_notice;
 mod search_list;

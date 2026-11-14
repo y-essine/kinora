@@ -246,6 +246,69 @@ impl VideoPage {
         });
     }
 
+    // --- Kinora: what the player sheet needs (see `player_sheet.rs`) ---------
+
+    /// The player's place in the page: x, y, width, height.
+    pub fn player_rect(&self) -> Option<[f64; 4]> {
+        let r = self.imp().player_frame.compute_bounds(self)?;
+        Some([
+            r.x() as f64,
+            r.y() as f64,
+            r.width() as f64,
+            r.height() as f64,
+        ])
+    }
+
+    /// Whether a point of the page is on the stage (the player and its glow).
+    pub fn stage_contains(&self, x: f64, y: f64) -> bool {
+        self.imp()
+            .stage
+            .compute_bounds(self)
+            .is_some_and(|r| r.contains_point(&gtk::graphene::Point::new(x as f32, y as f32)))
+    }
+
+    /// Fade everything but the player (the header, the glow, the details).
+    pub fn set_chrome_opacity(&self, opacity: f64) {
+        let imp = self.imp();
+        imp.header_bar.set_opacity(opacity);
+        imp.stage_glow.set_opacity(opacity);
+        imp.stage_scrim.set_opacity(opacity);
+        imp.details_box.set_opacity(opacity);
+    }
+
+    /// How far the page is scrolled down, in pixels.
+    pub fn scroll_position(&self) -> f64 {
+        gtk::prelude::AdjustmentExt::value(&self.imp().page_scroller.vadjustment())
+    }
+
+    /// Back to the top at once (the player has to be in view to shrink).
+    pub fn scroll_top_now(&self) {
+        gtk::prelude::AdjustmentExt::set_value(&self.imp().page_scroller.vadjustment(), 0.0);
+    }
+
+    /// The played part of the video, 0 to 1.
+    pub fn progress_fraction(&self) -> f64 {
+        let Some(player) = self.imp().clapper.player() else {
+            return 0.0;
+        };
+        let duration = player
+            .queue()
+            .and_then(|q| q.current_item())
+            .map(|i| i.duration())
+            .unwrap_or(0.0);
+        if duration > 0.0 {
+            (player.position() / duration).clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// The first "Up next" video, if they have arrived.
+    pub fn next_video(&self) -> Option<Video> {
+        gtk::gio::prelude::ListModelExt::item(&self.imp().up_next_store, 0)
+            .and_then(|o| o.downcast::<Video>().ok())
+    }
+
     pub fn finished(&self) -> bool {
         if self.external() {
             return true;
@@ -383,10 +446,20 @@ pub mod imp {
         #[template_child]
         billboard: TemplateChild<clapper_gtk::Billboard>,
         #[template_child]
-        page_scroller: TemplateChild<gtk::ScrolledWindow>,
+        pub(super) page_scroller: TemplateChild<gtk::ScrolledWindow>,
         // Kinora: the stage (player over its ambient glow) and the page body.
         #[template_child]
-        stage: TemplateChild<gtk::Overlay>,
+        pub(super) stage: TemplateChild<gtk::Overlay>,
+        #[template_child]
+        pub(super) player_frame: TemplateChild<gtk::Box>,
+        #[template_child]
+        pub(super) header_bar: TemplateChild<adw::HeaderBar>,
+        #[template_child]
+        pub(super) stage_glow: TemplateChild<gtk::Picture>,
+        #[template_child]
+        pub(super) stage_scrim: TemplateChild<gtk::Box>,
+        #[template_child]
+        pub(super) details_box: TemplateChild<gtk::Box>,
         #[template_child]
         stage_clamp: TemplateChild<adw::Clamp>,
         #[template_child]
@@ -403,7 +476,13 @@ pub mod imp {
         up_next_list: TemplateChild<gtk::ListBox>,
         #[template_child]
         autoplay_switch: TemplateChild<gtk::Switch>,
-        up_next_store: FiniteVideoStore,
+        pub(super) up_next_store: FiniteVideoStore,
+        /// Kinora: the page is shrunk into the mini-player (see `player_sheet.rs`).
+        #[property(get, set)]
+        minimized: Cell<bool>,
+        /// Kinora: where and when the player was last double-clicked:
+        /// -1 left third, 0 middle, 1 right third.
+        double_click: Cell<Option<(i8, std::time::Instant)>>,
         autoplay_done: Cell<bool>,
         /// When play() was pressed, to log how long the video took to start.
         pub(super) play_started: Cell<Option<std::time::Instant>>,
@@ -446,6 +525,13 @@ pub mod imp {
                 billboard: Default::default(),
                 page_scroller: Default::default(),
                 stage: Default::default(),
+                player_frame: Default::default(),
+                header_bar: Default::default(),
+                stage_glow: Default::default(),
+                stage_scrim: Default::default(),
+                details_box: Default::default(),
+                minimized: Default::default(),
+                double_click: Default::default(),
                 stage_clamp: Default::default(),
                 body_clamp: Default::default(),
                 body: Default::default(),
@@ -781,6 +867,20 @@ pub mod imp {
 
         #[template_callback]
         fn toggle_fullscreen(&self) {
+            // Kinora: a double click on the left or right third of the player
+            // seeks 10 seconds instead (Clapper reports every double click here).
+            if let Some((side, at)) = self.double_click.take()
+                && side != 0
+                && at.elapsed() < std::time::Duration::from_millis(700)
+            {
+                let action = if side > 0 {
+                    "video.seek-forward"
+                } else {
+                    "video.seek-backward"
+                };
+                let _ = WidgetExt::activate_action(&*self.obj(), action, None);
+                return;
+            }
             self.toggle_fullscreen_mode(false);
         }
 
@@ -950,10 +1050,11 @@ pub mod imp {
                     move |_, _| {
                         if obj.fullscreened() {
                             obj.set_fullscreened(false);
-                            Propagation::Stop
                         } else {
-                            Propagation::Proceed
+                            // Kinora: Esc shrinks the page into the mini-player.
+                            let _ = WidgetExt::activate_action(&obj, "win.minimize-player", None);
                         }
+                        Propagation::Stop
                     }
                 ))),
             );
@@ -992,6 +1093,45 @@ pub mod imp {
             shortcut_controller.add_shortcut(shortcut_fullscreen);
             shortcut_controller.add_shortcut(shortcut_window_fullscreen);
             obj.add_controller(shortcut_controller);
+
+            // Kinora: remember where the player is double-clicked (see
+            // `toggle_fullscreen`). Clicks on its controls don't count.
+            let double_click = gtk::GestureClick::new();
+            double_click.set_propagation_phase(gtk::PropagationPhase::Capture);
+            double_click.connect_pressed(clone!(
+                #[weak]
+                obj,
+                move |gesture, n_press, x, y| {
+                    let imp = obj.imp();
+                    let clapper = gesture.widget().expect("Gesture to have a widget");
+                    let mut target = clapper.pick(x, y, gtk::PickFlags::DEFAULT);
+                    let mut on_control = false;
+                    while let Some(widget) = target {
+                        if widget == clapper {
+                            break;
+                        }
+                        on_control |= widget.is::<gtk::Button>()
+                            || widget.is::<gtk::Range>()
+                            || widget.type_().name() == "ClapperGtkSimpleControls";
+                        target = widget.parent();
+                    }
+                    if n_press != 2 || on_control {
+                        imp.double_click.set(None);
+                        return;
+                    }
+                    let third = clapper.width() as f64 / 3.0;
+                    let side = if x < third {
+                        -1
+                    } else if x > 2.0 * third {
+                        1
+                    } else {
+                        0
+                    };
+                    imp.double_click
+                        .set(Some((side, std::time::Instant::now())));
+                }
+            ));
+            self.clapper.add_controller(double_click);
 
             // Set up MPRIS
             // Make sure that every instance of VideoPage gets its own own_name, otherwise having multiple videos opened at the same time (e.g. one in the bottom bar and one in the navigation stack) would overwrite each other.
