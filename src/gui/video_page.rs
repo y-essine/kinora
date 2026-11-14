@@ -780,6 +780,29 @@ pub mod imp {
                 }
             ));
 
+            // Pipeline Home: the player lives in the page's scrolling column, where
+            // it gets no height of its own; size it 16:9 to the page width (at most
+            // 70% of the page height). Fullscreen lifts this and lets it fill.
+            self.clapper.add_tick_callback(clone!(
+                #[weak]
+                obj,
+                #[upgrade_or]
+                glib::ControlFlow::Break,
+                move |clapper, _| {
+                    let want = if obj.fullscreened() {
+                        -1
+                    } else {
+                        let by_width = obj.width() as f64 * 9.0 / 16.0;
+                        let cap = obj.height() as f64 * 0.7;
+                        by_width.min(cap).max(120.0).round() as i32
+                    };
+                    if clapper.height_request() != want {
+                        clapper.set_height_request(want);
+                    }
+                    glib::ControlFlow::Continue
+                }
+            ));
+
             // Pipeline Home: "Up next" list and autoplay.
             self.up_next_list.bind_model(
                 Some(&self.up_next_store),
