@@ -3,7 +3,7 @@
 //! No GUI toolkit is used here (no gtk, gdk, glib or adw). Frontends (the GTK
 //! app in `src/`) read their own settings, pass plain values in
 //! ([`AccountConfig`], [`PlaybackConfig`], [`Paths`]), and turn the results
-//! ([`pcore::Video`], [`pcore::Channel`], [`home::HomePage`]) into their own
+//! ([`pcore::Video`], [`pcore::Channel`], [`home::HomePage`], [`PlaylistCard`]) into their own
 //! widgets and models. See `docs/architecture.md`.
 //!
 //! [`Core`] is the entry point. Its futures need a Tokio runtime (they run
@@ -34,6 +34,7 @@ use extension::{
 };
 pub use home::{HomeChip, HomePage};
 use player::Transition;
+pub use playlist::{PlaylistCard, PlaylistKind};
 
 /// Errors are messages for the user or the log; nothing matches on them yet.
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -76,14 +77,56 @@ impl Core {
     /// The first page of Home, from the first enabled main feed source (the
     /// account extension's YouTube Home): the plain home page, or the feed of
     /// the chip with this continuation token.
+    ///
+    /// For a list of videos: pages without plain videos are skipped. The
+    /// playlists and mixes of the pages it read are in
+    /// [`HomePage::playlists`]; to show them, use
+    /// [`Self::home_with_playlists`].
     pub async fn home(
         &self,
         account: &AccountConfig,
         chip_token: Option<&str>,
     ) -> Result<HomePage, Error> {
+        self.home_first(account, chip_token, false).await
+    }
+
+    /// The next page of Home, from the previous page's [`HomePage::next`].
+    pub async fn home_more(&self, account: &AccountConfig, token: &str) -> Result<HomePage, Error> {
+        self.home_next(account, token, false).await
+    }
+
+    /// [`Self::home`] for a frontend that shows playlist and mix cards
+    /// ([`HomePage::playlists`]) next to the videos: a page with playlists
+    /// and no videos (the "Mixes" and "Playlists" chips) is a page to show,
+    /// not an empty one to skip.
+    pub async fn home_with_playlists(
+        &self,
+        account: &AccountConfig,
+        chip_token: Option<&str>,
+    ) -> Result<HomePage, Error> {
+        self.home_first(account, chip_token, true).await
+    }
+
+    /// [`Self::home_more`] for a frontend that shows playlists (see
+    /// [`Self::home_with_playlists`]).
+    pub async fn home_more_with_playlists(
+        &self,
+        account: &AccountConfig,
+        token: &str,
+    ) -> Result<HomePage, Error> {
+        self.home_next(account, token, true).await
+    }
+
+    async fn home_first(
+        &self,
+        account: &AccountConfig,
+        chip_token: Option<&str>,
+        playlists: bool,
+    ) -> Result<HomePage, Error> {
         let request = FeedRequest {
             chip: chip_token.map(str::to_owned),
             continuation: None,
+            playlists,
         };
         self.load_home(account, request).await.map_err(|e| {
             e.unwrap_or_else(|| {
@@ -93,11 +136,16 @@ impl Core {
         })
     }
 
-    /// The next page of Home, from the previous page's [`HomePage::next`].
-    pub async fn home_more(&self, account: &AccountConfig, token: &str) -> Result<HomePage, Error> {
+    async fn home_next(
+        &self,
+        account: &AccountConfig,
+        token: &str,
+        playlists: bool,
+    ) -> Result<HomePage, Error> {
         let request = FeedRequest {
             chip: None,
             continuation: Some(token.to_owned()),
+            playlists,
         };
         self.load_home(account, request)
             .await

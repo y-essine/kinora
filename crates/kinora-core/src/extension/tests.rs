@@ -124,10 +124,12 @@ impl FeedSource for ChipFeed {
             title: t.to_owned(),
             token: Some(t.to_owned()),
         };
+        let id = request.chip.as_deref().unwrap_or("all").to_owned()
+            + if request.playlists { "+playlists" } else { "" };
         Box::pin(ready(Ok(HomePage {
-            videos: vec![video(request.chip.as_deref().unwrap_or("all"))],
+            videos: vec![video(&id)],
             chips: vec![chip("Music"), chip("Mixes")],
-            next: None,
+            ..Default::default()
         })))
     }
 }
@@ -292,12 +294,23 @@ async fn core_home_uses_the_feed_source_and_the_chips_extension() {
     }
     let core = Core::with_extensions(paths, registry);
 
-    // home-chips drops the playlist-only "Mixes".
+    // home-chips keeps the playlist-only "Mixes" unless told to hide it.
     let page = core.home(&account, None).await.unwrap();
     let titles: Vec<_> = page.chips.iter().map(|c| c.title.as_str()).collect();
-    assert_eq!(titles, ["Music"]);
+    assert_eq!(titles, ["Music", "Mixes"]);
     let page = core.home(&account, Some("Music")).await.unwrap();
     assert_eq!(page.videos[0].id.id, "Music");
+    // Asking for playlists tells the source so.
+    let page = core
+        .home_with_playlists(&account, Some("Mixes"))
+        .await
+        .unwrap();
+    assert_eq!(page.videos[0].id.id, "Mixes+playlists");
+    let page = core
+        .home_more_with_playlists(&account, "tok")
+        .await
+        .unwrap();
+    assert_eq!(page.videos[0].id.id, "all+playlists");
 
     // Without home-chips, Home has no chip bar.
     core.extensions().set_disabled(["home-chips"]);

@@ -23,6 +23,10 @@ pub struct FeedRequest {
     pub chip: Option<String>,
     /// The previous page's [`HomePage::next`]: load the page after it.
     pub continuation: Option<String>,
+    /// The caller shows [`HomePage::playlists`] as well as the videos: a page
+    /// with playlists and no videos is a page to show, not an empty one to
+    /// skip. Sources fill `playlists` either way.
+    pub playlists: bool,
 }
 
 /// Something that supplies Home with videos (and maybe chips).
