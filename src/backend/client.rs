@@ -111,6 +111,26 @@ impl Client {
                 }
             ),
         );
+        // Pipeline Home: follow the YouTube account being connected or disconnected.
+        let update_account = clone!(
+            #[weak(rename_to = s)]
+            self,
+            move |settings: &gdk::gio::Settings, _: &str| {
+                let connected = !settings.string("account-cookies-command").trim().is_empty();
+                let changed = connected != s.has_account();
+                s.set_has_account(connected);
+                if changed || connected {
+                    s.home_store().clear();
+                    s.set_home_error(String::new());
+                    if connected {
+                        gspawn!(async move { s.refresh_home().await });
+                    }
+                }
+            }
+        );
+        self.set_has_account(!settings.string("account-cookies-command").trim().is_empty());
+        settings.connect_changed(Some("account-cookies-command"), update_account);
+
         settings
             .bind("only-videos-yesterday", &self.filter_store(), "hide-today")
             .flags(SettingsBindFlags::DEFAULT)
@@ -637,6 +657,11 @@ impl Client {
         if self.home_loading() {
             return;
         }
+        if !self.has_account() {
+            self.home_store().clear();
+            self.set_home_error(String::new());
+            return;
+        }
         self.set_home_loading(true);
         self.set_home_error(String::new());
 
@@ -1041,6 +1066,8 @@ mod imp {
         pub(super) home_loading: Cell<bool>,
         #[property(get, set)]
         pub(super) home_error: RefCell<String>,
+        #[property(get, set)]
+        pub(super) has_account: Cell<bool>,
 
         pub(super) setup_finished_watch_channel: tokio::sync::watch::Sender<bool>,
 
@@ -1066,6 +1093,7 @@ mod imp {
                 )),
                 home_loading: Default::default(),
                 home_error: Default::default(),
+                has_account: Default::default(),
                 watched_store: RefCell::new(FiniteVideoStore::with_sort(
                     crate::backend::finite_video_store::VideoSort::WatchedDescending,
                 )),

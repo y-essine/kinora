@@ -186,8 +186,29 @@ Adw.ViewStack main_stack {
         remove-downloaded => $remove_downloaded() swapped;
       }
 
+      Adw.StatusPage {
+        visible: bind $not(template.client as <$TFClient>.has-account) as <bool>;
+        hexpand: true;
+        vexpand: true;
+        title: _("Your YouTube Home");
+        description: _("Connect a YouTube account to see its Home feed here and get its Up next under every video. Everything else works without an account.");
+        icon-name: "starred-symbolic";
+
+        child: Button {
+          styles [
+            "pill",
+            "suggested-action",
+          ]
+
+          halign: center;
+          label: _("Connect Account");
+          action-name: "win.connect-account";
+        };
+      }
+
       Adw.StatusPage status_home_loading {
         visible: bind $and(
+          template.client as <$TFClient>.has-account,
           template.client as <$TFClient>.home-loading,
           template.client as <$TFClient>.home-store as <$TFFiniteVideoStore>.is-empty
           ) as <bool>;
@@ -202,6 +223,7 @@ Adw.ViewStack main_stack {
 
       Adw.StatusPage {
         visible: bind $and(
+          template.client as <$TFClient>.has-account,
           $not(template.client as <$TFClient>.home-loading) as <bool>,
           template.client as <$TFClient>.home-store as <$TFFiniteVideoStore>.is-empty
           ) as <bool>;

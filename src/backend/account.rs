@@ -61,6 +61,75 @@ pub async fn cookies_file(command: &str) -> Result<Option<PathBuf>, Error> {
     Ok(Some(path))
 }
 
+/// A browser profile that is signed in to YouTube, as found by
+/// `yt-account-cookies --list`.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct BrowserProfile {
+    /// Browser id understood by `yt-account-cookies --browser`.
+    pub browser: String,
+    /// Human name of the browser, e.g. "Chromium".
+    pub browser_name: String,
+    /// Profile folder (Chromium family) or path (Firefox family).
+    pub profile: String,
+    /// The profile's own name, as shown in the browser.
+    pub name: String,
+}
+
+impl BrowserProfile {
+    /// The `account-cookies-command` that signs in through this profile.
+    pub fn command(&self) -> String {
+        format!(
+            "yt-account-cookies --browser {} --profile {}",
+            shell_quote(&self.browser),
+            shell_quote(&self.profile)
+        )
+    }
+
+    /// How the account is shown once connected.
+    pub fn label(&self) -> String {
+        format!("{} · {}", self.name, self.browser_name)
+    }
+}
+
+/// Browser profiles signed in to YouTube.
+pub async fn browser_profiles() -> Result<Vec<BrowserProfile>, Error> {
+    let out = Command::new("yt-account-cookies")
+        .arg("--list")
+        .output()
+        .await
+        .map_err(|e| {
+            format!(
+                "Could not run yt-account-cookies ({e}). Is Pipeline Home installed completely?"
+            )
+        })?;
+    if !out.status.success() {
+        return Err(last_line(&out.stderr)
+            .unwrap_or_else(|| "yt-account-cookies --list failed".to_owned())
+            .into());
+    }
+    Ok(serde_json::from_slice(&out.stdout)?)
+}
+
+/// The `account-cookies-command` for an exported cookies.txt file.
+pub fn file_command(path: &Path) -> String {
+    format!(
+        "yt-account-cookies --file {}",
+        shell_quote(&path.to_string_lossy())
+    )
+}
+
+/// Run a cookies command once to check that it really yields a YouTube login.
+pub async fn test_command(command: &str) -> Result<(), Error> {
+    cookies_file(command)
+        .await?
+        .map(|_| ())
+        .ok_or_else(|| "No command given".into())
+}
+
+fn shell_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
 /// The account's YouTube home page, in YouTube's order. Upload dates and view
 /// counts are not part of the listing; fill them in with the regular video
 /// information lookup.

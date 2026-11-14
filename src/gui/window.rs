@@ -1318,6 +1318,28 @@ pub mod imp {
                 }
             ));
 
+            // Pipeline Home: connect or disconnect the YouTube account.
+            let action_connect_account = SimpleAction::new("connect-account", None);
+            action_connect_account.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    crate::gui::account_dialog::AccountDialog::new(&obj.client())
+                        .present(Some(&obj));
+                }
+            ));
+
+            let action_disconnect_account = SimpleAction::new("disconnect-account", None);
+            action_disconnect_account.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    let settings = &obj.imp().settings;
+                    let _ = settings.set_string("account-cookies-command", "");
+                    let _ = settings.set_string("account-label", "");
+                }
+            ));
+
             let action_show_errors = SimpleAction::new("show-errors", None);
             action_show_errors.connect_activate(clone!(
                 #[weak]
@@ -1478,6 +1500,8 @@ pub mod imp {
             actions.add_action(&action_filter_dialog);
             actions.add_action(&action_show_help_overlay);
             actions.add_action(&action_about);
+            actions.add_action(&action_connect_account);
+            actions.add_action(&action_disconnect_account);
             actions.add_action(&action_show_errors);
             actions.add_action(&action_clear_errors);
             actions.add_action(&action_watch_later);

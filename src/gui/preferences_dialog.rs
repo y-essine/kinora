@@ -116,6 +116,14 @@ pub mod imp {
     #[properties(wrapper_type = super::PreferencesDialog)]
     #[template(resource = "/ui/preferences_dialog.ui")]
     pub struct PreferencesDialog {
+        // Pipeline Home
+        #[template_child]
+        row_account: TemplateChild<ActionRow>,
+        #[template_child]
+        button_account_connect: TemplateChild<gtk::Button>,
+        #[template_child]
+        button_account_disconnect: TemplateChild<gtk::Button>,
+
         #[template_child]
         group_external: TemplateChild<PreferencesGroup>,
 
@@ -591,6 +599,40 @@ pub mod imp {
             }
         }
 
+        /// Pipeline Home: show which YouTube account is connected.
+        fn init_account(&self) {
+            let update = clone!(
+                #[weak(rename_to = s)]
+                self,
+                move |settings: &Settings, _: &str| {
+                    let connected = !settings.string("account-cookies-command").trim().is_empty();
+                    let label = settings.string("account-label");
+                    s.row_account.set_title(&if !connected {
+                        gettextrs::gettext("Not Connected")
+                    } else if label.is_empty() {
+                        gettextrs::gettext("Connected")
+                    } else {
+                        glib::markup_escape_text(&label).to_string()
+                    });
+                    s.row_account.set_subtitle(&if connected {
+                        gettextrs::gettext("Home and Up next come from this account")
+                    } else {
+                        gettextrs::gettext("Fully anonymous")
+                    });
+                    s.button_account_connect.set_label(&if connected {
+                        gettextrs::gettext("Change…")
+                    } else {
+                        gettextrs::gettext("Connect…")
+                    });
+                    s.button_account_disconnect.set_visible(connected);
+                }
+            );
+            update(&self.settings, "");
+            self.settings
+                .connect_changed(Some("account-cookies-command"), update.clone());
+            self.settings.connect_changed(Some("account-label"), update);
+        }
+
         fn init_youtube_cookies(&self) {
             self.youtube_cookies_changed();
 
@@ -821,6 +863,9 @@ pub mod imp {
 
         fn new() -> Self {
             Self {
+                row_account: Default::default(),
+                button_account_connect: Default::default(),
+                button_account_disconnect: Default::default(),
                 group_external: Default::default(),
                 switch_external_default: Default::default(),
                 switch_show_splash: Default::default(),
@@ -871,6 +916,7 @@ pub mod imp {
             self.init_settings();
             self.init_piped_preferences_urls();
             self.init_youtube_cookies();
+            self.init_account();
             self.init_download();
             if crate::config::FLATPAK {
                 self.init_flatpak();

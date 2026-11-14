@@ -137,8 +137,12 @@
     </key>
     <!-- Pipeline Home -->
     <key name="account-cookies-command" type="s">
-      <default>'yt-account-cookies'</default>
-      <summary>Command that prints the path to a Netscape cookies.txt of the YouTube account used for Home, Up next and watch history. Empty disables the account.</summary>
+      <default>''</default>
+      <summary>Command that prints the path to a Netscape cookies.txt of the YouTube account used for Home, Up next and watch history. Empty (the default) means no account: fully anonymous.</summary>
+    </key>
+    <key name="account-label" type="s">
+      <default>''</default>
+      <summary>How the connected YouTube account is shown, e.g. "hellyeah · Chromium"</summary>
     </key>
     <key name="autoplay-next" type="b">
       <default>true</default>

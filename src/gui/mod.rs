@@ -1,3 +1,4 @@
+mod account_dialog;
 mod bottom_bar;
 mod channel_item;
 mod channel_page;

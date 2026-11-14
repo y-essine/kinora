@@ -6,6 +6,32 @@ template $TFPreferencesDialog: Adw.PreferencesDialog {
     title: _("General");
     icon-name: 'preferences-system-symbolic';
 
+    // Pipeline Home
+    Adw.PreferencesGroup {
+      title: _("YouTube Account");
+      description: _("Optional. Adds your Home feed and personal Up next; videos you play are marked watched on the account.");
+
+      Adw.ActionRow row_account {
+        title: _("Not Connected");
+
+        Gtk.Button button_account_connect {
+          label: _("Connect…");
+          valign: center;
+          action-name: "win.connect-account";
+        }
+
+        Gtk.Button button_account_disconnect {
+          label: _("Disconnect");
+          valign: center;
+          action-name: "win.disconnect-account";
+
+          styles [
+            "destructive-action",
+          ]
+        }
+      }
+    }
+
     Adw.PreferencesGroup {
       title: _("General");
 

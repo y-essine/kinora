@@ -1,51 +1,176 @@
 #!/usr/bin/python3
-# yt-account-cookies [CHROMIUM_PROFILE]
-#
-# Export a Chromium profile's YouTube cookies to a private cookies.txt and print
-# its path. Pipeline Home runs this (the "account-cookies-command" setting) to
-# sign in to your YouTube account for Home, Up next and watch history.
-#
-#   yt-account-cookies "Profile 3"     # the profile folder name in ~/.config/chromium
-#
-# Why not `yt-dlp --cookies-from-browser`? yt-dlp picks Chromium's key from the
-# GNOME keyring by label ("Chromium Safe Storage"), and other Chromium-based
-# apps (Electron) can store a key under the same label, so it may take the wrong
-# one. Here the key is looked up by its application=chromium attribute; yt-dlp
-# still does the decrypting. Needs python-secretstorage and yt-dlp.
+"""Find and export the YouTube login of a browser profile.
+
+Pipeline Home runs this to use your YouTube account (the "account-cookies-command"
+setting). It prints the path of a private Netscape cookies.txt.
+
+  yt-account-cookies --list                                # signed-in profiles, as JSON
+  yt-account-cookies --browser chromium --profile "Profile 3"
+  yt-account-cookies --browser firefox --profile abcd1234.default-release
+  yt-account-cookies --file ~/Downloads/cookies.txt        # use an exported file
+  yt-account-cookies "Profile 3"                           # old form: a Chromium profile
+
+--list never decrypts anything: it only checks whether a profile holds YouTube's
+login cookie. Chromium-family browsers keep their cookie key in the GNOME
+keyring; it is looked up by the browser's application attribute rather than by
+its label, because several apps (Electron) store keys under the same label.
+Needs yt-dlp, and python-secretstorage for Chromium-family browsers.
+"""
+import argparse
+import configparser
+import json
 import os
+import shutil
+import sqlite3
 import sys
+import tempfile
 
-import secretstorage
-import yt_dlp.cookies as cookies
+HOME = os.path.expanduser("~")
+CONFIG = os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
+CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")), "pipeline-home")
 
-PROFILE = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("PIPELINE_HOME_CHROMIUM_PROFILE", "Default")
-OUT = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "pipeline-home", "cookies.txt")
+# id: (display name, yt-dlp browser name, user data dir, keyring application attribute)
+CHROMIUM_FAMILY = {
+    "chromium": ("Chromium", "chromium", os.path.join(CONFIG, "chromium"), "chromium"),
+    "chrome": ("Google Chrome", "chrome", os.path.join(CONFIG, "google-chrome"), "chrome"),
+    "brave": ("Brave", "brave", os.path.join(CONFIG, "BraveSoftware", "Brave-Browser"), "brave"),
+    "vivaldi": ("Vivaldi", "vivaldi", os.path.join(CONFIG, "vivaldi"), "vivaldi"),
+    "edge": ("Microsoft Edge", "edge", os.path.join(CONFIG, "microsoft-edge"), "microsoft-edge"),
+}
+# id: (display name, yt-dlp browser name, profiles root)
+FIREFOX_FAMILY = {
+    "firefox": ("Firefox", "firefox", os.path.join(HOME, ".mozilla", "firefox")),
+    "librewolf": ("LibreWolf", "firefox", os.path.join(HOME, ".librewolf")),
+}
 
 
-def chromium_key(browser_keyring_name, logger):
-    con = secretstorage.dbus_init()
+def has_youtube_login(db_path, table, host_col):
+    """Whether a cookie database holds YouTube's login cookie (names only, no decryption)."""
+    if not os.path.exists(db_path):
+        return False
+    with tempfile.TemporaryDirectory() as tmp:
+        copy = os.path.join(tmp, "cookies.sqlite")
+        shutil.copy(db_path, copy)  # the browser may hold a lock on the original
+        try:
+            con = sqlite3.connect(copy)
+            row = con.execute(
+                f"SELECT 1 FROM {table} WHERE name = 'LOGIN_INFO' AND {host_col} LIKE '%youtube.com' LIMIT 1"
+            ).fetchone()
+            con.close()
+            return row is not None
+        except sqlite3.Error:
+            return False
+
+
+def list_profiles():
+    found = []
+    for bid, (bname, _, root, _) in CHROMIUM_FAMILY.items():
+        try:
+            with open(os.path.join(root, "Local State")) as f:
+                cache = json.load(f).get("profile", {}).get("info_cache", {})
+        except (OSError, ValueError):
+            continue
+        for folder, info in cache.items():
+            for db in ("Network/Cookies", "Cookies"):
+                path = os.path.join(root, folder, db)
+                if os.path.exists(path):
+                    if has_youtube_login(path, "cookies", "host_key"):
+                        found.append({"browser": bid, "browser_name": bname, "profile": folder,
+                                      "name": info.get("name") or folder})
+                    break
+    for bid, (bname, _, root) in FIREFOX_FAMILY.items():
+        ini = configparser.ConfigParser()
+        if not ini.read(os.path.join(root, "profiles.ini")):
+            continue
+        for section in ini.sections():
+            if not section.startswith("Profile") or "Path" not in ini[section]:
+                continue
+            rel = ini[section].get("IsRelative", "1") == "1"
+            path = os.path.join(root, ini[section]["Path"]) if rel else ini[section]["Path"]
+            if has_youtube_login(os.path.join(path, "cookies.sqlite"), "moz_cookies", "host"):
+                found.append({"browser": bid, "browser_name": bname, "profile": path,
+                              "name": ini[section].get("Name", os.path.basename(path))})
+    return found
+
+
+def out_path(*parts):
+    """One cookies file per source, so exporting one profile never overwrites another."""
+    safe = "-".join("".join(ch if ch.isalnum() else "_" for ch in os.path.basename(p)) for p in parts)
+    return os.path.join(CACHE, f"cookies-{safe}.txt")
+
+
+def save(jar, out):
+    if not any(c.name == "LOGIN_INFO" and "youtube.com" in c.domain for c in jar):
+        sys.exit("yt-account-cookies: this profile is not signed in to YouTube")
+    OUT = out
+    os.makedirs(os.path.dirname(OUT), mode=0o700, exist_ok=True)
+    old = os.umask(0o077)
     try:
-        col = secretstorage.get_default_collection(con)
-        if col.is_locked():
-            col.unlock()
-        for item in col.search_items({"application": "chromium"}):
-            return item.get_secret()
+        jar.save(OUT, ignore_discard=True, ignore_expires=True)
     finally:
-        con.close()
-    return b""
+        os.umask(old)
+    os.chmod(OUT, 0o600)
+    print(OUT)
 
 
-cookies._get_gnome_keyring_password = chromium_key
+def export(browser, profile):
+    import yt_dlp.cookies as cookies
 
-jar = cookies.extract_cookies_from_browser("chromium", PROFILE, keyring="GNOMEKEYRING")
-if not any(c.name == "LOGIN_INFO" and "youtube.com" in c.domain for c in jar):
-    sys.exit(f"yt-account-cookies: no YouTube login found in Chromium profile {PROFILE!r}")
+    if browser in FIREFOX_FAMILY:
+        _, ytdlp_name, _ = FIREFOX_FAMILY[browser]
+        return save(cookies.extract_cookies_from_browser(ytdlp_name, profile), out_path(browser, profile))
+    if browser not in CHROMIUM_FAMILY:
+        sys.exit(f"yt-account-cookies: unknown browser {browser!r}")
+    _, ytdlp_name, _, app = CHROMIUM_FAMILY[browser]
+    original = cookies._get_gnome_keyring_password
 
-os.makedirs(os.path.dirname(OUT), mode=0o700, exist_ok=True)
-old = os.umask(0o077)
-try:
-    jar.save(OUT, ignore_discard=True, ignore_expires=True)
-finally:
-    os.umask(old)
-os.chmod(OUT, 0o600)
-print(OUT)
+    def keyring_password(browser_keyring_name, logger):
+        import secretstorage
+
+        con = secretstorage.dbus_init()
+        try:
+            col = secretstorage.get_default_collection(con)
+            if col.is_locked():
+                col.unlock()
+            for item in col.search_items({"application": app}):
+                return item.get_secret()
+        finally:
+            con.close()
+        return original(browser_keyring_name, logger)
+
+    cookies._get_gnome_keyring_password = keyring_password
+    save(cookies.extract_cookies_from_browser(ytdlp_name, profile, keyring="GNOMEKEYRING"), out_path(browser, profile))
+
+
+def use_file(path):
+    from http.cookiejar import MozillaCookieJar
+
+    jar = MozillaCookieJar()
+    try:
+        jar.load(os.path.expanduser(path), ignore_discard=True, ignore_expires=True)
+    except (OSError, ValueError) as e:
+        sys.exit(f"yt-account-cookies: can't read {path}: {e}")
+    save(jar, out_path("file", path))
+
+
+def main():
+    p = argparse.ArgumentParser(description="Find and export the YouTube login of a browser profile.")
+    p.add_argument("--list", action="store_true", help="list browser profiles signed in to YouTube, as JSON")
+    p.add_argument("--browser", help="chromium, chrome, brave, vivaldi, edge, firefox or librewolf")
+    p.add_argument("--profile", help="profile folder name (Chromium family) or path (Firefox family)")
+    p.add_argument("--file", help="use an exported Netscape cookies.txt")
+    p.add_argument("legacy_profile", nargs="?", help=argparse.SUPPRESS)
+    a = p.parse_args()
+
+    if a.list:
+        print(json.dumps(list_profiles()))
+    elif a.file:
+        use_file(a.file)
+    elif a.browser:
+        export(a.browser, a.profile or "Default")
+    else:
+        export("chromium", a.legacy_profile or os.environ.get("PIPELINE_HOME_CHROMIUM_PROFILE", "Default"))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,4 +1,4 @@
-mod account;
+pub mod account;
 mod channel;
 mod client;
 mod filter;

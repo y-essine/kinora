@@ -19,6 +19,7 @@
     <file preprocess="xml-stripblanks">ui/import_dialog.ui</file>
     <file preprocess="xml-stripblanks">ui/export_dialog.ui</file>
     <file preprocess="xml-stripblanks">ui/privacy_notice.ui</file>
+    <file preprocess="xml-stripblanks">ui/account_dialog.ui</file>
     <file preprocess="xml-stripblanks">ui/subscription_item.ui</file>
     <file preprocess="xml-stripblanks">ui/bottom_bar.ui</file>
   </gresource>
