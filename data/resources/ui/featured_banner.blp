@@ -15,12 +15,13 @@ template $TFFeaturedBanner: Adw.BreakpointBin {
   }
 
   Adw.Breakpoint {
-    condition ("max-width: 760sp")
+    condition ("max-width: 920sp")
 
     setters {
       template.height-request: 350;
       frame.halign: fill;
       frame.width-request: -1;
+      lead.visible: false;
     }
   }
 
@@ -31,6 +32,7 @@ template $TFFeaturedBanner: Adw.BreakpointBin {
       template.height-request: 300;
       frame.halign: fill;
       frame.width-request: -1;
+      lead.visible: false;
       content.margin-start: 16;
       content.margin-end: 16;
       content.margin-bottom: 12;
@@ -63,30 +65,44 @@ template $TFFeaturedBanner: Adw.BreakpointBin {
       paintable: bind $pixbuf_to_ambient(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
     }
 
-    // Wide: the whole 16:9 picture on the right. Narrow: it fills the banner.
+    // Wide: the whole 16:9 picture on the right, the glow dimming towards it.
+    // Narrow: the picture fills the banner.
     [overlay]
-    Overlay frame {
+    Box frame {
       halign: end;
-      width-request: 693;
+      width-request: 913;
 
-      [overlay]
-      Box {
+      Box lead {
         styles [
-          "k-banner-edge",
+          "k-banner-lead",
         ]
 
+        width-request: 220;
         can-target: false;
       }
 
-      Picture picture {
-        styles [
-          "k-banner-picture",
-        ]
+      Overlay {
+        hexpand: true;
 
-        content-fit: cover;
-        can-shrink: true;
-        accessible-role: presentation;
-        paintable: bind $pixbuf_to_paintable(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+        [overlay]
+        Box {
+          styles [
+            "k-banner-edge",
+          ]
+
+          can-target: false;
+        }
+
+        Picture picture {
+          styles [
+            "k-banner-picture",
+          ]
+
+          content-fit: cover;
+          can-shrink: true;
+          accessible-role: presentation;
+          paintable: bind $pixbuf_to_paintable(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+        }
       }
     }
 
