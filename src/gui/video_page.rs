@@ -1133,6 +1133,9 @@ pub mod imp {
             ));
             self.clapper.add_controller(double_click);
 
+            // Kinora: show the buffered part ahead of the playhead.
+            crate::gui::buffer_bar::attach(&self.clapper);
+
             // Set up MPRIS
             // Make sure that every instance of VideoPage gets its own own_name, otherwise having multiple videos opened at the same time (e.g. one in the bottom bar and one in the navigation stack) would overwrite each other.
             let player = self.clapper.player().expect("Clapper to have a Player");

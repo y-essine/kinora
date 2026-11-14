@@ -1,4 +1,5 @@
 mod account_dialog;
+mod buffer_bar;
 mod channel_item;
 mod channel_page;
 mod error_dialog;

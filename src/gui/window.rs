@@ -902,12 +902,16 @@ pub mod imp {
                     let secs: u64 = secs.parse().unwrap_or(1);
                     let (o, name) = (obj.clone(), name.to_owned());
                     glib::timeout_add_local_once(std::time::Duration::from_secs(secs), move || {
-                        log::info!("DEV: action win.{name}");
-                        let _ = gtk::prelude::WidgetExt::activate_action(
-                            &o,
-                            &format!("win.{name}"),
-                            None,
-                        );
+                        // `video.NAME` goes to the open video page's own actions.
+                        let (target, full): (gtk::Widget, String) = match name.strip_prefix("video.") {
+                            Some(_) => match super::dev_find_video_page(o.upcast_ref()) {
+                                Some(page) => (page, name.clone()),
+                                None => return,
+                            },
+                            None => (o.clone().upcast(), format!("win.{name}")),
+                        };
+                        log::info!("DEV: action {full}");
+                        let _ = gtk::prelude::WidgetExt::activate_action(&target, &full, None);
                     });
                 }
             }
@@ -1991,4 +1995,21 @@ pub mod imp {
     impl ApplicationWindowImpl for Window {}
     impl AdwWindowImpl for Window {}
     impl AdwApplicationWindowImpl for Window {}
+}
+
+/// Test hooks: the first video page in the window (the player sheet's).
+#[cfg(feature = "dev-hooks")]
+fn dev_find_video_page(root: &gtk::Widget) -> Option<gtk::Widget> {
+    use gtk::prelude::*;
+    if root.is::<crate::gui::video_page::VideoPage>() {
+        return Some(root.clone());
+    }
+    let mut child = root.first_child();
+    while let Some(c) = child {
+        if let Some(found) = dev_find_video_page(&c) {
+            return Some(found);
+        }
+        child = c.next_sibling();
+    }
+    None
 }

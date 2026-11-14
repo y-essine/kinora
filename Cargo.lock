@@ -1493,6 +1493,7 @@ dependencies = [
  "gdk4",
  "gettext-rs",
  "glib",
+ "gstreamer",
  "gtk4",
  "kinora-core",
  "libadwaita",

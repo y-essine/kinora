@@ -71,3 +71,5 @@ kinora-core = { path = "crates/kinora-core" }
 
 clapper = { package = "clapper-player", version = "0.10", features = ["v0_10"] }
 clapper-gtk = { package = "clapper-player-gtk", version = "0.10", features = ["v0_10"]  }
+# Kinora: the buffered part of the seek bar (the same GStreamer Clapper uses).
+gst = { package = "gstreamer", version = "0.24" }

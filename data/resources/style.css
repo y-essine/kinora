@@ -25,6 +25,11 @@ clapper-gtk-seek-bar scale trough highlight {
   background-color: var(--accent-bg-color);
 }
 
+/* Kinora: the buffered part ahead of the playhead (see buffer_bar.rs). */
+clapper-gtk-seek-bar scale trough fill {
+  background-color: alpha(white, 0.35);
+}
+
 .video-description {
   padding: 12px;
 }
