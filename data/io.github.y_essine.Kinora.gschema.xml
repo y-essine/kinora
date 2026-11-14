@@ -162,5 +162,9 @@
       <default>true</default>
       <summary>Play the first Up next video when a video ends</summary>
     </key>
+    <key name="reduce-effects" type="b">
+      <default>false</default>
+      <summary>Lite: switch off the ambient glow, hover effects, motion and preparing videos on hover.</summary>
+    </key>
   </schema>
 </schemalist>

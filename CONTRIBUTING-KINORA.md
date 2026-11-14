@@ -14,5 +14,7 @@ Upstream Pipeline's guide is in [CONTRIBUTING.md](CONTRIBUTING.md); this is the 
 - **Kept apart** (`dev/run.sh`): its own library, cache and settings under `.dev/home/` (settings in a keyfile, not dconf), so testing never touches your real Kinora. To give it an account, use *Connect Account* in the dev build, or put `account-cookies-command` in `.dev/home/config/glib-2.0/settings/keyfile`.
 - **Inspect live**: `GTK_DEBUG=interactive dev/run.sh` (or Ctrl+Shift+D) opens the GTK Inspector: widget tree, properties, live CSS.
 - **Test hooks** (`dev-hooks` feature, never in release builds) drive the app without clicking:
-  `KH_PAGE=feed`, `KH_SEARCH=lofi`, `KH_OPEN=0` (Nth Home video), `KH_ACTION=settings@5,connect-account@20`, `KH_NEXT_AFTER=15`, `KH_SCROLL_AFTER=12`.
+  `KH_PAGE=feed`, `KH_SEARCH=lofi`, `KH_OPEN=0` (Nth Home video), `KH_ACTION=settings@5,connect-account@20`, `KH_NEXT_AFTER=15`, `KH_SCROLL_AFTER=12`, `KH_HOME_SCROLL=600@12` (scroll Home down 600 px after 12 s).
+- **Side by side**: development builds do not hand over to an instance that is already running, so builds from several checkouts (or two windows of one, to compare states) run next to each other.
+- **Design**: the look is described in [docs/design.md](docs/design.md); new interface parts use its tokens and components.
 - **Faster builds**: `dev/build.sh` links with `mold` when it's installed, and uses `sccache` in linked git worktrees so parallel checkouts share compiled dependencies (in the main checkout sccache would add ~1 s to every small rebuild). Measured: a one-file Rust change rebuilds in about 3 s.

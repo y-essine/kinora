@@ -201,6 +201,13 @@ fn main() {
         .application_id(APP_ID)
         .resource_base_path(RESOURCES_PATH)
         .build();
+    // Kinora: development builds from several checkouts (git worktrees) run
+    // side by side instead of handing over to the one that started first.
+    #[cfg(feature = "dev-hooks")]
+    {
+        use gtk::gio::prelude::ApplicationExt;
+        app.set_flags(gtk::gio::ApplicationFlags::NON_UNIQUE);
+    }
     app.connect_activate(build_ui);
     app.run();
 }

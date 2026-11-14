@@ -134,6 +134,8 @@ pub mod imp {
         #[template_child]
         switch_seasonal_style: TemplateChild<SwitchRow>,
         #[template_child]
+        switch_reduce_effects: TemplateChild<SwitchRow>,
+        #[template_child]
         entry_external_player: TemplateChild<EntryRow>,
 
         #[template_child]
@@ -206,6 +208,14 @@ pub mod imp {
                 .bind(
                     "seasonal-style",
                     &self.switch_seasonal_style.get(),
+                    "active",
+                )
+                .flags(SettingsBindFlags::DEFAULT)
+                .build();
+            self.settings
+                .bind(
+                    "reduce-effects",
+                    &self.switch_reduce_effects.get(),
                     "active",
                 )
                 .flags(SettingsBindFlags::DEFAULT)
@@ -870,6 +880,7 @@ pub mod imp {
                 switch_external_default: Default::default(),
                 switch_show_splash: Default::default(),
                 switch_seasonal_style: Default::default(),
+                switch_reduce_effects: Default::default(),
                 entry_external_player: Default::default(),
                 entry_custom_yt_dlp_arguments: Default::default(),
                 combo_download_format: Default::default(),
