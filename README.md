@@ -1,61 +1,78 @@
 <div align="center">
- <h1>📽 Pipeline</h1>
- <strong>Follow your favorite video creators</strong>
-</div>
-
-<div class="ignore-css">
- <p align="center">
-  <a href="https://flathub.org/apps/de.schmidhuberj.tubefeeder"><img src="https://img.shields.io/flathub/downloads/de.schmidhuberj.tubefeeder?logo=flathub&labelColor=77767b&color=4a90d9"></a>
-  <a href="https://matrix.to/#/%23pipelineapp:matrix.org"><img src="https://img.shields.io/badge/Matrix-Join-brightgreen"></a>
-  <a href="https://hosted.weblate.org/engage/schmiddi-on-mobile/"><img src="https://hosted.weblate.org/widgets/schmiddi-on-mobile/-/pipeline/svg-badge.svg"></a>
- </p>
+ <h1>🏠 Pipeline Home</h1>
+ <strong>Pipeline, with your YouTube account's Home feed and Up next</strong>
 </div>
 <br>
-Pipeline lets you watch and download videos from YouTube and PeerTube, all without needing to navigate through different websites. Its adaptive design allows you to enjoy content on any screen size.
 
-![Screenshot of the video page](/data/screenshots/video.png)
+Pipeline Home is a spin-off of [Pipeline](https://gitlab.com/schmiddi-on-mobile/pipeline) by Julian
+Schmidhuber and contributors, a GTK app for watching YouTube and PeerTube without the website. It keeps
+everything Pipeline does and adds the parts of YouTube that need an account:
 
-## Installation
+- **Home**: your account's YouTube home feed, in YouTube's own order, as the first page.
+- **Up next**: under every video, the recommendations YouTube would show you for it.
+- **Autoplay**: when a video ends, the first Up next video starts (switch on the video page).
+- **Watch history that teaches the account**: videos you play are marked watched on YouTube, so
+  Home and Up next learn from what you watch here.
+- **Window fullscreen**: besides normal fullscreen (`F`), a button and `T` make the video fill
+  the window instead of the screen, like YouTube's theater mode.
+- **One scrolling video page**: the player scrolls away with the description and Up next.
 
-<table>
-  <tr>
-    <td>Flatpak</td>
-    <td>
-      <a href='https://flathub.org/apps/details/de.schmidhuberj.tubefeeder'><img width='130' alt='Download on Flathub' src='https://flathub.org/api/badge?svg&locale=en'/></a>
-    </td>
-  </tr>
-</table>
+Playback itself stays anonymous: YouTube refuses signed-in stream requests that lack an extra
+anti-bot token, so the account is only used to read recommendations and to mark videos watched.
 
-## Features
+> [!WARNING]
+> Using an account from an unofficial client is against YouTube's terms and can get the account
+> flagged. Use a separate (burner) account.
 
-- Search for you favorite channels and subscribe to them.
-- Aggregate videos from all subscriptions into a single feed
-- Filter out unwanted items from the feed, like short videos or videos from a series.
-- Play those videos either in the built-in video player or with any other video player of your choice.
-- Download videos for offline viewing.
-- Manage videos you want to watch later.
-- Import subscriptions from [NewPipe](https://github.com/TeamNewPipe/NewPipe/) or YouTube
-- Multiple platforms:
-    - YouTube (using Piped as the backend to prevent throttling)
-    - PeerTube
-    - suggest any other platform with a good API and it will be considered
+## Setup
 
-## Contributing
+1. Sign in to YouTube with your account in a Chromium profile.
+2. Find the profile's folder name in `~/.config/chromium` (`Default`, `Profile 1`, ...).
+3. Point Pipeline Home at it:
 
-See the [Contributing page](CONTRIBUTING.md).
+   ```sh
+   gsettings set de.schmidhuberj.tubefeeder account-cookies-command "yt-account-cookies 'Profile 3'"
+   ```
 
-## Translation
+`account-cookies-command` is any command that prints the path to a Netscape `cookies.txt` of the
+account. The bundled `yt-account-cookies` exports it from a Chromium profile through the GNOME keyring
+(it needs `python-secretstorage` and `yt-dlp`). An empty command turns the account features off; Up
+next then falls back to anonymous related videos.
 
-Pipeline can easily be translated for other languages, as it uses gettext. Please consider contributing translations using [Weblate](https://hosted.weblate.org/engage/schmiddi-on-mobile/), as an alternative you can also open merge requests and I will notify you if updates are necessary. Thanks to Weblate for free hosting and all the translators for their great work keeping the translations up-to-date.
+## Install (Arch Linux)
 
-<a href="https://hosted.weblate.org/engage/schmiddi-on-mobile/">
-<img src="https://hosted.weblate.org/widgets/schmiddi-on-mobile/-/pipeline/multi-auto.svg" alt="Translation status" />
-</a>
+```sh
+git clone https://github.com/y-essine/pipeline-home
+cd pipeline-home/packaging/arch
+makepkg -si
+```
 
-## Wiki
+It replaces `pipeline-gtk` and keeps the same app ID, so your subscriptions, watch later and
+history carry over.
 
-Please also take a look at the [wiki](https://gitlab.com/schmiddi-on-mobile/pipeline/-/wikis/home) for more information on how to use the app.
+## Building
 
-## Code of Conduct
+Same as Pipeline (Meson + Cargo, see [README.upstream.md](README.upstream.md)):
 
-This project follows [GNOME's Code of Conduct](https://conduct.gnome.org/).
+```sh
+meson setup build -Dprofile=development
+meson compile -C build
+```
+
+## What changed
+
+The account code is kept apart so the patch stays easy to rebase onto new Pipeline releases:
+
+- `src/backend/account.rs` (new): cookies, home feed (yt-dlp), Up next (RustyPipe, signed in),
+  marking watched.
+- `src/backend/client.rs`: `home_store`, `refresh_home()`, `up_next()`, `mark_watched_on_account()`.
+- `src/gui/window.rs`, `data/resources/ui/window.blp`: the Home page.
+- `src/gui/video_page.rs`, `data/resources/ui/video_page.blp`: Up next, autoplay, window
+  fullscreen, single scrolling page.
+
+The first commit is upstream Pipeline 4.1.1; everything after it is Pipeline Home.
+
+## License
+
+GPL-3.0-or-later, like Pipeline. All credit for Pipeline itself goes to its
+[authors](https://gitlab.com/schmiddi-on-mobile/pipeline/-/graphs/main).
