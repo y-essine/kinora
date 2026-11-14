@@ -2,6 +2,12 @@
 //!
 //! Read straight from YouTube's InnerTube API (one request, about a second);
 //! yt-dlp is the fallback when that fails.
+//!
+//! A page holds plain videos ([`HomePage::videos`]) and, apart from them,
+//! the playlists and mixes of the grid ([`HomePage::playlists`]). The
+//! "Mixes" and "Playlists" chips hold only the latter. Callers that show
+//! playlists ask with `playlists: true` (see [`load`]), so a page made only
+//! of playlists counts as a page rather than as an empty one to skip.
 
 use std::path::Path;
 use std::time::Duration;
@@ -14,9 +20,10 @@ use tokio::sync::OnceCell;
 use url::Url;
 
 use crate::Error;
+use crate::playlist::{self, PlaylistCard, PlaylistKind};
 use crate::youtube::{
-    Auth, PLATFORM, WEB_USER_AGENT, best_url, channel, last_line, parse_duration, text_of,
-    watch_url,
+    Auth, PLATFORM, WEB_USER_AGENT, best_url, channel, last_line, parse_count, parse_duration,
+    text_of, watch_url,
 };
 
 const HOME_URL: &str = "https://www.youtube.com/feed/recommended";
@@ -33,22 +40,28 @@ const HOME_EMPTY_PAGE_RETRIES: usize = 2;
 /// The first page of Home: the plain home page, or a chip's feed when
 /// `chip_token` is given. The plain page falls back to yt-dlp (slower) when the
 /// direct request fails or comes back without videos.
-pub async fn load(cookies: &Path, chip_token: Option<&str>) -> Result<HomePage, Error> {
+///
+/// `playlists`: the caller shows [`HomePage::playlists`] too, so a page with
+/// playlists and no videos is not empty (it is neither skipped nor a reason
+/// for the yt-dlp fallback). Without it, pages without videos are skipped as
+/// before; the playlists of the pages seen are kept either way.
+pub async fn load(
+    cookies: &Path,
+    chip_token: Option<&str>,
+    playlists: bool,
+) -> Result<HomePage, Error> {
     if let Some(token) = chip_token {
-        return continuation(cookies, token).await;
+        return continuation(cookies, token, playlists).await;
     }
-    match first_page(cookies).await {
-        Ok(page) if !page.videos.is_empty() => Ok(page),
+    match first_page(cookies, playlists).await {
+        Ok(page) if !page.is_empty(playlists) => Ok(page),
         // The direct request failed or came back empty: ask yt-dlp (slower).
         direct => {
             match direct {
                 Ok(_) => log::warn!("Home: YouTube sent no videos, trying yt-dlp"),
                 Err(e) => log::warn!("Home: direct request failed, trying yt-dlp: {e}"),
             }
-            ytdlp_feed(cookies).await.map(|videos| HomePage {
-                videos,
-                ..Default::default()
-            })
+            ytdlp_page(cookies).await
         }
     }
 }
@@ -57,6 +70,11 @@ pub async fn load(cookies: &Path, chip_token: Option<&str>) -> Result<HomePage, 
 /// fallback for `first_page`. Upload dates and view counts are not part of the
 /// listing; fill them in with the regular video information lookup.
 pub async fn ytdlp_feed(cookies: &Path) -> Result<Vec<Video>, Error> {
+    ytdlp_page(cookies).await.map(|page| page.videos)
+}
+
+/// [`ytdlp_feed`] with the listing's playlists and mixes.
+async fn ytdlp_page(cookies: &Path) -> Result<HomePage, Error> {
     let out = Command::new("yt-dlp")
         .arg("--cookies")
         .arg(cookies)
@@ -72,8 +90,12 @@ pub async fn ytdlp_feed(cookies: &Path) -> Result<Vec<Video>, Error> {
     }
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout)?;
-    let entries = json["entries"].as_array().cloned().unwrap_or_default();
-    Ok(entries.iter().filter_map(feed_entry_to_video).collect())
+    let entries = json["entries"].as_array().map_or(&[][..], Vec::as_slice);
+    Ok(HomePage {
+        videos: entries.iter().filter_map(feed_entry_to_video).collect(),
+        playlists: entries.iter().filter_map(feed_entry_to_playlist).collect(),
+        ..Default::default()
+    })
 }
 
 /// A chip of the Home page's filter bar ("All", "Music", "Gaming", ...).
@@ -87,44 +109,61 @@ pub struct HomeChip {
 /// One page of the Home feed.
 #[derive(Debug, Clone, Default)]
 pub struct HomePage {
+    /// Plain videos (no Shorts, ads, upcoming streams, playlists or mixes).
     pub videos: Vec<Video>,
+    /// The page's playlists, mixes and albums, in YouTube's order, apart
+    /// from the videos. The "Mixes" and "Playlists" chips' feeds hold only
+    /// these. Play one with [`PlaylistCard::dj_seed`].
+    pub playlists: Vec<PlaylistCard>,
     /// The filter bar; only on the first page.
     pub chips: Vec<HomeChip>,
     /// Continuation for the next page, if YouTube has more.
     pub next: Option<String>,
 }
 
+impl HomePage {
+    /// Nothing to show: no videos, and, when the caller shows them
+    /// (`playlists`), no playlists either.
+    pub fn is_empty(&self, playlists: bool) -> bool {
+        self.videos.is_empty() && (!playlists || self.playlists.is_empty())
+    }
+}
+
 /// The account's YouTube home page, in YouTube's order, straight from the
 /// InnerTube API. Upload dates are not part of it; fill them in with the
-/// regular video information lookup.
-pub async fn first_page(cookies: &Path) -> Result<HomePage, Error> {
+/// regular video information lookup. `playlists`: see [`load`].
+pub async fn first_page(cookies: &Path, playlists: bool) -> Result<HomePage, Error> {
     let json = browse(cookies, json!({ "browseId": "FEwhat_to_watch" })).await?;
     let mut page = parse_home(&json);
-    if page.videos.is_empty() && page.chips.is_empty() {
+    if page.is_empty(true) && page.chips.is_empty() {
         return Err("YouTube's home page had no videos".into());
     }
-    skip_empty_pages(cookies, &mut page).await;
+    skip_empty_pages(cookies, &mut page, playlists).await;
     Ok(page)
 }
 
-/// A later page of the Home feed, or a chip's feed, from a continuation token.
-pub async fn continuation(cookies: &Path, token: &str) -> Result<HomePage, Error> {
+/// A later page of the Home feed, or a chip's feed, from a continuation
+/// token. `playlists`: see [`load`].
+pub async fn continuation(cookies: &Path, token: &str, playlists: bool) -> Result<HomePage, Error> {
     let json = browse(cookies, json!({ "continuation": token })).await?;
     let mut page = parse_continuation(&json);
-    skip_empty_pages(cookies, &mut page).await;
+    skip_empty_pages(cookies, &mut page, playlists).await;
     Ok(page)
 }
 
-/// Pages made only of Shorts, Mixes and ads show nothing; look at the next one.
-async fn skip_empty_pages(cookies: &Path, page: &mut HomePage) {
+/// Pages made only of Shorts, Mixes and ads show nothing in a list of
+/// videos; look at the next one. With `playlists`, Mixes are something to
+/// show, so only pages with neither are skipped.
+async fn skip_empty_pages(cookies: &Path, page: &mut HomePage, playlists: bool) {
     for _ in 0..HOME_EMPTY_PAGE_RETRIES {
-        let Some(token) = page.next.clone().filter(|_| page.videos.is_empty()) else {
+        let Some(token) = page.next.clone().filter(|_| page.is_empty(playlists)) else {
             return;
         };
         match browse(cookies, json!({ "continuation": token })).await {
             Ok(json) => {
                 let next = parse_continuation(&json);
                 page.videos.extend(next.videos);
+                page.playlists.extend(next.playlists);
                 page.next = next.next;
             }
             Err(e) => {
@@ -221,14 +260,16 @@ fn parse_continuation(json: &Value) -> HomePage {
         if let Some(items) = items {
             let part = parse_items(items);
             page.videos.extend(part.videos);
+            page.playlists.extend(part.playlists);
             page.next = part.next.or(page.next);
         }
     }
     page
 }
 
-/// Videos and the continuation out of a list of grid items. YouTube currently
-/// sends videos as `lockupViewModel`, older responses as `videoRenderer`.
+/// Videos, playlists and the continuation out of a list of grid items.
+/// YouTube currently sends videos and playlists as `lockupViewModel`, older
+/// responses videos as `videoRenderer`.
 fn parse_items(items: &[Value]) -> HomePage {
     let mut page = HomePage::default();
     for item in items {
@@ -242,6 +283,10 @@ fn parse_items(items: &[Value]) -> HomePage {
         // Shelves (Shorts, ...) are `richSectionRenderer`s and ads `adSlotRenderer`s: skipped.
         let content = &item["richItemRenderer"]["content"];
         let video = if let Some(lockup) = content.get("lockupViewModel") {
+            if let Some(card) = playlist::from_lockup(lockup) {
+                page.playlists.push(card);
+                continue;
+            }
             lockup_to_video(lockup)
         } else if let Some(renderer) = content.get("videoRenderer") {
             video_renderer_to_video(renderer)
@@ -254,7 +299,7 @@ fn parse_items(items: &[Value]) -> HomePage {
 }
 
 fn lockup_to_video(l: &Value) -> Option<Video> {
-    // Mixes and playlists are lockups too.
+    // Mixes and playlists are lockups too (`playlist::from_lockup`).
     if l["contentType"].as_str() != Some("LOCKUP_CONTENT_TYPE_VIDEO") {
         return None;
     }
@@ -420,26 +465,46 @@ fn collect_badges(value: &Value, out: &mut Vec<(String, String)>) {
     }
 }
 
-/// "980K views", "1,234 views", "5.2K watching", "No views".
-fn parse_count(text: &str) -> Option<u64> {
-    let word = text.split_whitespace().next()?;
-    if word.eq_ignore_ascii_case("no") {
-        return Some(0);
+/// A playlist or mix of the yt-dlp listing (a "YoutubeTab" entry with a
+/// playlist id).
+fn feed_entry_to_playlist(e: &serde_json::Value) -> Option<PlaylistCard> {
+    if e["ie_key"].as_str() != Some("YoutubeTab") {
+        return None;
     }
-    let (number, scale) = match word.chars().last()? {
-        'K' | 'k' => (&word[..word.len() - 1], 1e3),
-        'M' => (&word[..word.len() - 1], 1e6),
-        'B' => (&word[..word.len() - 1], 1e9),
-        _ => (word, 1.0),
-    };
-    let number: f64 = number.replace(',', "").parse().ok()?;
-    Some((number * scale).round() as u64)
+    let id = e["url"]
+        .as_str()
+        .filter(|u| u.contains("list="))
+        .or(e["id"].as_str())
+        .and_then(playlist::normalize_id)?;
+    // Channels are "YoutubeTab" entries too.
+    if id.starts_with("UC") && id.len() == 24 {
+        return None;
+    }
+    Some(PlaylistCard {
+        kind: PlaylistKind::of(&id),
+        title: e["title"].as_str()?.to_owned(),
+        thumbnail: e["thumbnails"]
+            .as_array()
+            .and_then(|t| t.iter().rev().find_map(|t| t["url"].as_str()))
+            .and_then(|u| Url::parse(u).ok()),
+        owner: e["channel"]
+            .as_str()
+            .or(e["uploader"].as_str())
+            .map(str::to_owned),
+        owner_id: e["channel_id"].as_str().map(str::to_owned),
+        video_count: e["playlist_count"]
+            .as_u64()
+            .and_then(|n| u32::try_from(n).ok()),
+        first_video_id: None,
+        id,
+    })
 }
 
 fn feed_entry_to_video(e: &serde_json::Value) -> Option<Video> {
     let id = e["id"].as_str()?;
-    // Only plain videos: Mixes and playlists ("YoutubeTab") are not playable as
-    // a video and have no single channel.
+    // Only plain videos: Mixes and playlists ("YoutubeTab",
+    // `feed_entry_to_playlist`) are not playable as a video and have no
+    // single channel.
     if e["ie_key"].as_str() != Some("Youtube") || id.len() != 11 {
         return None;
     }
@@ -563,7 +628,75 @@ mod tests {
             json!({ "richItemRenderer": { "content": { "adSlotRenderer": {} } } }),
             json!({ "richSectionRenderer": { "content": { "richShelfRenderer": {} } } }),
         ];
-        assert!(parse_items(&items).videos.is_empty());
+        let page = parse_items(&items);
+        assert!(page.videos.is_empty());
+        // The mix is not a video, but it is not lost either.
+        assert_eq!(page.playlists.len(), 1);
+        assert_eq!(page.playlists[0].id, "RDabc");
+        assert_eq!(page.playlists[0].kind, PlaylistKind::Mix);
+        assert!(page.is_empty(false));
+        assert!(!page.is_empty(true));
+    }
+
+    /// Like a "Mixes" chip's feed: a continuation of playlist lockups and one
+    /// video (real lockups from an anonymous search, in Home's grid items).
+    #[test]
+    fn a_page_of_mixes_has_playlists_and_no_videos() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("fixtures/playlist_lockups.json")).unwrap();
+        let mut items: Vec<Value> = fixture["lockups"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|l| json!({ "richItemRenderer": { "content": { "lockupViewModel": l } } }))
+            .collect();
+        items.push(
+            json!({ "continuationItemRenderer": { "continuationEndpoint": {
+            "continuationCommand": { "token": "tok-next" } } } }),
+        );
+        let more = json!({ "onResponseReceivedActions": [
+            { "reloadContinuationItemsCommand": { "continuationItems": items } }
+        ] });
+        let page = parse_continuation(&more);
+        // The one video among them stays a video.
+        assert_eq!(page.videos.len(), 1);
+        assert_eq!(page.videos[0].id.id, "a5uQMwRMHcs");
+        assert_eq!(page.playlists.len(), 4);
+        assert_eq!(
+            page.playlists.iter().map(|p| p.kind).collect::<Vec<_>>(),
+            [
+                PlaylistKind::Playlist,
+                PlaylistKind::Mix,
+                PlaylistKind::Mix,
+                PlaylistKind::Album
+            ]
+        );
+        assert_eq!(page.next.as_deref(), Some("tok-next"));
+        assert!(!page.is_empty(true));
+    }
+
+    #[test]
+    fn ytdlp_playlists_are_cards() {
+        let entries = json!([
+            { "ie_key": "YoutubeTab", "id": "RDdQw4w9WgXcQ", "title": "Mix - Rick Astley",
+              "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ" },
+            { "ie_key": "YoutubeTab", "id": "PLabc", "title": "Mine", "playlist_count": 12,
+              "channel": "Me", "url": "https://www.youtube.com/playlist?list=PLabc" },
+            { "ie_key": "YoutubeTab", "id": "UCuAXFkgsw1L7xaCfnd5JJOw", "title": "A channel",
+              "url": "https://www.youtube.com/channel/UCuAXFkgsw1L7xaCfnd5JJOw" },
+            { "ie_key": "Youtube", "id": "dQw4w9WgXcQ", "title": "A video" },
+        ]);
+        let cards: Vec<PlaylistCard> = entries
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(feed_entry_to_playlist)
+            .collect();
+        assert_eq!(cards.len(), 2);
+        assert_eq!(cards[0].kind, PlaylistKind::Mix);
+        assert_eq!(cards[1].id, "PLabc");
+        assert_eq!(cards[1].video_count, Some(12));
+        assert_eq!(cards[1].owner.as_deref(), Some("Me"));
     }
 
     #[test]

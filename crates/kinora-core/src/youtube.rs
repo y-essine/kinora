@@ -178,6 +178,22 @@ pub(crate) fn parse_duration(text: &str) -> Option<TimeDelta> {
     Some(TimeDelta::seconds(seconds))
 }
 
+/// "980K views", "1,234 views", "5.2K watching", "No views", "24 videos".
+pub(crate) fn parse_count(text: &str) -> Option<u64> {
+    let word = text.split_whitespace().next()?;
+    if word.eq_ignore_ascii_case("no") {
+        return Some(0);
+    }
+    let (number, scale) = match word.chars().last()? {
+        'K' | 'k' => (&word[..word.len() - 1], 1e3),
+        'M' => (&word[..word.len() - 1], 1e6),
+        'B' => (&word[..word.len() - 1], 1e9),
+        _ => (word, 1.0),
+    };
+    let number: f64 = number.replace(',', "").parse().ok()?;
+    Some((number * scale).round() as u64)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

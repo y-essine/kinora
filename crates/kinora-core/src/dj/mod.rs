@@ -1,9 +1,11 @@
-//! The DJ: a continuous music session from a seed (a video, or "my mix"),
-//! with no repeats and crossfades between tracks. This is the engine; the
-//! frontend draws it and plays the audio.
+//! The DJ: a continuous music session from a seed (a video, "my mix", or a
+//! playlist, album or mix: [`DjSeed`]), with no repeats and crossfades
+//! between tracks. This is the engine; the frontend draws it and plays the
+//! audio.
 //!
-//! - [`radio`]: fetches the songs (YouTube Music's radio, YouTube's mix as
-//!   the fallback) and parses them into [`Track`]s.
+//! - [`radio`]: fetches the songs (YouTube Music's radio or playlist,
+//!   regular YouTube's mix or playlist as the fallback) and parses them into
+//!   [`Track`]s.
 //! - [`DjSession`]: the queue (current, upcoming, history), skip, "play
 //!   next", remove, dedupe, and when to fetch more.
 //! - [`plan_transition`]: when to start the next track and the crossfade
@@ -39,6 +41,28 @@
 //!     let page = core.dj_more(account, &request).await?;
 //!     session.extend(&request, page);
 //! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # From a playlist or a mix
+//!
+//! ```no_run
+//! # async fn example(core: &kinora_core::Core, account: &kinora_core::AccountConfig,
+//! #     card: &kinora_core::PlaylistCard) -> Result<(), kinora_core::Error> {
+//! use kinora_core::dj::DjSeed;
+//!
+//! // A card from `HomePage::playlists` or `core.account_playlists(account)`...
+//! let mut session = core.dj_start(account, card.dj_seed(false)).await?;
+//! // ...or an id or URL the user pasted.
+//! let seed = DjSeed::playlist("https://www.youtube.com/playlist?list=PL…", None);
+//! # let _ = seed;
+//!
+//! // Nothing plays yet: start the first track.
+//! let first = session.advance().cloned();
+//! // Then the same loop as above. When the playlist is over, the session
+//! // goes on with the radio of its last track by itself.
+//! # let _ = first;
 //! # Ok(())
 //! # }
 //! ```

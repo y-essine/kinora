@@ -137,12 +137,12 @@ impl FeedSource for YouTubeHome {
             let cookies = ctx.account()?.cookies().await?;
             if let Some(token) = request.continuation {
                 let cookies = cookies.ok_or("No YouTube account is set up.")?;
-                return home::continuation(&cookies, &token).await;
+                return home::continuation(&cookies, &token, request.playlists).await;
             }
             let cookies = cookies.ok_or(
                 "No YouTube account is set up. Set the account cookies command in the preferences.",
             )?;
-            home::load(&cookies, request.chip.as_deref()).await
+            home::load(&cookies, request.chip.as_deref(), request.playlists).await
         })
     }
 }

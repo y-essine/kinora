@@ -7,13 +7,14 @@ use crate::HomePage;
 use crate::extension::{Context, Extension, FeedFilter, Manifest, Setting};
 
 pub const ID: &str = "home-chips";
-/// Setting: leave out the chips whose feeds hold only playlists.
+/// Setting (off by default): leave Mixes and Playlists out of Home, both the
+/// chips whose feeds hold only playlists and the playlist cards
+/// ([`HomePage::playlists`]).
 pub const HIDE_PLAYLIST_CHIPS: &str = "hide-playlist-chips";
 
-/// Chips whose feeds hold only playlists (Mixes). Kinora shows plain videos
-/// only, so these would lead to an empty page. (Requests ask for English, so
-/// the titles are stable.)
-const PLAYLIST_ONLY_CHIPS: &[&str] = &["Mixes", "Playlists"];
+/// Chips whose feeds hold only playlists and mixes, no plain videos.
+/// (Requests ask for English, so the titles are stable.)
+pub const PLAYLIST_ONLY_CHIPS: &[&str] = &["Mixes", "Playlists"];
 
 pub struct HomeChipsExtension {
     manifest: Manifest,
@@ -37,8 +38,8 @@ impl HomeChipsExtension {
                 settings: vec![Setting::toggle(
                     HIDE_PLAYLIST_CHIPS,
                     "Hide Mixes and Playlists",
-                    Some("Their feeds have no plain videos"),
-                    true,
+                    Some("Only videos on Home, no playlists to play with the DJ"),
+                    false,
                 )],
                 builtin: true,
             },
@@ -63,6 +64,7 @@ impl FeedFilter for PlaylistChips {
         if ctx.flag(HIDE_PLAYLIST_CHIPS) {
             page.chips
                 .retain(|c| !PLAYLIST_ONLY_CHIPS.contains(&c.title.as_str()));
+            page.playlists.clear();
         }
     }
 }
@@ -73,7 +75,7 @@ mod tests {
 
     use super::*;
     use crate::extension::{ExtensionRegistry, SettingValue, value_key};
-    use crate::{AccountConfig, HomeChip, Paths};
+    use crate::{AccountConfig, HomeChip, Paths, PlaylistCard, PlaylistKind};
 
     fn page() -> HomePage {
         let chip = |title: &str, token: Option<&str>| HomeChip {
@@ -87,6 +89,16 @@ mod tests {
                 chip("Music", Some("b")),
                 chip("Playlists", Some("c")),
             ],
+            playlists: vec![PlaylistCard {
+                id: "RDMM".to_owned(),
+                title: "My Mix".to_owned(),
+                kind: PlaylistKind::Mix,
+                thumbnail: None,
+                owner: None,
+                owner_id: None,
+                video_count: None,
+                first_video_id: None,
+            }],
             ..Default::default()
         }
     }
@@ -96,21 +108,35 @@ mod tests {
     }
 
     #[test]
-    fn playlist_only_chips_are_skipped() {
+    fn playlists_are_kept_unless_hidden() {
         let registry = ExtensionRegistry::with_builtins();
         let (account, paths) = (AccountConfig::anonymous(), Paths::new("/tmp/kinora-test"));
 
-        let mut home = page();
-        registry.filter_feed(&mut home, &account, &paths);
-        assert_eq!(titles(&home), ["All", "Music"]);
-
-        // The setting switched off keeps them.
-        registry.set_values(HashMap::from([(
-            value_key(ID, HIDE_PLAYLIST_CHIPS),
-            SettingValue::Bool(false),
-        )]));
+        // By default the playlist chips and cards stay: the DJ plays them.
         let mut home = page();
         registry.filter_feed(&mut home, &account, &paths);
         assert_eq!(titles(&home), ["All", "Mixes", "Music", "Playlists"]);
+        assert_eq!(home.playlists.len(), 1);
+
+        // "Hide Mixes and Playlists" drops both.
+        registry.set_values(HashMap::from([(
+            value_key(ID, HIDE_PLAYLIST_CHIPS),
+            SettingValue::Bool(true),
+        )]));
+        let mut home = page();
+        registry.filter_feed(&mut home, &account, &paths);
+        assert_eq!(titles(&home), ["All", "Music"]);
+        assert!(home.playlists.is_empty());
+    }
+
+    #[test]
+    fn the_setting_is_off_by_default() {
+        let ext = HomeChipsExtension::new();
+        let setting = ext.manifest().setting(HIDE_PLAYLIST_CHIPS).unwrap();
+        assert_eq!(setting.title, "Hide Mixes and Playlists");
+        assert_eq!(
+            setting.kind,
+            crate::extension::SettingKind::Toggle { default: false }
+        );
     }
 }

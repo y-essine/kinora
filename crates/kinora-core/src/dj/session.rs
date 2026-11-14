@@ -68,13 +68,21 @@ pub struct DjSession {
     /// Videos whose radio this session already used.
     seeds: HashSet<String>,
     fruitless: u8,
+    /// Ids of the tracks that came from a playlist seed's own pages.
+    #[serde(default)]
+    from_playlist: HashSet<String>,
 }
 
 impl DjSession {
     /// A session from the first page of its radio. For a video seed the
     /// video (the page's first track) becomes [`Self::current`]: it is
-    /// already playing. For "my mix" nothing is current yet: call
-    /// [`Self::advance`] for the first track.
+    /// already playing. For "my mix" and playlists nothing is current yet:
+    /// call [`Self::advance`] for the first track.
+    ///
+    /// A playlist seed's tracks are queued in the playlist's order (or
+    /// shuffled, as asked), page after page. When the playlist has no more
+    /// pages, [`Self::refill_request`] starts the radio of its last track,
+    /// so the music goes on in the same vein. A mix never ends.
     pub fn start(seed: DjSeed, options: DjOptions, page: RadioPage) -> Self {
         let mut session = Self {
             source: page.source,
@@ -89,6 +97,7 @@ impl DjSession {
             blocked: HashSet::new(),
             seeds: HashSet::new(),
             fruitless: 0,
+            from_playlist: HashSet::new(),
         };
         session.extend(&RadioRequest::Start(seed.clone()), page);
         if let DjSeed::Video(id) = &seed
@@ -142,6 +151,21 @@ impl DjSession {
     /// What played, oldest first.
     pub fn history(&self) -> &[HistoryEntry] {
         &self.history
+    }
+
+    /// Whether `track` came from the seed playlist (or mix) itself, rather
+    /// than from a radio started after it. Always `false` for video and
+    /// "my mix" seeds. A frontend can mark where the playlist ends in the
+    /// queue ("then: radio").
+    pub fn is_from_playlist(&self, track: &Track) -> bool {
+        self.from_playlist.contains(&track.id)
+    }
+
+    /// Still in the seed playlist: it has more pages, or its tracks are
+    /// still queued, and no radio was started yet. `false` for video and
+    /// "my mix" seeds.
+    pub fn in_playlist(&self) -> bool {
+        matches!(self.seed, DjSeed::Playlist { .. }) && self.seeds.is_empty()
     }
 
     /// Nothing plays, nothing is queued, and there is no way to get more.
@@ -232,10 +256,12 @@ impl DjSession {
         self.upcoming.len() < self.options.refill_below
     }
 
-    /// What to fetch to top the queue up: the radio's next page, or, when it
-    /// has none left, the radio of the most recent track whose radio was not
-    /// used yet. `None` when the queue is full enough, or when there is
-    /// nothing left to start from.
+    /// What to fetch to top the queue up: the radio's (or playlist's) next
+    /// page, or, when it has none left, the radio of the most recent track
+    /// whose radio was not used yet. When a playlist runs out, that is its
+    /// last track (the last one queued), so the radio follows on from where
+    /// the playlist ends. `None` when the queue is full enough, or when
+    /// there is nothing left to start from.
     pub fn refill_request(&self) -> Option<RadioRequest> {
         if !self.needs_refill() {
             return None;
@@ -243,12 +269,23 @@ impl DjSession {
         if let Some(continuation) = &self.continuation {
             return Some(RadioRequest::More(continuation.clone()));
         }
-        self.current
-            .iter()
-            .chain(self.history.iter().rev().map(|h| &h.track))
-            .chain(self.upcoming.iter().rev())
-            .find(|t| !self.seeds.contains(&t.id))
-            .map(|t| RadioRequest::Start(DjSeed::Video(t.id.clone())))
+        let unused = |t: &&Track| !self.seeds.contains(&t.id);
+        let history = || self.history.iter().rev().map(|h| &h.track);
+        let next = if self.in_playlist() {
+            self.upcoming
+                .iter()
+                .rev()
+                .chain(&self.current)
+                .chain(history())
+                .find(unused)
+        } else {
+            self.current
+                .iter()
+                .chain(history())
+                .chain(self.upcoming.iter().rev())
+                .find(unused)
+        };
+        next.map(|t| RadioRequest::Start(DjSeed::Video(t.id.clone())))
     }
 
     /// Fetching `request` failed: don't ask for it again. A continuation is
@@ -283,12 +320,18 @@ impl DjSession {
     /// Add a fetched page (the answer to `request`) to the queue, leaving out
     /// duplicates. Returns how many tracks were added.
     pub fn extend(&mut self, request: &RadioRequest, page: RadioPage) -> usize {
+        // Pages before the first radio are the seed playlist's own.
+        let from_playlist =
+            self.in_playlist() && !matches!(request, RadioRequest::Start(DjSeed::Video(_)));
         if let RadioRequest::Start(DjSeed::Video(id)) = request {
             self.seeds.insert(id.clone());
         }
         let mut added = 0;
         for track in page.tracks {
             if self.accepts(&track) {
+                if from_playlist {
+                    self.from_playlist.insert(track.id.clone());
+                }
                 self.upcoming.push(track);
                 added += 1;
             }
@@ -511,6 +554,117 @@ mod tests {
             s.refill_request(),
             Some(RadioRequest::Start(DjSeed::Video("b".into())))
         );
+    }
+
+    fn playlist_seed() -> DjSeed {
+        DjSeed::playlist("PLroadtrip", Some("Road trip".into())).unwrap()
+    }
+
+    /// A playlist's next page, from a real parse so the type stays opaque.
+    fn playlist_more() -> Option<RadioContinuation> {
+        serde_json::from_value(
+            serde_json::json!({ "music": { "playlist": "PLroadtrip", "token": "p2" } }),
+        )
+        .ok()
+    }
+
+    #[test]
+    fn a_playlist_plays_in_order_then_goes_on_with_a_radio() {
+        let options = DjOptions {
+            avoid_repeats: true,
+            refill_below: 3,
+        };
+        let first = page(
+            vec![
+                track("p1", "Africa", "TOTO"),
+                track("p2", "Take On Me", "a-ha"),
+            ],
+            playlist_more(),
+        );
+        let mut s = DjSession::start(playlist_seed(), options, first);
+        // Nothing plays until the frontend starts the first track.
+        assert_eq!(s.current(), None);
+        assert!(s.in_playlist());
+        assert_eq!(s.seed().title(), Some("Road trip"));
+
+        // The playlist's next page first.
+        let next_page = s.refill_request().unwrap();
+        assert_eq!(next_page, RadioRequest::More(playlist_more().unwrap()));
+        let last = page(
+            vec![
+                track("p3", "Venus", "Bananarama"),
+                track("p4", "Down Under", "Men At Work"),
+            ],
+            None,
+        );
+        assert_eq!(s.extend(&next_page, last), 2);
+        assert_eq!(ids(s.upcoming()), ["p1", "p2", "p3", "p4"]);
+        assert_eq!(s.advance().unwrap().id, "p1");
+        assert_eq!(s.advance().unwrap().id, "p2");
+        assert!(s.in_playlist());
+
+        // The playlist is over: the radio of its last track ("p4") follows,
+        // not that of the one playing.
+        let radio = s.refill_request().unwrap();
+        assert_eq!(radio, RadioRequest::Start(DjSeed::Video("p4".into())));
+        let page_of_radio = page(
+            vec![
+                track("p4", "Down Under", "Men At Work"),
+                track("r1", "Land Down Under (Live)", "Men At Work"),
+                track("r2", "Africa", "TOTO"),
+                track("r3", "Don't You Want Me", "The Human League"),
+            ],
+            more(),
+        );
+        // "p4" is queued and "Africa" played: only "r1" and "r3" are new.
+        assert_eq!(s.extend(&radio, page_of_radio), 2);
+        assert_eq!(ids(s.upcoming()), ["p3", "p4", "r1", "r3"]);
+        assert!(!s.in_playlist());
+        assert!(s.is_from_playlist(&track("p3", "", "")));
+        assert!(!s.is_from_playlist(&track("r1", "", "")));
+
+        // From now on it is an ordinary radio session.
+        assert_eq!(s.advance().unwrap().id, "p3");
+        assert_eq!(s.advance().unwrap().id, "p4");
+        assert!(matches!(s.refill_request(), Some(RadioRequest::More(_))));
+        s.fetch_failed(&s.refill_request().unwrap());
+        // The radio's continuation failed: the most recent track whose radio
+        // was not used ("p4" was) seeds the next one.
+        assert_eq!(
+            s.refill_request(),
+            Some(RadioRequest::Start(DjSeed::Video("p3".into())))
+        );
+    }
+
+    #[test]
+    fn a_short_playlist_queues_the_radio_after_its_last_track() {
+        let options = DjOptions {
+            avoid_repeats: true,
+            refill_below: 10,
+        };
+        let first = page(
+            vec![
+                track("p1", "Africa", "TOTO"),
+                track("p2", "Venus", "Bananarama"),
+            ],
+            None,
+        );
+        let s = DjSession::start(playlist_seed(), options, first);
+        assert_eq!(
+            s.refill_request(),
+            Some(RadioRequest::Start(DjSeed::Video("p2".into())))
+        );
+        assert!(!s.is_finished());
+    }
+
+    #[test]
+    fn a_mix_seed_follows_its_continuation() {
+        let mix = DjSeed::playlist("RDEMni3jl65KF37F9JYsJM8DGg", None).unwrap();
+        let first = page(vec![track("a", "A", "X"), track("b", "B", "Y")], more());
+        let s = DjSession::start(mix, DjOptions::default(), first);
+        assert_eq!(s.current(), None);
+        assert!(matches!(s.refill_request(), Some(RadioRequest::More(_))));
+        assert!(s.is_from_playlist(&track("a", "A", "X")));
     }
 
     #[test]
