@@ -46,6 +46,7 @@ impl VideoPage {
                 &self.convert_to_clapper_playable_url(&video),
             ));
             player.play();
+            self.imp().play_started.set(Some(std::time::Instant::now()));
             // Kinora: count it on the YouTube account once it was really watched.
             self.mark_watched_on_account_later(&video);
         } else {
@@ -330,6 +331,8 @@ pub mod imp {
         autoplay_switch: TemplateChild<gtk::Switch>,
         up_next_store: FiniteVideoStore,
         autoplay_done: Cell<bool>,
+        /// When play() was pressed, to log how long the video took to start.
+        pub(super) play_started: Cell<Option<std::time::Instant>>,
 
         #[property(get, set)]
         fullscreened: Cell<bool>,
@@ -362,6 +365,7 @@ pub mod imp {
                 autoplay_switch: Default::default(),
                 up_next_store: FiniteVideoStore::with_sort(VideoSort::AsAdded),
                 autoplay_done: Default::default(),
+                play_started: Default::default(),
                 fullscreened: Default::default(),
                 window_mode: Default::default(),
                 state: Default::default(),
@@ -475,6 +479,14 @@ pub mod imp {
         /// When the video has played to its end, continue with the first "Up next" video.
         fn maybe_autoplay(&self, player: &clapper::Player) {
             let obj = self.obj();
+            if player.state() == clapper::PlayerState::Playing {
+                if let Some(started) = self.play_started.take() {
+                    log::info!(
+                        "Player: playing after {:.1} s",
+                        started.elapsed().as_secs_f64()
+                    );
+                }
+            }
             log::debug!(
                 "autoplay check: state {:?}, position {:.2}, duration {:?}, up next {}",
                 player.state(),

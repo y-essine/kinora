@@ -674,6 +674,7 @@ impl Client {
         }
         self.set_home_loading(true);
         self.set_home_error(String::new());
+        let started = std::time::Instant::now();
 
         let command = self.account_cookies_command();
         let result = tspawn!(async move {
@@ -703,6 +704,11 @@ impl Client {
         for video in &videos {
             store.add(video.clone());
         }
+        log::info!(
+            "Home: {} videos in {:.1} s",
+            videos.len(),
+            started.elapsed().as_secs_f64()
+        );
         if videos.is_empty() {
             self.set_home_error(
                 "YouTube returned no recommendations. Watch a few videos on the account first."
