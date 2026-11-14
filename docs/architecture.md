@@ -37,6 +37,7 @@ face, like a Tauri app for Windows or an mpv-based player, can reuse the brain a
 | `account.rs` | Cookies, browser profiles (`kinora-account`), Up next and subscriptions (RustyPipe), mark watched (yt-dlp) |
 | `streams.rs` | Prepared playback (`kinora-prepare`) and the experimental RustyPipe fast start (DASH/HLS) |
 | `player.rs` | The `Player` trait and playback helpers |
+| `dj/` | The DJ engine: YouTube Music radio, the session queue, crossfade planning (see *The DJ*) |
 | `extension/` | The extension model, the registry and the built-in extensions |
 
 Rules:
@@ -147,17 +148,61 @@ list to store. Labels in manifests are English; translate them in the frontend.
 |---|---|---|---|
 | `account` (Network, Account) | `youtube-home` main feed source; `on_watched` marks the video watched on YouTube; menu item `import-subscriptions` (Home) | `personal-up-next`, `mark-watched` (both on) | Fully anonymous: no Home, anonymous Up next, nothing sent to the account. `Core::account_active` and the Client's `has-account` are false |
 | `home-chips` | a feed filter that hides the playlist-only Mixes/Playlists chips | `hide-playlist-chips` (on) | Home is one feed without a chip bar |
+| `dj` (Network, Account, PlayerControl) | nothing to the fixed points: frontends call `Core::dj_*` (see *The DJ*) | `crossfade-seconds` (choice `"0"`..`"12"`, `"6"`), `avoid-repeats` (on), `start-from` (`current-video` \| `my-mix`) | `Core::dj_*` fail; nothing is fetched |
 
 What stays in the core on purpose: anonymous Up next (it works without an account; the account
 extension only personalises it), prepared/fast-start playback, and connecting an account (the
 browser-profile dialog is a frontend flow that ends in `AccountConfig::cookies_command`).
 Autoplay ("play the first Up next video") is still in the GTK video page; with the new page it
-should ask `Core::choose_next`/`Core::transition` and call `player::play_next`, which is where a
-DJ extension (radio queue + crossfade) plugs in.
+should ask `Core::choose_next`/`Core::transition` and call `player::play_next`. The DJ does not
+take autoplay over: a DJ session is started on purpose and has its own queue.
 
 Experiences are sets of extensions: **Private** = `account` off; **Lite** = `home-chips` off
 (later: other heavy extensions); **Connected** = all on; **Fun** = opt-in extensions like a DJ.
 Extensions that should start *off* need an `enabled-extensions` list too (not added yet).
+
+## The DJ
+
+A continuous music session from a seed: a video (its YouTube Music radio) or "my mix" (`RDMM`,
+personal when the account is active, YouTube's popular mix otherwise). The engine is in
+`kinora_core::dj`, with no I/O except `dj::radio::fetch`; the frontend draws the session and
+plays the audio.
+
+- **Radio** (`dj::radio`): InnerTube `next` on music.youtube.com (`WEB_REMIX`, playlist
+  `RDAMVM<videoId>`), signed in with the same cookies.txt → `Cookie` + `SAPISIDHASH` auth as Home
+  (`youtube::Auth`, origin `https://music.youtube.com`) when `Core::account_active`, else
+  anonymous. About 50 tracks a page plus a radio continuation token. Fallbacks, in order: the
+  same request anonymously, then regular YouTube's mix (`WEB`, `RD<videoId>`, 25 videos a page,
+  continued by asking for the mix from its last video). Parsed into `dj::Track` (id, title,
+  artists with channel ids, album and year for songs, duration, thumbnail, kind
+  Song/MusicVideo/Video). `Track::to_video()` gives the `pcore::Video` to prepare and play.
+- **Session** (`DjSession`): `current`, `upcoming`, `history` (with `skipped`); `advance`, `skip`,
+  `play_next`, `enqueue`, `remove`, `move_to`. Dedupe keeps out the same video and the same song
+  by the same main artist in another upload (`dj::track_key`: brackets and " - " version notes
+  like "(Official Video)", "(Lyrics)", "(2022 Remaster)", "Live" dropped; remixes, covers and
+  acoustic versions kept apart). With `avoid-repeats`, nothing played comes back; removed tracks
+  never do. `refill_request()` says what to fetch when fewer than 10 are left: the next page, or a
+  new radio from the most recent track whose radio was not used yet (radios that only repeat
+  themselves are dropped after two pages).
+- **Transitions** (`dj::plan_transition`, pure): `TransitionPlan { start_at, fade }` from the
+  current track's length and position, the next one's length and the crossfade setting. The fade is
+  at most 1/8 of the shorter track, none under 30 s or for unknown lengths (live); planned late,
+  it fades over what is left. `plan.gains(elapsed)` / `plan.curve(steps)` give equal-power volumes
+  (`cos`/`sin`, linear amplitude 0..1); `plan.transition()` is the `player::Transition` for players
+  that crossfade themselves.
+
+`Core`: `dj_settings()`, `dj_seed(account, open_video)`, `dj_start(account, seed) -> DjSession`,
+`dj_more(account, &RadioRequest) -> RadioPage` (no session borrowed across the request; feed the
+page to `session.extend(&request, page)`, or `session.fetch_failed(&request)`),
+`dj_refill(account, &mut session)`, `dj_transition(duration, position, &next) -> TransitionPlan`.
+All fail while the extension is off. `cargo run -p kinora-core --example dj_radio -- [VIDEO_ID |
+mymix]` tries it against the live API; the parser tests use recorded anonymous responses in
+`crates/kinora-core/src/dj/fixtures/`.
+
+What a frontend does: keep the `DjSession`; when a track starts, prepare `peek_next()` and plan
+the transition with the player's real duration; at `start_at` start the next track at volume 0
+and set both volumes from `gains(elapsed)` every ~50 ms for `fade`, then stop the old one (a cut:
+on end of stream); call `advance()` (or `skip()`), then refill in the background.
 
 ## A new frontend
 
@@ -184,6 +229,9 @@ would ship them next to the app).
 - Move the SQLite store, the `papi` provider setup (Piped/RustyPipe/PeerTube) and import/export
   into the core. The store uses the GObject `Filter`, so it needs a plain filter type first.
 - A `ClapperPlayer` implementing `Player`, and autoplay through `choose_next`/`play_next`.
+- The DJ's UI and its crossfading playback (two players, volumes from `TransitionPlan`). A number
+  setting kind would suit `crossfade-seconds` better than a choice. The DJ is on by default but
+  idle until started; for the Fun experience it could move to the opt-in list.
 - Render menus and settings panels from the registry in the GTK app (the account menu is still
   hand-written in `window.rs`).
 - Third-party extensions: load manifests from files and run their code sandboxed (e.g. WASM),
