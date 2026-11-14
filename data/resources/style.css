@@ -20,7 +20,7 @@
 /* Colored Clapper playback progress bar */
 clapper-gtk-seek-bar scale trough highlight {
   /* Workaround for adwaita overriding the accent color to white inside OSD https://gitlab.gnome.org/GNOME/libadwaita/-/blob/main/src/stylesheet/_common.scss#L38 */
-  --accent-bg-color: @accent_bg_color;
+  --accent-bg-color: var(--k-accent, @accent_bg_color);
   color: var(--accent-fg-color);
   background-color: var(--accent-bg-color);
 }
