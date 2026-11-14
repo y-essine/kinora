@@ -9,13 +9,15 @@ use std::time::Duration;
 use chrono::TimeDelta;
 use pcore::{Channel, Video, VideoId};
 use serde_json::{Value, json};
-use sha1::{Digest, Sha1};
 use tokio::process::Command;
 use tokio::sync::OnceCell;
 use url::Url;
 
 use crate::Error;
-use crate::youtube::{PLATFORM, channel, last_line, watch_url};
+use crate::youtube::{
+    Auth, PLATFORM, WEB_USER_AGENT, best_url, channel, last_line, parse_duration, text_of,
+    watch_url,
+};
 
 const HOME_URL: &str = "https://www.youtube.com/feed/recommended";
 /// How many videos the Home page asks for.
@@ -24,9 +26,7 @@ const HOME_SIZE: u32 = 60;
 const YOUTUBE_ORIGIN: &str = "https://www.youtube.com";
 const BROWSE_URL: &str = "https://www.youtube.com/youtubei/v1/browse?prettyPrint=false";
 /// The web client version RustyPipe falls back to; YouTube accepts it for browse requests.
-const WEB_CLIENT_VERSION: &str = "2.20241216.05.00";
-const WEB_USER_AGENT: &str =
-    "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0";
+pub(crate) const WEB_CLIENT_VERSION: &str = "2.20241216.05.00";
 /// How many continuation requests Home makes to get past pages without plain videos.
 const HOME_EMPTY_PAGE_RETRIES: usize = 2;
 
@@ -148,7 +148,7 @@ async fn browse(cookies: &Path, request: Value) -> Result<Value, Error> {
         })
         .await?;
 
-    let auth = Auth::from_cookies_txt(&tokio::fs::read_to_string(cookies).await?)?;
+    let auth = Auth::from_file(cookies, "www.youtube.com").await?;
     let mut body = request;
     body["context"] = json!({
         "client": {
@@ -158,14 +158,9 @@ async fn browse(cookies: &Path, request: Value) -> Result<Value, Error> {
         }
     });
 
-    let response = http
-        .post(BROWSE_URL)
+    let response = auth
+        .sign(http.post(BROWSE_URL), YOUTUBE_ORIGIN)
         .header("Content-Type", "application/json")
-        .header("Cookie", auth.cookie)
-        .header("Authorization", sapisidhash(&auth.sapisid))
-        .header("Origin", YOUTUBE_ORIGIN)
-        .header("X-Origin", YOUTUBE_ORIGIN)
-        .header("X-Goog-AuthUser", "0")
         .body(body.to_string())
         .send()
         .await?;
@@ -174,58 +169,6 @@ async fn browse(cookies: &Path, request: Value) -> Result<Value, Error> {
         return Err(format!("YouTube answered the home request with {status}").into());
     }
     Ok(serde_json::from_slice(&response.bytes().await?)?)
-}
-
-/// What a signed-in request needs from the cookies.txt.
-struct Auth {
-    /// The `Cookie` header: the youtube.com cookies.
-    cookie: String,
-    sapisid: String,
-}
-
-impl Auth {
-    fn from_cookies_txt(txt: &str) -> Result<Self, Error> {
-        let mut pairs = Vec::new();
-        let mut sapisid = None;
-        for line in txt.lines() {
-            // Chromium-style exports mark HttpOnly cookies with this prefix.
-            let line = line.strip_prefix("#HttpOnly_").unwrap_or(line);
-            if line.starts_with('#') {
-                continue;
-            }
-            let fields: Vec<&str> = line.split('\t').collect();
-            if fields.len() < 7
-                || !matches!(
-                    fields[0].trim_start_matches('.'),
-                    "youtube.com" | "www.youtube.com"
-                )
-            {
-                continue;
-            }
-            let (name, value) = (fields[5], fields[6].trim_end());
-            if name == "SAPISID" {
-                sapisid = Some(value.to_owned());
-            }
-            pairs.push(format!("{name}={value}"));
-        }
-        let sapisid = sapisid
-            .ok_or("The account cookies hold no YouTube login (SAPISID). Connect it again.")?;
-        Ok(Self {
-            cookie: pairs.join("; "),
-            sapisid,
-        })
-    }
-}
-
-/// The `Authorization` header YouTube's web client sends when signed in.
-fn sapisidhash(sapisid: &str) -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs());
-    let mut hash = Sha1::new();
-    hash.update(format!("{now} {sapisid} {YOUTUBE_ORIGIN}"));
-    let hex: String = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
-    format!("SAPISIDHASH {now}_{hex}")
 }
 
 /// The first page: a rich grid with a filter chip bar above it.
@@ -477,38 +420,6 @@ fn collect_badges(value: &Value, out: &mut Vec<(String, String)>) {
     }
 }
 
-/// The largest image of a list of `{ "url": ... }` sources (they are sorted by size).
-fn best_url(sources: &Value) -> Option<Url> {
-    sources
-        .as_array()?
-        .iter()
-        .rev()
-        .find_map(|s| s["url"].as_str())
-        .and_then(|u| Url::parse(u).ok())
-}
-
-/// Text of `{ "simpleText": ... }` or `{ "runs": [...] }`.
-fn text_of(v: &Value) -> Option<String> {
-    let text = match v["simpleText"].as_str() {
-        Some(t) => t.to_owned(),
-        None => v["runs"]
-            .as_array()?
-            .iter()
-            .filter_map(|r| r["text"].as_str())
-            .collect(),
-    };
-    Some(text).filter(|t| !t.is_empty())
-}
-
-/// "12:48" or "1:09:10".
-fn parse_duration(text: &str) -> Option<TimeDelta> {
-    let mut seconds = 0i64;
-    for part in text.trim().split(':') {
-        seconds = seconds * 60 + part.parse::<i64>().ok()?;
-    }
-    Some(TimeDelta::seconds(seconds))
-}
-
 /// "980K views", "1,234 views", "5.2K watching", "No views".
 fn parse_count(text: &str) -> Option<u64> {
     let word = text.split_whitespace().next()?;
@@ -748,18 +659,5 @@ mod tests {
         assert_eq!(parse_count("views"), None);
         assert_eq!(parse_duration("0:30"), Some(TimeDelta::seconds(30)));
         assert_eq!(parse_duration("LIVE"), None);
-    }
-
-    #[test]
-    fn cookies_txt_gives_a_header_and_sapisid() {
-        let txt = "# Netscape HTTP Cookie File\n\
-            .youtube.com\tTRUE\t/\tTRUE\t0\tSAPISID\tsecret\n\
-            #HttpOnly_.youtube.com\tTRUE\t/\tTRUE\t0\tSID\tabc\n\
-            .google.com\tTRUE\t/\tTRUE\t0\tNID\tnope\n";
-        let auth = Auth::from_cookies_txt(txt).unwrap();
-        assert_eq!(auth.sapisid, "secret");
-        assert_eq!(auth.cookie, "SAPISID=secret; SID=abc");
-        assert!(Auth::from_cookies_txt(".google.com\tTRUE\t/\tTRUE\t0\tNID\tx").is_err());
-        assert!(sapisidhash("secret").starts_with("SAPISIDHASH "));
     }
 }

@@ -43,7 +43,8 @@ fn video(id: &str) -> Video {
     }
 }
 
-/// A "DJ" that plays the last candidate with a crossfade, and a feed with chips.
+/// A made-up "DJ" (not the built-in one) that plays the last candidate with a
+/// crossfade, and a feed with chips.
 struct Dj {
     manifest: Manifest,
     watched: Arc<Mutex<Vec<String>>>,
@@ -71,7 +72,7 @@ impl Dj {
             kind: choice,
         }];
         Self {
-            manifest: manifest("dj", permissions, settings),
+            manifest: manifest("test-dj", permissions, settings),
             watched: Arc::default(),
         }
     }
@@ -199,7 +200,7 @@ fn disabled_list_switches_extensions_off() {
     );
 
     let panels = registry.settings_panels();
-    assert_eq!(panels.len(), 2);
+    assert_eq!(panels.len(), 3);
     assert!(!panels[0].enabled && panels[0].builtin);
     assert_eq!(panels[0].values["mark-watched"], SettingValue::Bool(true));
 }
@@ -209,32 +210,32 @@ fn stored_values_that_do_not_fit_are_ignored() {
     let mut registry = ExtensionRegistry::new();
     registry.register(Arc::new(Dj::new(vec![]))).unwrap();
     assert_eq!(
-        registry.value("dj", "pick"),
+        registry.value("test-dj", "pick"),
         Some(SettingValue::Text("last".into()))
     );
 
     registry.set_values(HashMap::from([(
-        value_key("dj", "pick"),
+        value_key("test-dj", "pick"),
         SettingValue::Text("nope".into()),
     )]));
     assert_eq!(
-        registry.value("dj", "pick"),
+        registry.value("test-dj", "pick"),
         Some(SettingValue::Text("last".into()))
     );
     registry.set_values(HashMap::from([(
-        value_key("dj", "pick"),
+        value_key("test-dj", "pick"),
         SettingValue::Bool(true),
     )]));
     assert_eq!(
-        registry.value("dj", "pick"),
+        registry.value("test-dj", "pick"),
         Some(SettingValue::Text("last".into()))
     );
     registry.set_values(HashMap::from([(
-        value_key("dj", "pick"),
+        value_key("test-dj", "pick"),
         SettingValue::Text("first".into()),
     )]));
     assert_eq!(
-        registry.value("dj", "pick"),
+        registry.value("test-dj", "pick"),
         Some(SettingValue::Text("first".into()))
     );
 }
@@ -263,7 +264,7 @@ fn choosing_the_next_video_needs_player_control() {
         Transition::Crossfade(_)
     ));
 
-    with.set_disabled(["dj"]);
+    with.set_disabled(["test-dj"]);
     assert_eq!(with.choose_next(&a, &candidates, &account, &paths), None);
 }
 
@@ -276,7 +277,7 @@ async fn hooks_run_for_enabled_extensions_only() {
     registry.register(Arc::new(dj)).unwrap();
 
     registry.watched(&video("a"), &account, &paths).await;
-    registry.set_disabled(["dj"]);
+    registry.set_disabled(["test-dj"]);
     registry.watched(&video("b"), &account, &paths).await;
     assert_eq!(*watched.lock().unwrap(), ["a"]);
 }
@@ -303,7 +304,7 @@ async fn core_home_uses_the_feed_source_and_the_chips_extension() {
     assert!(core.home(&account, None).await.unwrap().chips.is_empty());
 
     // Without any main feed source, Home explains how to get one.
-    core.extensions().set_disabled(["dj"]);
+    core.extensions().set_disabled(["test-dj"]);
     let error = core.home(&account, None).await.unwrap_err().to_string();
     assert!(error.starts_with("No YouTube account is set up"));
 }
@@ -316,6 +317,77 @@ fn the_account_is_active_only_when_connected_and_enabled() {
     assert!(!core.account_active(&AccountConfig::anonymous()));
     core.extensions().set_disabled([builtin::account::ID]);
     assert!(!core.account_active(&connected));
+}
+
+#[tokio::test]
+async fn the_dj_follows_its_switch_and_settings() {
+    use crate::dj::{DjSeed, Track};
+    use builtin::dj::{CROSSFADE_SECONDS, MY_MIX, START_FROM};
+    use std::time::Duration;
+
+    let core = Core::new(Paths::new("/tmp/kinora-test"));
+    let anonymous = AccountConfig::anonymous();
+    let connected = AccountConfig::new("kinora-account --file x");
+    let open = VideoId {
+        id: "dQw4w9WgXcQ".into(),
+        platform: "youtube".into(),
+    };
+    let radio = DjSeed::Video(open.id.clone());
+
+    // Start from the open video; "my mix" without one.
+    assert_eq!(core.dj_seed(&connected, Some(&open)), radio);
+    assert_eq!(core.dj_seed(&anonymous, None), DjSeed::MyMix);
+    let peertube = VideoId {
+        id: "x".into(),
+        platform: "peertube".into(),
+    };
+    assert_eq!(core.dj_seed(&anonymous, Some(&peertube)), DjSeed::MyMix);
+
+    // "My mix" needs the account, else the open video it is.
+    core.extensions().set_values(HashMap::from([
+        (
+            value_key("dj", START_FROM),
+            SettingValue::Text(MY_MIX.into()),
+        ),
+        (
+            value_key("dj", CROSSFADE_SECONDS),
+            SettingValue::Text("3".into()),
+        ),
+    ]));
+    assert_eq!(core.dj_seed(&connected, Some(&open)), DjSeed::MyMix);
+    assert_eq!(core.dj_seed(&anonymous, Some(&open)), radio);
+    core.extensions().set_disabled([builtin::account::ID]);
+    assert_eq!(core.dj_seed(&connected, Some(&open)), radio);
+
+    // The crossfade setting shapes the plan.
+    let next = Track::from_video(&video("b"));
+    assert!(core.dj_transition(None, Duration::ZERO, &next).is_cut());
+    let mut long = next.clone();
+    long.duration = Some(Duration::from_secs(200));
+    let plan = core.dj_transition(Some(Duration::from_secs(200)), Duration::ZERO, &long);
+    assert_eq!(plan.fade, Duration::from_secs(3));
+    assert_eq!(plan.start_at, Some(Duration::from_secs(197)));
+
+    // Frontends spawn these on their runtime.
+    fn is_send<T: Send>(_: &T) {}
+    let mut session = crate::dj::DjSession::start(
+        radio.clone(),
+        Default::default(),
+        crate::dj::RadioPage {
+            tracks: vec![],
+            continuation: None,
+            source: crate::dj::RadioSource::Music,
+            personal: false,
+        },
+    );
+    is_send(&core.dj_start(&anonymous, radio.clone()));
+    is_send(&core.dj_more(&anonymous, &crate::dj::RadioRequest::Start(radio.clone())));
+    is_send(&core.dj_refill(&anonymous, &mut session));
+
+    // Off, the DJ does nothing (and fetches nothing).
+    core.extensions().set_disabled(["dj"]);
+    let error = core.dj_start(&anonymous, radio).await.unwrap_err();
+    assert!(error.to_string().contains("switched off"), "{error}");
 }
 
 #[test]

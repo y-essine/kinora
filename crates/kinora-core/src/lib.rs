@@ -12,17 +12,24 @@
 
 pub mod account;
 pub mod config;
+pub mod dj;
 pub mod extension;
 pub mod home;
 pub mod player;
 pub mod streams;
 pub mod youtube;
 
+use std::time::Duration;
+
 use pcore::{Video, VideoId};
 
 pub use config::{AccountConfig, Paths, PlaybackConfig};
+use dj::{
+    DjSeed, DjSession, DjSettings, RadioPage, RadioRequest, StartFrom, Track, TransitionPlan,
+};
 use extension::{
-    ActionOutcome, ExtensionRegistry, FeedPlacement, FeedRequest, MenuTarget, SettingValue, builtin,
+    ActionOutcome, Context, ExtensionRegistry, FeedPlacement, FeedRequest, MenuTarget, Permission,
+    SettingValue, builtin,
 };
 pub use home::{HomeChip, HomePage};
 use player::Transition;
@@ -183,6 +190,133 @@ impl Core {
         self.extensions
             .activate(extension, item, target, account, &self.paths)
             .await
+    }
+
+    // ---- DJ ----
+
+    /// The DJ extension's context; `Err` while it is switched off.
+    fn dj_context(&self, account: &AccountConfig) -> Result<Context, Error> {
+        if !self.extensions.is_enabled(builtin::dj::ID) {
+            return Err("The DJ is switched off. Turn it on in the preferences.".into());
+        }
+        let ctx = self
+            .extensions
+            .context(builtin::dj::ID, account, &self.paths)
+            .ok_or("The DJ is not installed")?;
+        ctx.require(Permission::Network)?;
+        ctx.require(Permission::PlayerControl)?;
+        Ok(ctx)
+    }
+
+    /// The DJ's settings (crossfade, avoid repeats, start from), defaults
+    /// filled in.
+    pub fn dj_settings(&self) -> DjSettings {
+        self.extensions
+            .context(builtin::dj::ID, &AccountConfig::anonymous(), &self.paths)
+            .map(|ctx| builtin::dj::settings(&ctx))
+            .unwrap_or_default()
+    }
+
+    /// Where "DJ" starts, following the "start from" setting: the open
+    /// YouTube video, or "my mix". "My mix" needs the account; without it
+    /// the open video is used when there is one.
+    pub fn dj_seed(&self, account: &AccountConfig, current: Option<&VideoId>) -> DjSeed {
+        let video = current
+            .filter(|v| youtube::is_youtube(v))
+            .map(|v| DjSeed::Video(v.id.clone()));
+        match (self.dj_settings().start_from, video) {
+            (StartFrom::MyMix, Some(video)) if !self.account_active(account) => video,
+            (StartFrom::MyMix, _) | (StartFrom::CurrentVideo, None) => DjSeed::MyMix,
+            (StartFrom::CurrentVideo, Some(video)) => video,
+        }
+    }
+
+    /// Start a DJ session: the first page of the seed's radio, in a session
+    /// set up from the DJ's settings. The radio is personal when the account
+    /// is active. See [`dj`] for the loop a frontend runs.
+    pub async fn dj_start(
+        &self,
+        account: &AccountConfig,
+        seed: DjSeed,
+    ) -> Result<DjSession, Error> {
+        let request = RadioRequest::Start(seed.clone());
+        let page = self.dj_more(account, &request).await?;
+        Ok(DjSession::start(seed, self.dj_settings().options(), page))
+    }
+
+    /// Fetch a page for a session: [`DjSession::refill_request`]'s answer.
+    /// Hand it to [`DjSession::extend`] (or, on an error, tell the session
+    /// with [`DjSession::fetch_failed`]). Takes no session, so a frontend
+    /// need not hold its session across the request.
+    pub async fn dj_more(
+        &self,
+        account: &AccountConfig,
+        request: &RadioRequest,
+    ) -> Result<RadioPage, Error> {
+        let ctx = self.dj_context(account)?;
+        let cookies = if self.account_active(account) {
+            match ctx.account() {
+                Ok(account) => account.cookies().await.unwrap_or_else(|e| {
+                    log::warn!("DJ: {e}");
+                    None
+                }),
+                Err(_) => None,
+            }
+        } else {
+            None
+        };
+        dj::radio::fetch(request, cookies.as_deref()).await
+    }
+
+    /// Top a session's queue up (a few requests at most, until it no longer
+    /// [`needs_refill`](DjSession::needs_refill)). Returns how many tracks
+    /// were added; an error only when nothing could be added. For frontends
+    /// that can lend the session to a future; others use [`Self::dj_more`].
+    pub async fn dj_refill(
+        &self,
+        account: &AccountConfig,
+        session: &mut DjSession,
+    ) -> Result<usize, Error> {
+        const MAX_REQUESTS: usize = 3;
+        let mut added = 0;
+        let mut error = None;
+        for _ in 0..MAX_REQUESTS {
+            let Some(request) = session.refill_request() else {
+                break;
+            };
+            match self.dj_more(account, &request).await {
+                Ok(page) => added += session.extend(&request, page),
+                Err(e) => {
+                    session.fetch_failed(&request);
+                    error = Some(e);
+                }
+            }
+            if !session.needs_refill() {
+                break;
+            }
+        }
+        match error {
+            Some(e) if added == 0 => Err(e),
+            _ => Ok(added),
+        }
+    }
+
+    /// When and how to go from the current track to `next`, with the
+    /// crossfade setting: see [`dj::plan_transition`]. `duration` is the
+    /// current track's length as the player knows it (or its
+    /// [`Track::duration`]), `position` where it is now.
+    pub fn dj_transition(
+        &self,
+        duration: Option<Duration>,
+        position: Duration,
+        next: &Track,
+    ) -> TransitionPlan {
+        dj::plan_transition(
+            duration,
+            position,
+            next.duration,
+            self.dj_settings().crossfade,
+        )
     }
 
     // ---- Playback ----
