@@ -20,6 +20,7 @@ use crate::backend::{FilterStore, FiniteVideoStore, SubscriptionsStore};
 use crate::store::{Cache, Store, export, import};
 use crate::{gspawn, tspawn};
 
+use super::extension_values::extension_values;
 use super::{Channel, Filter, SearchItem, SearchStream, Video, VideoFetcherStream};
 
 gtk::glib::wrapper! {
@@ -1470,35 +1471,6 @@ fn account_label(settings: &gdk::gio::Settings) -> String {
     }
 }
 
-/// Kinora: the `extension-settings` dictionary (`a{sv}`, booleans and strings)
-/// as the core's setting values. Other value types are skipped.
-fn extension_values(
-    dict: &glib::Variant,
-) -> std::collections::HashMap<String, kinora_core::extension::SettingValue> {
-    use kinora_core::extension::SettingValue;
-    let mut values = std::collections::HashMap::new();
-    if !dict.is_container() {
-        return values;
-    }
-    for entry in dict.iter() {
-        let (Some(key), Some(value)) = (
-            entry.child_value(0).str().map(str::to_owned),
-            entry.child_value(1).as_variant(),
-        ) else {
-            continue;
-        };
-        let value = if let Some(b) = value.get::<bool>() {
-            SettingValue::Bool(b)
-        } else if let Some(s) = value.str() {
-            SettingValue::Text(s.to_owned())
-        } else {
-            continue;
-        };
-        values.insert(key, value);
-    }
-    values
-}
-
 /// Kinora: whether a search stream event belongs to the given platform.
 fn search_result_on(result: &pcore::SearchStreamResult, platform: &str) -> bool {
     match result {
@@ -1517,22 +1489,6 @@ fn search_result_on(result: &pcore::SearchStreamResult, platform: &str) -> bool 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn extension_settings_dictionary_becomes_values() {
-        use glib::prelude::ToVariant;
-        use kinora_core::extension::SettingValue;
-        let dict: std::collections::HashMap<String, glib::Variant> = [
-            ("account.mark-watched".to_owned(), false.to_variant()),
-            ("dj.pick".to_owned(), "last".to_variant()),
-            ("dj.count".to_owned(), 3i32.to_variant()),
-        ]
-        .into();
-        let values = extension_values(&dict.to_variant());
-        assert_eq!(values.len(), 2);
-        assert_eq!(values["account.mark-watched"], SettingValue::Bool(false));
-        assert_eq!(values["dj.pick"], SettingValue::Text("last".into()));
-    }
 
     #[test]
     fn search_filter_matches_platform_events() {

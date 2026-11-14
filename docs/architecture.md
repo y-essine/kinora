@@ -121,7 +121,7 @@ use. Built-in extensions are trusted Rust code, so for them this is discipline, 
 | Feed filters | `FeedFilter::filter(ctx, &mut HomePage)` | every Home page |
 | Player hooks | `PlayerHook { on_watched, on_ended, choose_next, transition }` | `on_watched` (30 s into a video, or opened externally) |
 | Menu items | `MenuItem { id, label, location: Main \| Home \| Video }` + `Extension::activate` → `ActionOutcome` (`Done`, `Message`, `Subscribe`, `Play`) | "Import subscriptions" runs through `activate`; the menus themselves are still hand-written |
-| Settings panel | `Setting { key, title, subtitle, kind: Toggle \| Choice \| Text }` → `SettingsPanel` | not rendered yet |
+| Settings panel | `Setting { key, title, subtitle, kind: Toggle \| Choice \| Text }` → `SettingsPanel` | Preferences → Extensions (`src/gui/extension_settings.rs`) |
 
 **Registry**: `ExtensionRegistry` keeps extensions in registration order, rejects invalid or
 duplicate manifests, and holds the disabled list and stored setting values (values that don't
@@ -184,7 +184,7 @@ would ship them next to the app).
 - Move the SQLite store, the `papi` provider setup (Piped/RustyPipe/PeerTube) and import/export
   into the core. The store uses the GObject `Filter`, so it needs a plain filter type first.
 - A `ClapperPlayer` implementing `Player`, and autoplay through `choose_next`/`play_next`.
-- Render menus and settings panels from the registry in the GTK app (the account menu is still
+- Render menus from the registry in the GTK app (settings panels already are; the account menu is still
   hand-written in `window.rs`).
 - Third-party extensions: load manifests from files and run their code sandboxed (e.g. WASM),
   where permissions become a real boundary; an `enabled-extensions` list for opt-in ones.
