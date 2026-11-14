@@ -149,6 +149,10 @@ impl Utility {
     }
 
     pub fn format_date_human(time: &chrono::DateTime<Utc>) -> String {
+        // Kinora: the epoch marks "not known yet" (videos from a short listing).
+        if time.timestamp() == 0 {
+            return String::new();
+        }
         let time = time.with_timezone(&Local);
         let date = time.date_naive();
         let today = Utc::now().date_naive();

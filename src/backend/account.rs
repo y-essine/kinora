@@ -10,7 +10,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use chrono::{TimeDelta, Utc};
+use chrono::TimeDelta;
 use pcore::{Channel, ChannelId, Video, VideoId};
 use rustypipe::client::RustyPipe;
 use tokio::process::Command;
@@ -242,6 +242,11 @@ async fn sign_in(rp: &RustyPipe, cookies: &Path) -> Result<(), Error> {
 
 fn feed_entry_to_video(e: &serde_json::Value) -> Option<Video> {
     let id = e["id"].as_str()?;
+    // Only plain videos: Mixes and playlists ("YoutubeTab") are not playable as
+    // a video and have no single channel.
+    if e["ie_key"].as_str() != Some("Youtube") || id.len() != 11 {
+        return None;
+    }
     // Shorts are vertical and live in their own shelf; skip them.
     if e["url"].as_str().is_some_and(|u| u.contains("/shorts/")) {
         return None;
@@ -265,8 +270,9 @@ fn feed_entry_to_video(e: &serde_json::Value) -> Option<Video> {
         playable_url: watch_url(id),
         uploader: channel(channel_id, channel_name),
         title: title.to_owned(),
-        // Not in the listing; replaced once the video information is loaded.
-        uploaded: Utc::now(),
+        // Not in the listing: the epoch means "not known yet" (shown as nothing)
+        // until the video information is loaded.
+        uploaded: chrono::DateTime::UNIX_EPOCH,
         duration: e["duration"].as_f64().map(|d| TimeDelta::seconds(d as i64)),
         thumbnail,
         description: None,
@@ -302,7 +308,7 @@ fn video_item_to_video(v: &rustypipe::model::VideoItem) -> Option<Video> {
         uploaded: v
             .publish_date
             .and_then(|d| chrono::DateTime::from_timestamp(d.unix_timestamp(), 0))
-            .unwrap_or_else(Utc::now),
+            .unwrap_or(chrono::DateTime::UNIX_EPOCH),
         duration: v.duration.map(|s| TimeDelta::seconds(s as i64)),
         thumbnail: v
             .thumbnail

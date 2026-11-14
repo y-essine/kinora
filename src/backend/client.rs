@@ -723,12 +723,19 @@ impl Client {
             #[weak(rename_to = s)]
             self,
             async move {
-                for video in videos {
-                    if let Err(e) = s.populate_video_information(&video.id()).await {
-                        log::debug!("No extra information for {}: {e}", video.id().id);
-                    }
-                    s.populate_thumbnail(&video).await;
-                }
+                use futures::StreamExt;
+                // A few at a time, so "Up next" fills in within seconds.
+                futures::stream::iter(videos)
+                    .for_each_concurrent(4, |video| {
+                        let s = s.clone();
+                        async move {
+                            if let Err(e) = s.populate_video_information(&video.id()).await {
+                                log::debug!("No extra information for {}: {e}", video.id().id);
+                            }
+                            s.populate_thumbnail(&video).await;
+                        }
+                    })
+                    .await;
             }
         ));
     }

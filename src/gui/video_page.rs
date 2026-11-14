@@ -46,8 +46,8 @@ impl VideoPage {
                 &self.convert_to_clapper_playable_url(&video),
             ));
             player.play();
-            // Kinora: count it on the YouTube account.
-            self.client().mark_watched_on_account(&video);
+            // Kinora: count it on the YouTube account once it was really watched.
+            self.mark_watched_on_account_later(&video);
         } else {
             self.pause();
         }
@@ -163,10 +163,25 @@ impl VideoPage {
             .clapper
             .player()
             .expect("Clapper does not have a player");
+        // Only pause: the page is destroyed right after, which ends the player.
+        // Stopping or clearing the queue here raced with Clapper's player thread
+        // (a crash, or the next page's player never starting).
         player.pause();
-        if let Some(queue) = player.queue() {
-            queue.clear();
-        }
+    }
+
+    /// Kinora: mark the video watched on the YouTube account after 30 seconds
+    /// of it still being on this page. Doing it at once also competed with the
+    /// player for the network and CPU right when the video was starting.
+    fn mark_watched_on_account_later(&self, video: &Video) {
+        let page = glib::prelude::ObjectExt::downgrade(self);
+        let video = video.clone();
+        glib::timeout_add_seconds_local_once(30, move || {
+            if let Some(page) = page.upgrade() {
+                if page.video().as_ref() == Some(&video) {
+                    page.client().mark_watched_on_account(&video);
+                }
+            }
+        });
     }
 
     pub fn finished(&self) -> bool {
@@ -420,9 +435,14 @@ pub mod imp {
                             // The video thumbnail could have changed after updating the information; reload the thumbnail.
                             client.populate_thumbnail(&video).await;
 
-                            let result = client
-                                .populate_channel_information(&video.uploader().id())
-                                .await;
+                            // Kinora: an "Up next" video can still be waiting for its
+                            // channel; there is nothing to look up yet.
+                            let channel_id = video.uploader().id();
+                            let result = if channel_id.id.is_empty() {
+                                Ok(())
+                            } else {
+                                client.populate_channel_information(&channel_id).await
+                            };
                             if let Err(e) = result {
                                 log::error!("Failed to populate channel information: {e}");
                                 obj.window().display_error(
@@ -465,7 +485,9 @@ pub mod imp {
                     .map(|i| i.duration()),
                 self.up_next_store.n_items()
             );
+            // Live streams have no real end; their position runs with the duration.
             if self.autoplay_done.get()
+                || obj.video().is_some_and(|v| v.is_live())
                 || obj.external()
                 || !self.settings.boolean("autoplay-next")
                 || !matches!(
@@ -525,6 +547,10 @@ pub mod imp {
     impl VideoPage {
         #[template_callback(function)]
         fn format_uploaded(uploaded: String) -> String {
+            // Kinora: nothing until the upload date is known.
+            if uploaded.is_empty() {
+                return String::new();
+            }
             gettextrs::gettext("Uploaded {}").replace("{}", &uploaded)
         }
 
