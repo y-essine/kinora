@@ -56,6 +56,9 @@ kicker 11/700 uppercase in the accent.
 | **Stage** `.k-stage` | `video_page.blp` | The player on its ambient glow. |
 | **Player sheet** `TFPlayerSheet` | `player_sheet.{rs,blp}` | Holds the one video page over the window, and the mini-player it shrinks into. See *Player*. |
 | **Panel** `.k-panel` | CSS | A quiet container for text (the description). |
+| **DJ panel** | `dj.rs` | What plays and the queue, in the Up next column while the DJ is on. See *DJ*. |
+| **Playlist card and shelf** | `playlist_shelf.rs` | A playlist or mix: a poster on a stack, with a count and a kicker. A shelf is a titled row of them. See *DJ*. |
+| **Way to watch** `.k-mode-card` | `first_run.rs` | One of the four choices of the first launch. See *First run*. |
 | **Badge** `.k-badge` | CSS | Small label on a picture (duration, downloaded). |
 | **Buttons on pictures** `.k-glass`, `.k-play` | CSS | Secondary and primary action over an image. |
 
@@ -156,6 +159,101 @@ of videos, rendered by `TFVideoRow`; a card is a `Video`, rendered by
 already builds every row through one function (`new_row`), which is where
 contributed rows will be added. This is what keeps an extension from breaking
 the look.
+
+## DJ
+
+**The DJ is a mode of the player, not another place.** Music plays in the same
+player sheet as everything else: every track is an ordinary video page, with
+its video on the stage. What changes is what comes next. The DJ's queue stands
+where Up next would, and one amber word, *DJ on*, says who is choosing.
+
+### Ways in and out
+
+| Where | What | Starts from |
+|---|---|---|
+| Video page, action row | **Start DJ** (YouTube videos, while the DJ extension is on) | this video's radio, or the mix, following the DJ's *Start From* setting. The video plays on, untouched |
+| Home, under the banner | **Your mix, endlessly** strip with *Start DJ* | the account's mix |
+| Home, *Mixes* and *Your playlists* shelves | a playlist card | that playlist or mix, from its first item |
+| DJ panel | **Leave** | back to ordinary playing: the video plays on, Up next and autoplay return |
+
+Opening any other video, or closing the player, also leaves the DJ. Starting
+it never interrupts what plays unless something else was asked for (the mix, a
+playlist).
+
+### The panel
+
+In the Up next column (beside the details in wide windows, under them in
+narrow ones). One panel moves from page to page with the music.
+
+- **Card** (`.k-panel`): the kicker *DJ on* with an amber dot, a faint note
+  for where the music comes from (*Picked for you* with an account, *From
+  YouTube* when YouTube Music's radio failed and the plain mix stands in), and
+  *Leave*. Under it what plays: 64 px artwork, title (15/600), artists,
+  "album · year" for songs, and Skip.
+- **Queue**: "Up next" with the number queued, then up to 30 rows: 40 px
+  artwork, title, artists, length. Click a row to play it now. *Play next* and
+  *Remove* appear on a row with the pointer or the focus (opacity only). Drag
+  a row onto another to move it there; the target shows an amber line.
+
+In the mini-player a small amber **DJ** tag sits before the artist, and its
+Next button skips the track. Shift+N skips too; there is no "previous" in a DJ
+session.
+
+### Sound and motion
+
+- The only motion the DJ adds is in the sound. A track **crossfades** into the
+  next over the *Crossfade* setting (0 to 12 s, a slider in Preferences →
+  Extensions; short tracks fade shorter, live and very short ones cut). The
+  curve is equal power, so the loudness does not dip halfway.
+- The picture **cuts**: the next track's page takes the stage about 2 s
+  before the fade is due (its artwork and a spinner while it starts), and the
+  old track plays on unseen until it has faded out. No visual crossfade.
+- **Skip** does not wait: the old track fades out in under half a second and
+  the next one starts at full volume as soon as it can.
+- The next track is prepared while the current one plays, so it starts in
+  about a second. If it does not (a prepared stream can fail and fall back to
+  the slow path), the current track simply plays to its end and the next one
+  comes in when it is ready; nothing is cut off.
+
+### Playlists and mixes
+
+`playlist_shelf.rs`: a playlist is not a video, and its card says so. The
+16:9 poster lies on a small stack (two sheets peeking out above it), a badge
+counts its videos (mixes have no end, so no badge), and a kicker names it:
+*Mix*, *Playlist*, *Album*. A play glyph appears on hover or focus. Cards are
+as wide as video cards and sit on their own shelves on Home (*Mixes*, *Your
+playlists*), which hide while empty.
+
+### Not built yet
+
+- **Playlists play**: the shelves and the card are there; the engine's
+  playlist seed and the feeds that fill the shelves arrive with kinora-core.
+- **Previous track** and a visible history.
+- **Adding to the queue from elsewhere** ("Play next" on any video card): the
+  engine has `play_next`/`enqueue`; no menu item uses them yet.
+- **One volume during a fade**: changing the volume while two tracks cross
+  only takes effect when the fade is over.
+
+## First run
+
+**"How do you want to watch?"** comes up once, on the first launch, over
+Home. Four cards, one choice, two buttons (*Skip*, *Continue*). It can be left
+with Esc, and reopened from Preferences → General → *Ways to Watch*.
+
+A way to watch is a preset of settings that already exist. Nothing in the app
+asks which one was picked, and each part can be changed afterwards.
+
+| Way | Account extension | Home filters | DJ | Reduce effects |
+|---|---|---|---|---|
+| **Private**: no account; subscriptions and history stay on this computer | off | on | off | off |
+| **Lite**: quick and quiet | as it is | off | off | on |
+| **Connected**: the YouTube account's Home, recommendations, history | on | on | off | off |
+| **Fun**: connected, with the extras | on | on | on | off |
+
+*Connected* and *Fun* open the Connect dialog afterwards when no account is
+connected. When the settings already match a way, its card is selected;
+otherwise none is, and *Continue* waits for a choice. The chosen card takes the
+accent as an outline and a 10 % tint: no motion.
 
 ## Motion
 

@@ -32,6 +32,19 @@ pub enum SettingKind {
         /// The `value` of one of the options.
         default: String,
     },
+    /// A whole number in a range (a slider or a spin button). Stored as
+    /// text, in decimal, so it can replace a choice of numbers.
+    Number {
+        min: u32,
+        max: u32,
+        default: u32,
+        /// What the number counts, for the label: "s" gives "6 s".
+        #[serde(default)]
+        unit: Option<String>,
+        /// What to show instead of the minimum, e.g. "Off" for 0.
+        #[serde(default)]
+        min_label: Option<String>,
+    },
     /// Free text (an entry).
     Text {
         default: String,
@@ -49,8 +62,8 @@ pub struct SettingChoice {
     pub label: String,
 }
 
-/// A setting's value, as stored by the frontend: toggles are `Bool`, choices
-/// and text are `Text`.
+/// A setting's value, as stored by the frontend: toggles are `Bool`, choices,
+/// numbers and text are `Text`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SettingValue {
@@ -65,6 +78,7 @@ impl SettingKind {
             Self::Choice { default, .. } | Self::Text { default, .. } => {
                 SettingValue::Text(default.clone())
             }
+            Self::Number { default, .. } => SettingValue::Text(default.to_string()),
         }
     }
 
@@ -75,6 +89,9 @@ impl SettingKind {
             (Self::Toggle { .. }, SettingValue::Bool(_)) => true,
             (Self::Choice { options, .. }, SettingValue::Text(v)) => {
                 options.iter().any(|o| &o.value == v)
+            }
+            (Self::Number { min, max, .. }, SettingValue::Text(v)) => {
+                v.parse::<u32>().is_ok_and(|n| (*min..=*max).contains(&n))
             }
             (Self::Text { .. }, SettingValue::Text(_)) => true,
             _ => false,

@@ -28,6 +28,23 @@ impl PlayerSheet {
     /// card's picture, in the sheet's coordinates) if given, else rising from
     /// the bottom. Without it, a minimized sheet stays minimized.
     pub fn open(&self, page: &VideoPage, origin: Option<graphene::Rect>, expand: bool) {
+        self.open_with(page, origin, expand, false);
+    }
+
+    /// Like [`Self::open`], but the page that is replaced keeps playing and is
+    /// handed back: the DJ fades it out while the new one fades in (see
+    /// `gui/dj.rs`), then pauses and drops it.
+    pub fn open_over(&self, page: &VideoPage, expand: bool) -> Option<VideoPage> {
+        self.open_with(page, None, expand, true)
+    }
+
+    fn open_with(
+        &self,
+        page: &VideoPage,
+        origin: Option<graphene::Rect>,
+        expand: bool,
+        keep_playing: bool,
+    ) -> Option<VideoPage> {
         let imp = self.imp();
         imp.stop_animations();
         imp.closing.set(false);
@@ -36,8 +53,8 @@ impl PlayerSheet {
         let old = imp.video_page.take();
         let was_expanded = old.is_some() && imp.progress.get() > 0.99;
         let was_minimized = old.is_some() && !was_expanded;
-        if let Some(old) = old {
-            imp.release_page(&old);
+        if let Some(old) = &old {
+            imp.release_page(old, !keep_playing);
         }
 
         page.set_parent(self);
@@ -82,6 +99,7 @@ impl PlayerSheet {
             imp.set_expanded_state(false);
             imp.apply();
         }
+        old.filter(|_| keep_playing)
     }
 
     /// Shrink the page into the mini-player; the video keeps playing.
@@ -678,12 +696,14 @@ pub mod imp {
             self.animate_offset(direction * distance, true);
         }
 
-        pub(super) fn release_page(&self, page: &VideoPage) {
+        pub(super) fn release_page(&self, page: &VideoPage, pause: bool) {
             for handler in self.page_handlers.take() {
                 page.disconnect(handler);
             }
             // Only pause: stopping Clapper here has crashed (see VideoPage::stop).
-            page.stop();
+            if pause {
+                page.stop();
+            }
             page.unparent();
         }
 
@@ -696,7 +716,7 @@ pub mod imp {
             if page.fullscreened() {
                 page.set_fullscreened(false);
             }
-            self.release_page(&page);
+            self.release_page(&page, true);
             self.closing.set(false);
             self.progress.set(0.0);
             self.offset_x.set(0.0);

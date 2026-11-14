@@ -13,7 +13,7 @@ use crate::extension::{
 };
 
 pub const ID: &str = "dj";
-/// Setting (choice "0".."12"): the crossfade in seconds; "0" is off.
+/// Setting (number 0..12): the crossfade in seconds; 0 is off.
 pub const CROSSFADE_SECONDS: &str = "crossfade-seconds";
 /// Setting (toggle): never play a song twice in a session.
 pub const AVOID_REPEATS: &str = "avoid-repeats";
@@ -34,16 +34,6 @@ impl Default for DjExtension {
 
 impl DjExtension {
     pub fn new() -> Self {
-        let seconds = (0..=MAX_CROSSFADE.as_secs())
-            .map(|s| SettingChoice {
-                value: s.to_string(),
-                label: match s {
-                    0 => "Off".to_owned(),
-                    1 => "1 second".to_owned(),
-                    s => format!("{s} seconds"),
-                },
-            })
-            .collect();
         let choice = |key: &str, title: &str, subtitle: &str, options, default: &str| Setting {
             key: key.to_owned(),
             title: title.to_owned(),
@@ -72,13 +62,21 @@ impl DjExtension {
                     Permission::PlayerControl,
                 ],
                 settings: vec![
-                    choice(
-                        CROSSFADE_SECONDS,
-                        "Crossfade",
-                        "How long one track fades into the next. Short tracks fade shorter",
-                        seconds,
-                        "6",
-                    ),
+                    Setting {
+                        key: CROSSFADE_SECONDS.to_owned(),
+                        title: "Crossfade".to_owned(),
+                        subtitle: Some(
+                            "How long one track fades into the next. Short tracks fade shorter"
+                                .to_owned(),
+                        ),
+                        kind: SettingKind::Number {
+                            min: 0,
+                            max: MAX_CROSSFADE.as_secs() as u32,
+                            default: crate::dj::DEFAULT_CROSSFADE.as_secs() as u32,
+                            unit: Some("s".to_owned()),
+                            min_label: Some("Off".to_owned()),
+                        },
+                    },
                     Setting::toggle(
                         AVOID_REPEATS,
                         "Avoid Repeats",
@@ -165,14 +163,17 @@ mod tests {
         manifest.validate().unwrap();
         assert_eq!(manifest.name, "DJ");
         assert!(manifest.has(Permission::PlayerControl));
-        let SettingKind::Choice { options, default } =
-            &manifest.setting(CROSSFADE_SECONDS).unwrap().kind
+        let kind = &manifest.setting(CROSSFADE_SECONDS).unwrap().kind;
+        let SettingKind::Number {
+            min, max, default, ..
+        } = kind
         else {
-            panic!("crossfade is a choice");
+            panic!("crossfade is a number");
         };
-        assert_eq!(options.len(), 13);
-        assert_eq!(options[0].label, "Off");
-        assert_eq!(options.last().unwrap().value, "12");
-        assert_eq!(default, "6");
+        assert_eq!((*min, *max, *default), (0, 12, 6));
+        assert!(kind.accepts(&SettingValue::Text("12".to_owned())));
+        assert!(!kind.accepts(&SettingValue::Text("13".to_owned())));
+        assert!(!kind.accepts(&SettingValue::Text("six".to_owned())));
+        assert_eq!(kind.default_value(), SettingValue::Text("6".to_owned()));
     }
 }

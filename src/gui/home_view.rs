@@ -13,6 +13,19 @@ gtk::glib::wrapper! {
 }
 
 impl HomeView {
+    /// What the "Mixes" and "Your playlists" shelves show.
+    pub fn set_playlists(
+        &self,
+        mixes: Vec<crate::gui::playlist_shelf::PlaylistInfo>,
+        playlists: Vec<crate::gui::playlist_shelf::PlaylistInfo>,
+    ) {
+        use gtk::subclass::prelude::ObjectSubclassIsExt;
+        let shelves = self.imp().shelves.borrow();
+        for (shelf, items) in shelves.iter().zip([mixes, playlists]) {
+            shelf.set_items(items);
+        }
+    }
+
     /// Scroll Home vertically (test hook).
     #[cfg(feature = "dev-hooks")]
     pub fn scroll_to(&self, y: f64) {
@@ -81,6 +94,13 @@ pub mod imp {
         #[property(get, set = Self::set_feed_model, nullable)]
         feed_model: RefCell<Option<gio::ListModel>>,
 
+        /// The DJ can be started (its extension is on): show its strip.
+        #[property(get, set)]
+        dj_available: Cell<bool>,
+
+        /// Mixes and playlists (see `playlist_shelf.rs`); empty shelves hide.
+        pub(super) shelves: RefCell<Vec<crate::gui::playlist_shelf::PlaylistShelf>>,
+
         built: Cell<bool>,
         row_subscriptions: RefCell<Option<VideoRow>>,
         topics: RefCell<Vec<TopicRow>>,
@@ -106,6 +126,9 @@ pub mod imp {
                 self.obj().remove_css_class("compact");
             }
             let width = self.card_width();
+            for shelf in self.shelves.borrow().iter() {
+                shelf.set_card_width(width);
+            }
             for parent in [&*self.rows, &*self.topic_rows] {
                 let mut child = parent.first_child();
                 while let Some(widget) = child {
@@ -217,6 +240,31 @@ pub mod imp {
                 ),
             );
             self.rows.append(&for_you);
+
+            // Mixes and playlists: opening one starts the DJ with it.
+            let shelves: Vec<_> = [
+                gettextrs::gettext("Mixes"),
+                gettextrs::gettext("Your playlists"),
+            ]
+            .iter()
+            .map(|title| {
+                let shelf = crate::gui::playlist_shelf::PlaylistShelf::new(
+                    title,
+                    &client,
+                    self.card_width(),
+                );
+                let obj = self.obj().downgrade();
+                shelf.connect_open(move |playlist| {
+                    if let Some(obj) = obj.upgrade() {
+                        let target = (playlist.id.as_str(), playlist.title.as_str()).to_variant();
+                        let _ = obj.activate_action("win.dj-playlist", Some(&target));
+                    }
+                });
+                self.rows.append(shelf.widget());
+                shelf
+            })
+            .collect();
+            self.shelves.replace(shelves);
 
             // The backend keeps no playback positions, so this cannot be a
             // true "Continue watching" yet: it is the watch history.

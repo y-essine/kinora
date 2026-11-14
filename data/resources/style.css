@@ -675,6 +675,190 @@ button.k-glass:hover {
   background-color: var(--k-accent);
 }
 
+/* --- DJ ----------------------------------------------------------------------
+   A mode of the player (see docs/design.md, "DJ"): the queue stands where Up
+   next would, and one amber word says it is on. */
+.k-dj-card {
+  padding: var(--k-space-3) var(--k-space-4) var(--k-space-4);
+}
+
+.k-dj-on {
+  padding-left: 14px;
+  background-image: radial-gradient(circle, var(--k-accent) 0, var(--k-accent) 3px, transparent 3.5px);
+  background-size: 8px 8px;
+  background-repeat: no-repeat;
+  background-position: left center;
+}
+
+.k-dj-note,
+.k-dj-album {
+  font-size: 12px;
+  color: var(--k-text-faint);
+}
+
+.k-dj-leave {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--k-radius-pill);
+  color: var(--k-text-dim);
+}
+
+.k-dj-art {
+  border-radius: var(--k-radius-s);
+  background-color: var(--k-surface-2);
+}
+
+.k-dj-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.k-dj-row-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.k-dj-queue > row {
+  padding: 6px 8px;
+}
+
+.k-dj-queue > row:drop(active) {
+  box-shadow: inset 0 2px 0 var(--k-accent);
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* "Play next" and "remove" appear with the pointer or the focus; the length
+   gives them its place. */
+.k-dj-row-actions {
+  opacity: 0;
+  transition: opacity var(--k-dur-fast) var(--k-ease);
+}
+
+.k-dj-queue > row:hover .k-dj-row-actions,
+.k-dj-queue > row:focus-within .k-dj-row-actions {
+  opacity: 1;
+}
+
+/* The mini-player's "DJ". */
+.k-dj-tag {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  padding: 0 5px;
+  border-radius: 4px;
+  color: var(--k-on-accent);
+  background-color: var(--k-accent);
+}
+
+/* Playlists and mixes: a poster on a small stack (see gui/playlist_shelf.rs). */
+.k-playlist-cards {
+  padding: 6px var(--k-gutter) var(--k-space-5);
+}
+
+.k-playlist-card {
+  padding: 0;
+  border-radius: var(--k-radius-m);
+  font-weight: inherit;
+  background: none;
+  box-shadow: none;
+}
+
+.k-playlist-sheet {
+  margin-bottom: 3px;
+  border-radius: 6px 6px 0 0;
+}
+
+.k-playlist-sheet.back {
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+.k-playlist-sheet.front {
+  background-color: rgba(255, 255, 255, 0.20);
+}
+
+.k-playlist-play {
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: var(--k-radius-pill);
+  color: #ffffff;
+  background-color: var(--k-scrim);
+  opacity: 0;
+  transition: opacity var(--k-dur-fast) var(--k-ease);
+}
+
+.k-playlist-card:hover .k-playlist-play,
+.k-playlist-card:focus-visible .k-playlist-play {
+  opacity: 1;
+}
+
+/* Home: the way in. */
+.k-dj-strip {
+  margin: var(--k-space-4) var(--k-gutter) var(--k-space-2);
+  padding: var(--k-space-3) var(--k-space-4);
+  border-radius: var(--k-radius-l);
+  background-color: var(--k-surface-1);
+}
+
+.k-dj-strip-icon {
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: var(--k-radius-pill);
+  color: var(--k-accent);
+  background-color: color-mix(in srgb, var(--k-accent) 14%, transparent);
+}
+
+/* --- First run: "How do you want to watch?" (see docs/design.md) -------------- */
+.k-first-run-body {
+  padding: var(--k-space-6) var(--k-space-5) var(--k-space-5);
+}
+
+.k-first-run-title {
+  font-size: 26px;
+}
+
+.k-first-run flowbox {
+  margin: var(--k-space-5) 0 var(--k-space-4);
+}
+
+.k-first-run flowboxchild {
+  padding: 0;
+  background: none;
+  outline: none;
+}
+
+.k-mode-card {
+  padding: var(--k-space-4);
+  border-radius: var(--k-radius-l);
+  font-weight: inherit;
+  background-color: var(--k-surface-1);
+  box-shadow: inset 0 0 0 1px var(--k-line);
+  transition: background-color var(--k-dur-fast) var(--k-ease), box-shadow var(--k-dur-fast) var(--k-ease);
+}
+
+.k-mode-card:hover {
+  background-color: var(--k-surface-3);
+}
+
+.k-mode-card:checked {
+  background-color: color-mix(in srgb, var(--k-accent) 10%, var(--k-surface-2));
+  box-shadow: inset 0 0 0 2px var(--k-accent);
+}
+
+.k-first-run-icon {
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: var(--k-radius-pill);
+  color: var(--k-text-dim);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.k-mode-card:checked .k-first-run-icon {
+  color: var(--k-accent);
+  background-color: color-mix(in srgb, var(--k-accent) 16%, transparent);
+}
+
 /* --- Lite: effects off (the reduce-effects setting) ------------------------- */
 window.reduce-effects * {
   transition: none;

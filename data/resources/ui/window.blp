@@ -232,6 +232,7 @@ Adw.ViewStack main_stack {
           ) as <bool>;
         client: bind template.client;
         compact: bind template.breakpoint_collapsed;
+        dj-available: bind template.dj-available;
         feed-model: bind video_list.model;
         play-video => $play_video() swapped;
         copy-video-url => $copy_video_url() swapped;

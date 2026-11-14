@@ -4,8 +4,12 @@ use adw::Toast;
 use clapper::MediaItem;
 use clapper_gtk::prelude::AvExt;
 use gdk::prelude::SettingsExt;
-use glib::{Object, clone, object::Cast, subclass::types::ObjectSubclassIsExt};
-use gtk::prelude::WidgetExt;
+use glib::{
+    Object, clone,
+    object::{Cast, CastNone},
+    subclass::types::ObjectSubclassIsExt,
+};
+use gtk::prelude::{BoxExt, SettingsExtManual, WidgetExt};
 use url::Url;
 
 use crate::{
@@ -27,6 +31,16 @@ impl VideoPage {
     pub fn new(video: &Video, client: &Client) -> Self {
         Object::builder()
             .property("client", client)
+            .property("video", video)
+            .build()
+    }
+
+    /// Kinora: the page of a DJ track (see `gui/dj.rs`): no Up next and no
+    /// autoplay of its own, the DJ's queue is shown instead.
+    pub fn new_dj(video: &Video, client: &Client) -> Self {
+        Object::builder()
+            .property("client", client)
+            .property("dj", true)
             .property("video", video)
             .build()
     }
@@ -303,6 +317,96 @@ impl VideoPage {
         }
     }
 
+    /// The player's position in seconds.
+    pub fn position_secs(&self) -> f64 {
+        self.imp().clapper.player().map_or(0.0, |p| p.position())
+    }
+
+    /// The length of what plays, in seconds, once the player knows it.
+    pub fn duration_secs(&self) -> Option<f64> {
+        self.imp()
+            .clapper
+            .player()
+            .and_then(|p| p.queue())
+            .and_then(|q| q.current_item())
+            .map(|i| i.duration())
+            .filter(|d| *d > 0.0)
+    }
+
+    pub fn player_state(&self) -> clapper::PlayerState {
+        self.imp()
+            .clapper
+            .player()
+            .map_or(clapper::PlayerState::Stopped, |p| p.state())
+    }
+
+    /// Test hook: scroll the page down to `y`.
+    #[cfg(feature = "dev-hooks")]
+    pub fn dev_scroll_to(&self, y: f64) {
+        let adjustment = self.imp().page_scroller.vadjustment();
+        gtk::prelude::AdjustmentExt::set_value(&adjustment, y);
+        log::info!(
+            "DEV: page scrolled to {} of {}",
+            gtk::prelude::AdjustmentExt::value(&adjustment),
+            gtk::prelude::AdjustmentExt::upper(&adjustment)
+        );
+    }
+
+    /// Test hook: jump to `seconds` before the end.
+    #[cfg(feature = "dev-hooks")]
+    pub fn dev_seek_near_end(&self, seconds: f64) {
+        if let (Some(player), Some(duration)) = (self.imp().clapper.player(), self.duration_secs())
+        {
+            player.seek((duration - seconds).max(0.0));
+        }
+    }
+
+    /// The DJ's crossfade: play at `gain` (linear amplitude, 0 to 1) of the
+    /// user's volume. While a gain is set, the player's volume is the DJ's:
+    /// it is taken off the `player-volume` setting, which two players fading
+    /// against each other would otherwise fight over. `None` hands it back.
+    pub fn set_fade_gain(&self, gain: Option<f64>) {
+        let imp = self.imp();
+        let Some(player) = imp.clapper.player() else {
+            return;
+        };
+        match gain {
+            Some(gain) => {
+                if imp.fade_base.get().is_none() {
+                    gtk::gio::Settings::unbind(&player, "volume");
+                    imp.fade_base
+                        .set(Some(imp.settings.double("player-volume")));
+                }
+                let base = imp.fade_base.get().unwrap_or(1.0);
+                // Clapper's volume is on a cubic scale; the gain is linear.
+                player.set_volume(base * gain.clamp(0.0, 1.0).cbrt());
+            }
+            None => {
+                if imp.fade_base.take().is_some() {
+                    player.set_volume(imp.settings.double("player-volume"));
+                    imp.settings
+                        .bind("player-volume", &player, "volume")
+                        .build();
+                }
+            }
+        }
+    }
+
+    /// Show the DJ's queue in place of Up next (`None` takes it out again).
+    pub fn set_dj_panel(&self, panel: Option<&gtk::Widget>) {
+        let slot = &self.imp().dj_slot;
+        while let Some(child) = slot.first_child() {
+            slot.remove(&child);
+        }
+        if let Some(panel) = panel {
+            if let Some(parent) = panel.parent().and_downcast::<gtk::Box>() {
+                parent.remove(panel);
+            }
+            slot.append(panel);
+        }
+        slot.set_visible(panel.is_some());
+    }
+
     /// The first "Up next" video, if they have arrived.
     pub fn next_video(&self) -> Option<Video> {
         gtk::gio::prelude::ListModelExt::item(&self.imp().up_next_store, 0)
@@ -477,6 +581,16 @@ pub mod imp {
         #[template_child]
         autoplay_switch: TemplateChild<gtk::Switch>,
         pub(super) up_next_store: FiniteVideoStore,
+        #[template_child]
+        pub(super) dj_slot: TemplateChild<gtk::Box>,
+        /// Kinora: this page plays a DJ track (see `gui/dj.rs`).
+        #[property(get, set = Self::set_dj)]
+        dj: Cell<bool>,
+        /// Kinora: the DJ can be started (its extension is on).
+        #[property(get, set)]
+        dj_available: Cell<bool>,
+        /// The user's volume while the DJ fades this player (see `set_fade_gain`).
+        pub(super) fade_base: Cell<Option<f64>>,
         /// Kinora: the page is shrunk into the mini-player (see `player_sheet.rs`).
         #[property(get, set)]
         minimized: Cell<bool>,
@@ -530,6 +644,10 @@ pub mod imp {
                 stage_glow: Default::default(),
                 stage_scrim: Default::default(),
                 details_box: Default::default(),
+                dj_slot: Default::default(),
+                dj: Default::default(),
+                dj_available: Default::default(),
+                fade_base: Default::default(),
                 minimized: Default::default(),
                 double_click: Default::default(),
                 stage_clamp: Default::default(),
@@ -581,33 +699,10 @@ pub mod imp {
                 }
                 self.up_next_store.clear();
                 self.up_next_box.set_visible(false);
-                gspawn!(clone!(
-                    #[weak]
-                    obj,
-                    #[weak]
-                    client,
-                    #[weak]
-                    video,
-                    async move {
-                        let videos = client.up_next(&video).await;
-                        let imp = obj.imp();
-                        // The page may have moved on to another video meanwhile.
-                        if obj.video().as_ref() != Some(&video) {
-                            return;
-                        }
-                        imp.up_next_store.clear();
-                        for v in videos {
-                            imp.up_next_store.add(v);
-                        }
-                        imp.up_next_box.set_visible(imp.up_next_store.n_items() > 0);
-                        #[cfg(feature = "dev-hooks")]
-                        imp.dev_hooks_after_up_next();
-                        // Kinora: get the likely next video ready, so it starts at once.
-                        if let Some(next) = imp.up_next_store.item(0).and_downcast::<Video>() {
-                            client.prepare_playback(&next);
-                        }
-                    }
-                ));
+                // The DJ has its own queue.
+                if !self.dj.get() {
+                    self.load_up_next(&video);
+                }
 
                 // Load additional data
                 gspawn!(
@@ -650,6 +745,58 @@ pub mod imp {
                     ),
                     glib::Priority::LOW
                 );
+            }
+        }
+
+        /// Kinora: fetch "Up next" for the page's video and get the first one ready.
+        fn load_up_next(&self, video: &Video) {
+            let obj = self.obj();
+            let client = obj.client();
+            gspawn!(clone!(
+                #[weak]
+                obj,
+                #[weak]
+                client,
+                #[weak]
+                video,
+                async move {
+                    let videos = client.up_next(&video).await;
+                    let imp = obj.imp();
+                    // The page may have moved on to another video meanwhile.
+                    if obj.video().as_ref() != Some(&video) {
+                        return;
+                    }
+                    imp.up_next_store.clear();
+                    for v in videos {
+                        imp.up_next_store.add(v);
+                    }
+                    imp.up_next_box
+                        .set_visible(imp.up_next_store.n_items() > 0 && !obj.dj());
+                    #[cfg(feature = "dev-hooks")]
+                    imp.dev_hooks_after_up_next();
+                    // Kinora: get the likely next video ready, so it starts at once.
+                    if let Some(next) = imp.up_next_store.item(0).and_downcast::<Video>() {
+                        client.prepare_playback(&next);
+                    }
+                }
+            ));
+        }
+
+        /// Kinora: the DJ took this page over, or gave it back.
+        fn set_dj(&self, dj: bool) {
+            if self.dj.replace(dj) == dj {
+                return;
+            }
+            let obj = self.obj();
+            if dj {
+                self.up_next_box.set_visible(false);
+            } else {
+                obj.set_dj_panel(None);
+                if self.up_next_store.n_items() > 0 {
+                    self.up_next_box.set_visible(true);
+                } else if let Some(video) = obj.video() {
+                    self.load_up_next(&video);
+                }
             }
         }
 
@@ -742,7 +889,9 @@ pub mod imp {
                 self.up_next_store.n_items()
             );
             // Live streams have no real end; their position runs with the duration.
+            // (Nor does a DJ track: the DJ moves on by itself.)
             if self.autoplay_done.get()
+                || self.dj.get()
                 || obj.video().is_some_and(|v| v.is_live())
                 || obj.external()
                 || !self.settings.boolean("autoplay-next")
@@ -808,6 +957,12 @@ pub mod imp {
                 return String::new();
             }
             gettextrs::gettext("Uploaded {}").replace("{}", &uploaded)
+        }
+
+        /// Kinora: "Start DJ" is for YouTube videos, while the DJ is not on.
+        #[template_callback(function)]
+        fn dj_offered(available: bool, dj: bool, platform: Option<String>) -> bool {
+            available && !dj && platform.as_deref() == Some("youtube")
         }
 
         #[template_callback(function)]
@@ -1332,8 +1487,13 @@ pub mod imp {
             player.connect_volume_notify(clone!(
                 #[weak]
                 billboard,
+                #[weak]
+                obj,
                 move |_| {
-                    billboard.announce_volume();
+                    // Not while the DJ fades it.
+                    if obj.imp().fade_base.get().is_none() {
+                        billboard.announce_volume();
+                    }
                 }
             ));
 
