@@ -204,6 +204,25 @@ fn collect_badge_texts(value: &Value, out: &mut Vec<String>) {
     }
 }
 
+/// A card out of a RustyPipe playlist listing (the account's playlists).
+pub(crate) fn from_rustypipe(p: &rustypipe::model::PlaylistItem) -> Option<PlaylistCard> {
+    let id = normalize_id(&p.id)?;
+    Some(PlaylistCard {
+        kind: PlaylistKind::of(&id),
+        title: p.name.clone(),
+        thumbnail: p
+            .thumbnail
+            .iter()
+            .rev()
+            .find_map(|t| Url::parse(&t.url).ok()),
+        owner: p.channel.as_ref().map(|c| c.name.clone()),
+        owner_id: p.channel.as_ref().map(|c| c.id.clone()),
+        video_count: p.video_count.and_then(|n| u32::try_from(n).ok()),
+        first_video_id: None,
+        id,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

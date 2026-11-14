@@ -197,6 +197,28 @@ impl Core {
         account::up_next(self.paths.rustypipe_dir(), cookies, video.id.clone()).await
     }
 
+    /// The signed-in account's playlists, as YouTube's "Playlists" page
+    /// lists them (its own and the saved ones), plus "Liked videos"
+    /// ([`playlist::LIKED_VIDEOS`]) and "Watch later"
+    /// ([`playlist::WATCH_LATER`]) when YouTube leaves them out. Play one with
+    /// [`PlaylistCard::dj_seed`] and [`Self::dj_start`] (the DJ fetches it
+    /// signed in, so private playlists play too).
+    ///
+    /// Fails without an active account ([`Self::account_active`]).
+    pub async fn account_playlists(
+        &self,
+        account: &AccountConfig,
+    ) -> Result<Vec<PlaylistCard>, Error> {
+        if !self.account_active(account) {
+            return Err("No YouTube account is in use. Connect one in the preferences.".into());
+        }
+        let cookies = account
+            .cookies()
+            .await?
+            .ok_or("No YouTube account is set up.")?;
+        account::playlists(self.paths.rustypipe_dir(), cookies).await
+    }
+
     // ---- Extension contributions ----
 
     /// A video has really been watched: run the enabled extensions' hooks

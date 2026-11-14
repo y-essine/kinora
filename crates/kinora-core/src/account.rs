@@ -20,6 +20,7 @@ use tokio::sync::Mutex;
 use url::Url;
 
 pub use crate::Error;
+use crate::playlist::{self, PlaylistCard, PlaylistKind};
 use crate::youtube::{PLATFORM, channel, last_line, rusty_pipe, watch_url};
 
 /// Reuse the cookies file this long before asking the command for a fresh one.
@@ -194,6 +195,60 @@ pub async fn subscriptions(storage_dir: PathBuf, cookies: PathBuf) -> Result<Vec
         .collect())
 }
 
+/// The most playlists [`playlists`] lists.
+const PLAYLISTS_LIMIT: usize = 500;
+
+/// The account's playlists: YouTube's "Playlists" page (`FEplaylist_aggregation`,
+/// through RustyPipe's `saved_playlists`: the account's own playlists and the
+/// ones it saved), then "Liked videos" (`LL`) and "Watch later" (`WL`) when
+/// the page leaves them out (every account has them).
+///
+/// Not tried against a live account yet (Kinora's tests never use the
+/// user's cookies): it relies on RustyPipe's parser of that page.
+pub async fn playlists(storage_dir: PathBuf, cookies: PathBuf) -> Result<Vec<PlaylistCard>, Error> {
+    let rp = rusty_pipe(storage_dir).await?;
+    sign_in(&rp, &cookies)
+        .await
+        .map_err(|e| format!("Signing in to YouTube failed: {e}"))?;
+
+    let query = rp.query().authenticated();
+    let mut saved = query.saved_playlists().await?;
+    saved.extend_limit(&query, PLAYLISTS_LIMIT).await?;
+    let mut cards: Vec<PlaylistCard> = saved
+        .items
+        .iter()
+        .filter_map(playlist::from_rustypipe)
+        .collect();
+    with_special_playlists(&mut cards);
+    Ok(cards)
+}
+
+/// Add "Liked videos" and "Watch later" at the front when missing.
+fn with_special_playlists(cards: &mut Vec<PlaylistCard>) {
+    let special = [
+        (playlist::LIKED_VIDEOS, "Liked videos"),
+        (playlist::WATCH_LATER, "Watch later"),
+    ];
+    for (at, (id, title)) in special.into_iter().enumerate() {
+        if cards.iter().any(|c| c.id == id) {
+            continue;
+        }
+        cards.insert(
+            at.min(cards.len()),
+            PlaylistCard {
+                id: id.to_owned(),
+                title: title.to_owned(),
+                kind: PlaylistKind::Playlist,
+                thumbnail: None,
+                owner: None,
+                owner_id: None,
+                video_count: None,
+                first_video_id: None,
+            },
+        );
+    }
+}
+
 /// Mark a video as watched on the account, so its recommendations learn from it.
 pub async fn mark_watched(cookies: &Path, video_id: &str) -> Result<(), Error> {
     let out = Command::new("yt-dlp")
@@ -262,4 +317,40 @@ fn video_item_to_video(v: &rustypipe::model::VideoItem) -> Option<Video> {
         is_live: Some(v.is_live),
         requires_payment: Some(false),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn card(id: &str) -> PlaylistCard {
+        PlaylistCard {
+            id: id.to_owned(),
+            title: id.to_owned(),
+            kind: PlaylistKind::of(id),
+            thumbnail: None,
+            owner: None,
+            owner_id: None,
+            video_count: None,
+            first_video_id: None,
+        }
+    }
+
+    #[test]
+    fn liked_videos_and_watch_later_are_always_listed() {
+        let ids = |cards: &[PlaylistCard]| cards.iter().map(|c| c.id.clone()).collect::<Vec<_>>();
+        let mut cards = vec![card("PLa"), card("PLb")];
+        with_special_playlists(&mut cards);
+        assert_eq!(ids(&cards), ["LL", "WL", "PLa", "PLb"]);
+        assert_eq!(cards[0].title, "Liked videos");
+
+        // Listed already: left where YouTube put them.
+        let mut cards = vec![card("PLa"), card("WL"), card("LL")];
+        with_special_playlists(&mut cards);
+        assert_eq!(ids(&cards), ["PLa", "WL", "LL"]);
+
+        let mut none = Vec::new();
+        with_special_playlists(&mut none);
+        assert_eq!(ids(&none), ["LL", "WL"]);
+    }
 }
