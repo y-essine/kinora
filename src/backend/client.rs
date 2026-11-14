@@ -419,6 +419,17 @@ impl Client {
         Pixbuf::from_stream_future(&stream).await.ok()
     }
 
+    /// Kinora: a picture by its address, through the thumbnail cache (for
+    /// things that are not videos: playlist covers).
+    pub async fn picture(&self, url: Url) -> Option<Pixbuf> {
+        let cache = self.imp().cache.borrow().clone();
+        cache
+            .as_ref()
+            .expect("Cache to be set up")
+            .get_or_fetch(url, |u| async { self.pixbuf_for_url(u).await })
+            .await
+    }
+
     async fn populate_avatar(&self, channel: &Channel) {
         if let Some(url) = channel.avatar_url() {
             let cache = self.imp().cache.borrow().clone();

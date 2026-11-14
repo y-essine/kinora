@@ -984,6 +984,65 @@ pub mod imp {
                     sheet.dev_set_progress(p);
                 });
             }
+            // `KH_PLAYLIST_DEMO=1`: sample cards in Home's Mixes and playlists
+            // shelves, to look at them without the account's own.
+            if std::env::var("KH_PLAYLIST_DEMO").is_ok() {
+                use crate::gui::playlist_shelf::{PlaylistInfo, PlaylistKind};
+                let home = self.obj().client().home_store();
+                let sample = |n: u32, kind, title: &str, owner: Option<&str>, count| PlaylistInfo {
+                    id: format!("DEMO{n}"),
+                    title: title.to_owned(),
+                    owner: owner.map(str::to_owned),
+                    count,
+                    kind,
+                    thumbnail: home
+                        .item(n)
+                        .and_downcast::<Video>()
+                        .and_then(|v| v.thumbnail_url()),
+                };
+                self.home_view.set_playlists(
+                    vec![
+                        sample(1, PlaylistKind::Mix, "My Mix", Some("YouTube"), None),
+                        sample(
+                            2,
+                            PlaylistKind::Mix,
+                            "Mix: The Cranberries, Zombie",
+                            None,
+                            None,
+                        ),
+                        sample(
+                            3,
+                            PlaylistKind::Mix,
+                            "Late night drive",
+                            Some("YouTube"),
+                            None,
+                        ),
+                    ],
+                    vec![
+                        sample(
+                            4,
+                            PlaylistKind::Playlist,
+                            "Liked videos",
+                            Some("You"),
+                            Some(214),
+                        ),
+                        sample(
+                            5,
+                            PlaylistKind::Playlist,
+                            "Watch later",
+                            Some("You"),
+                            Some(37),
+                        ),
+                        sample(
+                            6,
+                            PlaylistKind::Album,
+                            "No Need to Argue",
+                            Some("The Cranberries"),
+                            Some(13),
+                        ),
+                    ],
+                );
+            }
             if let Ok(side) = std::env::var("KH_MINI_DOCK") {
                 self.player_sheet.dev_set_dock_right(side != "left");
             }
@@ -1839,6 +1898,21 @@ pub mod imp {
                     actions.add_action(&action);
                 }
             }
+            // A playlist or mix card was opened: the DJ plays it (id, title).
+            let action_dj_playlist = SimpleAction::new(
+                "dj-playlist",
+                Some(&<(String, String)>::static_variant_type()),
+            );
+            action_dj_playlist.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, target| {
+                    if let Some((id, title)) = target.and_then(|t| t.get::<(String, String)>()) {
+                        obj.imp().dj().start_playlist(&id, &title);
+                    }
+                }
+            ));
+            actions.add_action(&action_dj_playlist);
             actions.add_action(&action_settings);
             actions.add_action(&action_toggle_filter);
             actions.add_action(&action_filter_dialog);

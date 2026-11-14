@@ -129,6 +129,18 @@ impl Dj {
         self.start_from(from_mix.then_some(DjSeed::MyMix));
     }
 
+    /// Play a playlist or a mix with the DJ: all of it, in order, each item
+    /// fading into the next.
+    pub fn start_playlist(&self, id: &str, title: &str) {
+        match playlist_seed(id, title) {
+            Some(seed) => self.start_from(Some(seed)),
+            None => {
+                log::info!("DJ: no playlist seed in the engine yet ({id}, {title})");
+                self.toast(&gettextrs::gettext("The DJ cannot play playlists yet"));
+            }
+        }
+    }
+
     /// Start the DJ from `seed` (the mix, a playlist, ...); `None`: from the
     /// video in the player, following the "start from" setting.
     pub fn start_from(&self, seed: Option<DjSeed>) {
@@ -666,6 +678,12 @@ impl Dj {
         });
         self.dev_log();
     }
+}
+
+/// The seed that plays a playlist. The engine's playlist seed is on its way
+/// (kinora-core); until it is merged there is none.
+fn playlist_seed(_id: &str, _title: &str) -> Option<DjSeed> {
+    None
 }
 
 /// The video a seed takes over (it is already playing), if it is one.

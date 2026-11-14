@@ -41,6 +41,7 @@ src/backend/subscriptions_store.rs
 src/backend/video.rs
 src/backend/video_fetcher_stream.rs
 src/gui/player_sheet.rs
+src/gui/playlist_shelf.rs
 src/gui/featured_banner.rs
 src/gui/home_view.rs
 src/gui/video_row.rs

@@ -13,6 +13,7 @@ mod first_run;
 mod home_view;
 mod import_dialog;
 mod player_sheet;
+pub mod playlist_shelf;
 mod preferences_dialog;
 mod privacy_notice;
 mod search_list;
