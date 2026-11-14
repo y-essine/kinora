@@ -16,6 +16,7 @@ pub mod dj;
 pub mod extension;
 pub mod home;
 pub mod player;
+pub mod playlist;
 pub mod streams;
 pub mod youtube;
 
