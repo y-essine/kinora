@@ -144,6 +144,10 @@
       <default>''</default>
       <summary>How the connected YouTube account is shown, e.g. "hellyeah · Chromium"</summary>
     </key>
+    <key name="fast-start" type="b">
+      <default>true</default>
+      <summary>Start YouTube videos with Kinora's own stream lookup (about a second) instead of yt-dlp (several seconds); yt-dlp stays the fallback</summary>
+    </key>
     <key name="autoplay-next" type="b">
       <default>true</default>
       <summary>Play the first Up next video when a video ends</summary>

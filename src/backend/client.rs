@@ -787,6 +787,56 @@ impl Client {
         }
     }
 
+    /// Kinora: fast start. A URI Clapper can play right away for a YouTube
+    /// video (see `streams.rs`), or `None` when the caller should fall back to
+    /// the yt-dlp path (setting off, other platform, or the lookup failed).
+    pub async fn fast_playback_uri(&self, video: &Video) -> Option<String> {
+        if video.platform() != "youtube" || !self.imp().settings.boolean("fast-start") {
+            return None;
+        }
+        let (storage_dir, cache_dir) = Self::stream_dirs();
+        let id = video.id().id;
+        let started = std::time::Instant::now();
+        let result =
+            tspawn!(async move { super::streams::playback_uri(storage_dir, cache_dir, id).await })
+                .await
+                .expect("Failed to spawn tokio");
+        match result {
+            Ok(uri) => {
+                log::info!(
+                    "Fast start: streams for {} in {:.2} s",
+                    video.id().id,
+                    started.elapsed().as_secs_f64()
+                );
+                Some(uri)
+            }
+            Err(e) => {
+                log::warn!("Fast start failed for {}, using yt-dlp: {e}", video.id().id);
+                None
+            }
+        }
+    }
+
+    /// Kinora: look a video's streams up ahead of time (e.g. the first "Up next"
+    /// video), so it starts at once when picked or autoplayed.
+    pub fn prepare_playback(&self, video: &Video) {
+        if video.platform() != "youtube" || !self.imp().settings.boolean("fast-start") {
+            return;
+        }
+        let (storage_dir, cache_dir) = Self::stream_dirs();
+        let id = video.id().id;
+        tspawn!(async move {
+            if let Err(e) = super::streams::playback_uri(storage_dir, cache_dir, id.clone()).await {
+                log::debug!("Could not prepare {id}: {e}");
+            }
+        });
+    }
+
+    fn stream_dirs() -> (PathBuf, PathBuf) {
+        let base = glib::user_cache_dir().join(crate::migrate::DIR);
+        (base.join("account"), base.join("streams"))
+    }
+
     /// Mark a video as watched on the YouTube account (in the background).
     pub fn mark_watched_on_account(&self, video: &Video) {
         if video.platform() != "youtube" {

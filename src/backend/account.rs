@@ -213,7 +213,7 @@ pub async fn mark_watched(cookies: &Path, video_id: &str) -> Result<(), Error> {
     }
 }
 
-async fn rusty_pipe(storage_dir: PathBuf) -> Result<RustyPipe, Error> {
+pub(crate) async fn rusty_pipe(storage_dir: PathBuf) -> Result<RustyPipe, Error> {
     static RP: OnceCell<RustyPipe> = OnceCell::const_new();
     RP.get_or_try_init(|| async move {
         std::fs::create_dir_all(&storage_dir)?;

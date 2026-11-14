@@ -42,11 +42,29 @@ impl VideoPage {
                 .expect("Clapper does not have a player");
             let queue = player.queue().expect("Clapper does not have a queue");
             queue.clear();
-            queue.add_item(&MediaItem::new(
-                &self.convert_to_clapper_playable_url(&video),
-            ));
-            player.play();
             self.imp().play_started.set(Some(std::time::Instant::now()));
+            self.set_loading(true);
+            let fallback = self.convert_to_clapper_playable_url(&video);
+            if self.try_get_downloaded(&video).is_some() {
+                imp.fast_start_active.set(false);
+                queue.add_item(&MediaItem::new(&fallback));
+                player.play();
+            } else {
+                // Kinora: fast start (streams in ~0.2 s instead of ~9 s); the
+                // yt-dlp path is the fallback, here and on a playback error.
+                let page = self.clone();
+                let client = self.client();
+                let video = video.clone();
+                gspawn!(async move {
+                    let fast = client.fast_playback_uri(&video).await;
+                    if page.video().as_ref() != Some(&video) || page.external() {
+                        return;
+                    }
+                    page.imp().fast_start_active.set(fast.is_some());
+                    queue.add_item(&MediaItem::new(&fast.unwrap_or(fallback)));
+                    player.play();
+                });
+            }
             // Kinora: count it on the YouTube account once it was really watched.
             self.mark_watched_on_account_later(&video);
         } else {
@@ -321,6 +339,8 @@ pub mod imp {
 
         #[template_child]
         billboard: TemplateChild<clapper_gtk::Billboard>,
+        #[template_child]
+        page_scroller: TemplateChild<gtk::ScrolledWindow>,
 
         // Kinora: "Up next"
         #[template_child]
@@ -339,6 +359,16 @@ pub mod imp {
         /// Kinora: while fullscreened, fill the window instead of the screen.
         #[property(get, set)]
         window_mode: Cell<bool>,
+        /// Kinora: the video is starting (thumbnail and spinner over the player).
+        #[property(get, set)]
+        loading: Cell<bool>,
+        /// Kinora: the description is shown in full rather than a few lines.
+        #[property(get, set)]
+        description_expanded: Cell<bool>,
+        /// Kinora: the current item came from fast start (fall back on errors).
+        pub(super) fast_start_active: Cell<bool>,
+        /// Kinora: scroll to the top the next time the page is shown.
+        scroll_to_top_on_show: Cell<bool>,
         #[property(get, set)]
         show_sidebar_visible: Cell<bool>,
         #[property(get, set)]
@@ -360,6 +390,7 @@ pub mod imp {
                 clapper: Default::default(),
                 video: Default::default(),
                 billboard: Default::default(),
+                page_scroller: Default::default(),
                 up_next_box: Default::default(),
                 up_next_list: Default::default(),
                 autoplay_switch: Default::default(),
@@ -368,6 +399,10 @@ pub mod imp {
                 play_started: Default::default(),
                 fullscreened: Default::default(),
                 window_mode: Default::default(),
+                loading: Default::default(),
+                description_expanded: Default::default(),
+                fast_start_active: Default::default(),
+                scroll_to_top_on_show: Default::default(),
                 state: Default::default(),
                 position: Default::default(),
                 duration: Default::default(),
@@ -393,6 +428,12 @@ pub mod imp {
 
                 // Kinora: load "Up next" alongside the video information.
                 self.autoplay_done.set(false);
+                obj.set_description_expanded(false);
+                // Kinora: a new video's page opens at the top (see `setup`).
+                self.scroll_to_top_on_show.set(true);
+                if self.page_scroller.is_mapped() {
+                    self.scroll_to_top();
+                }
                 self.up_next_store.clear();
                 self.up_next_box.set_visible(false);
                 gspawn!(clone!(
@@ -414,6 +455,10 @@ pub mod imp {
                             imp.up_next_store.add(v);
                         }
                         imp.up_next_box.set_visible(imp.up_next_store.n_items() > 0);
+                        // Kinora: get the likely next video ready, so it starts at once.
+                        if let Some(next) = imp.up_next_store.item(0).and_downcast::<Video>() {
+                            client.prepare_playback(&next);
+                        }
                     }
                 ));
 
@@ -476,10 +521,23 @@ pub mod imp {
             obj.set_fullscreened(true);
         }
 
+        /// Kinora: back to the top; again shortly after, because focus moving into
+        /// the page during its transition scrolls it to the focused widget.
+        fn scroll_to_top(&self) {
+            self.scroll_to_top_on_show.set(false);
+            for delay in [0, 450] {
+                let scroller = self.page_scroller.clone();
+                glib::timeout_add_local_once(std::time::Duration::from_millis(delay), move || {
+                    scroller.vadjustment().set_value(0.0);
+                });
+            }
+        }
+
         /// When the video has played to its end, continue with the first "Up next" video.
         fn maybe_autoplay(&self, player: &clapper::Player) {
             let obj = self.obj();
             if player.state() == clapper::PlayerState::Playing {
+                obj.set_loading(false);
                 if let Some(started) = self.play_started.take() {
                     log::info!(
                         "Player: playing after {:.1} s",
@@ -564,6 +622,41 @@ pub mod imp {
                 return String::new();
             }
             gettextrs::gettext("Uploaded {}").replace("{}", &uploaded)
+        }
+
+        #[template_callback(function)]
+        fn description_is_long(description: Option<String>) -> bool {
+            description.is_some_and(|d| d.chars().count() > 280 || d.lines().count() > 4)
+        }
+
+        /// The first few lines of a long description, unless expanded. (GTK's
+        /// line limit doesn't apply to this selectable, linkified label.)
+        #[template_callback(function)]
+        fn collapse_description(description: Option<String>, expanded: bool) -> Option<String> {
+            let d = description?;
+            if expanded || !Self::description_is_long(Some(d.clone())) {
+                return Some(d);
+            }
+            let mut short: String = d.lines().take(4).collect::<Vec<_>>().join("\n");
+            if short.chars().count() > 280 {
+                short = short.chars().take(280).collect();
+            }
+            Some(format!("{}…", short.trim_end()))
+        }
+
+        #[template_callback(function)]
+        fn description_toggle_label(expanded: bool) -> String {
+            if expanded {
+                gettextrs::gettext("Show less")
+            } else {
+                gettextrs::gettext("Show more")
+            }
+        }
+
+        #[template_callback]
+        fn toggle_description(&self) {
+            let obj = self.obj();
+            obj.set_description_expanded(!obj.description_expanded());
         }
 
         #[template_callback]
@@ -854,6 +947,51 @@ pub mod imp {
                     glib::ControlFlow::Continue
                 }
             ));
+
+            // Kinora: a new video's page opens at the top once it is shown (pages
+            // are laid out only when on screen).
+            self.page_scroller.connect_map(clone!(
+                #[weak]
+                obj,
+                move |_| {
+                    if obj.imp().scroll_to_top_on_show.get() {
+                        obj.imp().scroll_to_top();
+                    }
+                }
+            ));
+
+            // Kinora: if a fast-start stream fails to play, retry with yt-dlp.
+            player.connect_local(
+                "error",
+                false,
+                clone!(
+                    #[weak]
+                    obj,
+                    #[upgrade_or_default]
+                    move |args| {
+                        let imp = obj.imp();
+                        if !imp.fast_start_active.replace(false) {
+                            obj.set_loading(false);
+                            return None;
+                        }
+                        let error = args
+                            .get(1)
+                            .and_then(|v| v.get::<glib::Error>().ok())
+                            .map(|e| e.to_string())
+                            .unwrap_or_default();
+                        log::warn!("Fast start stream failed ({error}); retrying with yt-dlp");
+                        if let (Some(video), Some(player)) = (obj.video(), imp.clapper.player()) {
+                            let queue = player.queue().expect("Clapper does not have a queue");
+                            queue.clear();
+                            queue.add_item(&clapper::MediaItem::new(
+                                &obj.convert_to_clapper_playable_url(&video),
+                            ));
+                            player.play();
+                        }
+                        None
+                    }
+                ),
+            );
 
             // Kinora: "Up next" list and autoplay.
             self.up_next_list.bind_model(

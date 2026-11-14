@@ -20,3 +20,4 @@ result
 *.pkg.tar.zst
 /.dev
 /packaging/arch/kinora
+/.claude/
