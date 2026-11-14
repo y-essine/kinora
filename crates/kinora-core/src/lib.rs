@@ -13,6 +13,7 @@
 pub mod account;
 pub mod config;
 pub mod home;
+pub mod player;
 pub mod streams;
 pub mod youtube;
 
