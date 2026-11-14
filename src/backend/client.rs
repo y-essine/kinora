@@ -117,26 +117,33 @@ impl Client {
                 }
             ),
         );
-        // Kinora: follow the YouTube account being connected or disconnected.
-        let update_account = clone!(
-            #[weak(rename_to = s)]
-            self,
-            move |settings: &gdk::gio::Settings, _: &str| {
-                let connected = !settings.string("account-cookies-command").trim().is_empty();
-                let changed = connected != s.has_account();
-                s.set_account_label(account_label(settings));
-                s.set_has_account(connected);
-                if changed || connected {
-                    s.reset_home();
-                    if connected {
-                        gspawn!(async move { s.refresh_home().await });
+        // Kinora: the extensions that are switched off, and their settings.
+        self.load_extension_settings();
+        for key in ["disabled-extensions", "extension-settings"] {
+            settings.connect_changed(
+                Some(key),
+                clone!(
+                    #[weak(rename_to = s)]
+                    self,
+                    move |_, _| {
+                        s.load_extension_settings();
+                        // The account or the chips may have been switched on or off.
+                        s.account_changed();
                     }
-                }
-            }
-        );
+                ),
+            );
+        }
+        // Kinora: follow the YouTube account being connected or disconnected.
         self.set_account_label(account_label(settings));
-        self.set_has_account(!settings.string("account-cookies-command").trim().is_empty());
-        settings.connect_changed(Some("account-cookies-command"), update_account);
+        self.set_has_account(self.core().account_active(&self.account_config()));
+        settings.connect_changed(
+            Some("account-cookies-command"),
+            clone!(
+                #[weak(rename_to = s)]
+                self,
+                move |_, _| s.account_changed()
+            ),
+        );
         settings.connect_changed(
             Some("account-label"),
             clone!(
@@ -673,9 +680,38 @@ impl Client {
 
     // ---- Kinora: the signed-in YouTube account ----
 
-    /// The core (see `crates/kinora-core`), shared with tokio tasks.
-    fn core(&self) -> Arc<kinora_core::Core> {
+    /// The core (see `crates/kinora-core`), shared with tokio tasks. The
+    /// preferences list the extensions with `core().extensions().settings_panels()`
+    /// and switch them through the `disabled-extensions` and
+    /// `extension-settings` settings, which the Client passes on.
+    pub fn core(&self) -> Arc<kinora_core::Core> {
         self.imp().core.borrow().clone().expect("Core to be set up")
+    }
+
+    /// Hand the extension settings from GSettings to the core.
+    fn load_extension_settings(&self) {
+        let settings = &self.imp().settings;
+        let core = self.core();
+        core.extensions()
+            .set_disabled(settings.strv("disabled-extensions"));
+        core.extensions()
+            .set_values(extension_values(&settings.value("extension-settings")));
+    }
+
+    /// The account was connected or disconnected, or its extension (or the
+    /// chips) switched on or off: update the account state and reload Home.
+    fn account_changed(&self) {
+        let connected = self.core().account_active(&self.account_config());
+        let changed = connected != self.has_account();
+        self.set_account_label(account_label(&self.imp().settings));
+        self.set_has_account(connected);
+        if changed || connected {
+            self.reset_home();
+            if connected {
+                let s = self.clone();
+                gspawn!(async move { s.refresh_home().await });
+            }
+        }
     }
 
     fn account_config(&self) -> kinora_core::AccountConfig {
@@ -1410,6 +1446,35 @@ fn account_label(settings: &gdk::gio::Settings) -> String {
     }
 }
 
+/// Kinora: the `extension-settings` dictionary (`a{sv}`, booleans and strings)
+/// as the core's setting values. Other value types are skipped.
+fn extension_values(
+    dict: &glib::Variant,
+) -> std::collections::HashMap<String, kinora_core::extension::SettingValue> {
+    use kinora_core::extension::SettingValue;
+    let mut values = std::collections::HashMap::new();
+    if !dict.is_container() {
+        return values;
+    }
+    for entry in dict.iter() {
+        let (Some(key), Some(value)) = (
+            entry.child_value(0).str().map(str::to_owned),
+            entry.child_value(1).as_variant(),
+        ) else {
+            continue;
+        };
+        let value = if let Some(b) = value.get::<bool>() {
+            SettingValue::Bool(b)
+        } else if let Some(s) = value.str() {
+            SettingValue::Text(s.to_owned())
+        } else {
+            continue;
+        };
+        values.insert(key, value);
+    }
+    values
+}
+
 /// Kinora: whether a search stream event belongs to the given platform.
 fn search_result_on(result: &pcore::SearchStreamResult, platform: &str) -> bool {
     match result {
@@ -1428,6 +1493,22 @@ fn search_result_on(result: &pcore::SearchStreamResult, platform: &str) -> bool 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn extension_settings_dictionary_becomes_values() {
+        use glib::prelude::ToVariant;
+        use kinora_core::extension::SettingValue;
+        let dict: std::collections::HashMap<String, glib::Variant> = [
+            ("account.mark-watched".to_owned(), false.to_variant()),
+            ("dj.pick".to_owned(), "last".to_variant()),
+            ("dj.count".to_owned(), 3i32.to_variant()),
+        ]
+        .into();
+        let values = extension_values(&dict.to_variant());
+        assert_eq!(values.len(), 2);
+        assert_eq!(values["account.mark-watched"], SettingValue::Bool(false));
+        assert_eq!(values["dj.pick"], SettingValue::Text("last".into()));
+    }
 
     #[test]
     fn search_filter_matches_platform_events() {

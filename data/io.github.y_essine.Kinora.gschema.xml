@@ -162,5 +162,13 @@
       <default>true</default>
       <summary>Play the first Up next video when a video ends</summary>
     </key>
+    <key name="disabled-extensions" type="as">
+      <default>[]</default>
+      <summary>Extensions that are switched off, by id ('account', 'home-chips', ...). All others are on.</summary>
+    </key>
+    <key name="extension-settings" type="a{sv}">
+      <default>{}</default>
+      <summary>The extensions' settings, keyed 'EXTENSION.SETTING' (e.g. 'account.mark-watched'): booleans for toggles, strings for choices and text. Missing keys use the extension's default.</summary>
+    </key>
   </schema>
 </schemalist>
