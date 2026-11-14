@@ -17,7 +17,7 @@
   <translation type="gettext">@gettext-package@</translation>
 
   <releases>
-    <release version="0.1.0" date="2026-11-14">
+    <release version="0.1.0-beta.1" date="2026-11-14" type="development">
       <description translate="no">
         <p>First Kinora release, based on Pipeline 4.1.1.</p> <ul> <li>Optional YouTube account: Home feed, personal Up next, watch history on the account.</li> <li>Autoplay of the next video.</li> <li>Window fullscreen next to screen fullscreen.</li> <li>The player scrolls with the video page.</li> </ul>
       </description>

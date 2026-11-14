@@ -46,6 +46,11 @@ fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
 
 /// Copy Pipeline's settings (the keys are the same) while Kinora has none yet.
 fn settings() {
+    // Only with the real settings store (dconf); a development build running on
+    // a keyfile or in memory must not write into the installed app's settings.
+    if std::env::var("GSETTINGS_BACKEND").is_ok_and(|b| b != "dconf") {
+        return;
+    }
     let new = format!("/{}/", BASE_ID.replace('.', "/"));
     let dump = |path: &str| {
         Command::new("dconf")

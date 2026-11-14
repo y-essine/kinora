@@ -26,7 +26,9 @@ import sys
 import tempfile
 
 HOME = os.path.expanduser("~")
-CONFIG = os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
+# KINORA_BROWSER_CONFIG: where the browsers keep their profiles, when the app
+# runs with its own XDG_CONFIG_HOME (development builds).
+CONFIG = os.environ.get("KINORA_BROWSER_CONFIG") or os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
 CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")), "kinora")
 
 # id: (display name, yt-dlp browser name, user data dir, keyring application attribute)

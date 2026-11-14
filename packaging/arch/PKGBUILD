@@ -1,7 +1,7 @@
 # Maintainer: y-essine
 # Based on the AUR pipeline-gtk PKGBUILD by Mark Wagie and contributors.
 pkgname=kinora
-pkgver=0.1.0
+pkgver=0.1.0beta.1
 pkgrel=1
 pkgdesc="Watch YouTube and PeerTube your way: fully anonymous, lightweight, or with your account"
 arch=('x86_64' 'aarch64')
@@ -41,7 +41,9 @@ sha256sums=('SKIP')
 pkgver() {
   cd "$pkgname"
   local base
+  # pacman versions can't contain "-": 0.1.0-beta.1 -> 0.1.0beta.1 (sorts before 0.1.0).
   base=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+  base=${base//-/}
   # Commits on top of the upstream import (the root commit).
   printf "%s.r%s.g%s" "$base" "$(( $(git rev-list --count HEAD) - 1 ))" "$(git rev-parse --short HEAD)"
 }

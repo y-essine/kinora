@@ -10,7 +10,6 @@ screenshot-aux
 .nixos-test-history
 result
 .vscode
-
 /subprojects/blueprint-compiler
 /_build
 /_dev
@@ -19,3 +18,5 @@ result
 /packaging/arch/pkg
 /packaging/arch/pipeline-home
 *.pkg.tar.zst
+/.dev
+/packaging/arch/kinora
