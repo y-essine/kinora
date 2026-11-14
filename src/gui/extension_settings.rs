@@ -119,8 +119,17 @@ fn store(settings: &Settings, extension: &str, key: &str, value: SettingValue) {
     }
 }
 
+/// "6 s", or the minimum's own label ("Off").
+fn number_label(n: u32, min: u32, unit: Option<&str>, min_label: Option<&str>) -> String {
+    match (min_label, unit) {
+        (Some(label), _) if n == min => gettextrs::gettext(label),
+        (_, Some(unit)) => format!("{n} {}", gettextrs::gettext(unit)),
+        _ => n.to_string(),
+    }
+}
+
 /// The row that shows and changes one setting: a switch for a toggle, a combo
-/// row for a choice, an entry for text.
+/// row for a choice, a slider for a number, an entry for text.
 fn setting_row(
     extension: &str,
     setting: &Setting,
@@ -186,6 +195,62 @@ fn setting_row(
             });
             row.upcast()
         }
+        SettingKind::Number {
+            min,
+            max,
+            default,
+            unit,
+            min_label,
+        } => {
+            let (min, max) = (*min, *max);
+            let current = match value {
+                SettingValue::Text(v) => v.parse().unwrap_or(*default),
+                SettingValue::Bool(_) => *default,
+            };
+            let row = adw::ActionRow::builder().title(title).build();
+            if let Some(subtitle) = subtitle {
+                row.set_subtitle(&subtitle);
+            }
+            let scale =
+                gtk::Scale::with_range(gtk::Orientation::Horizontal, min as f64, max as f64, 1.0);
+            scale.set_value(current as f64);
+            scale.set_round_digits(0);
+            scale.set_width_request(180);
+            scale.set_valign(gtk::Align::Center);
+            scale.add_mark(*default as f64, gtk::PositionType::Bottom, None);
+            scale.update_property(&[gtk::accessible::Property::Label(&gettextrs::gettext(
+                &setting.title,
+            ))]);
+            let (unit, min_label) = (unit.clone(), min_label.clone());
+            let label = gtk::Label::builder()
+                .label(number_label(
+                    current,
+                    min,
+                    unit.as_deref(),
+                    min_label.as_deref(),
+                ))
+                .width_chars(4)
+                .xalign(1.0)
+                .css_classes(["numeric", "dim-label"])
+                .build();
+            row.add_suffix(&scale);
+            row.add_suffix(&label);
+            let stored = std::cell::Cell::new(current);
+            scale.connect_value_changed(move |scale| {
+                let n = (scale.value().round() as u32).clamp(min, max);
+                if stored.replace(n) == n {
+                    return;
+                }
+                label.set_label(&number_label(n, min, unit.as_deref(), min_label.as_deref()));
+                store(
+                    &settings,
+                    &extension,
+                    &key,
+                    SettingValue::Text(n.to_string()),
+                );
+            });
+            row.upcast()
+        }
         SettingKind::Text { .. } => {
             let row = adw::EntryRow::builder()
                 .title(title)
@@ -222,5 +287,12 @@ mod tests {
             "Controls the player"
         );
         assert_eq!(permissions_summary(&[]), "Needs no special access");
+    }
+
+    #[test]
+    fn numbers_show_their_unit_and_the_minimum_its_label() {
+        assert_eq!(number_label(6, 0, Some("s"), Some("Off")), "6 s");
+        assert_eq!(number_label(0, 0, Some("s"), Some("Off")), "Off");
+        assert_eq!(number_label(3, 1, None, None), "3");
     }
 }
