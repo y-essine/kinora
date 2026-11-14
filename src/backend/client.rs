@@ -1,6 +1,8 @@
 use std::path::PathBuf;
+use std::pin::Pin;
 
 use chrono::{DateTime, Utc};
+use futures::StreamExt;
 use gdk::gdk_pixbuf::Pixbuf;
 use gdk::gio::prelude::{FileExt, ListModelExtManual};
 use gdk::gio::{File, MemoryInputStream, SettingsBindFlags};
@@ -611,9 +613,22 @@ impl Client {
         )
     }
 
-    pub async fn search(&self, query: &str) -> SearchStream {
+    /// Search all enabled platforms, or only `platform` (e.g. "youtube") if given.
+    // Kinora: the platform filter is applied on the merged stream, so that the platform's
+    // loading state and errors are hidden together with its results.
+    pub async fn search(&self, query: &str, platform: Option<&str>) -> SearchStream {
         self.await_setup_finished().await;
-        SearchStream::new(self.internal().await.search(query), self)
+        let stream = self.internal().await.search(query);
+        let stream: Pin<Box<dyn pcore::SearchStream>> = match platform {
+            Some(platform) => {
+                let platform = platform.to_owned();
+                Box::pin(
+                    stream.filter(move |r| futures::future::ready(search_result_on(r, &platform))),
+                )
+            }
+            None => stream,
+        };
+        SearchStream::new(stream, self)
     }
 
     pub async fn populate_video_information(&self, video_id: &VideoId) -> Result<(), pcore::Error> {
@@ -1146,5 +1161,47 @@ fn account_label(settings: &gdk::gio::Settings) -> String {
         gettextrs::gettext("YouTube account")
     } else {
         label.to_string()
+    }
+}
+
+/// Kinora: whether a search stream event belongs to the given platform.
+fn search_result_on(result: &pcore::SearchStreamResult, platform: &str) -> bool {
+    match result {
+        pcore::SearchStreamResult::Loading(p)
+        | pcore::SearchStreamResult::Loaded(p)
+        | pcore::SearchStreamResult::ErrorLoading(p, _) => p == platform,
+        pcore::SearchStreamResult::NextItem(pcore::SearchItem::Video(v)) => {
+            v.id.platform == platform
+        }
+        pcore::SearchStreamResult::NextItem(pcore::SearchItem::Channel(c)) => {
+            c.id.platform == platform
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn search_filter_matches_platform_events() {
+        let loading = pcore::SearchStreamResult::Loading("youtube".into());
+        assert!(search_result_on(&loading, "youtube"));
+        assert!(!search_result_on(&loading, "peertube"));
+
+        let channel =
+            pcore::SearchStreamResult::NextItem(pcore::SearchItem::Channel(pcore::Channel {
+                id: ChannelId {
+                    id: "x".into(),
+                    platform: "peertube".into(),
+                },
+                name: "x".into(),
+                avatar: None,
+                banner: None,
+                description: None,
+                subscribers: None,
+            }));
+        assert!(search_result_on(&channel, "peertube"));
+        assert!(!search_result_on(&channel, "youtube"));
     }
 }

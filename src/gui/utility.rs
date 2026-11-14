@@ -1,6 +1,6 @@
 use std::{ffi::OsStr, process::Stdio};
 
-use chrono::{Datelike, Days, Local, TimeDelta, Utc};
+use chrono::{Datelike, Local, TimeDelta, Utc};
 use glib::Object;
 use tokio::process::Command;
 
@@ -149,27 +149,60 @@ impl Utility {
     }
 
     pub fn format_date_human(time: &chrono::DateTime<Utc>) -> String {
-        // Kinora: the epoch marks "not known yet" (videos from a short listing).
+        Self::format_date_human_at(time, Utc::now())
+    }
+
+    // Kinora: YouTube only reports coarse ages ("4 years ago"), which the backend turns into an exact date with today's month and day.
+    // So only show weekdays for the last week and relative wording for anything older, instead of dates that look exact but are not.
+    fn format_date_human_at(time: &chrono::DateTime<Utc>, now: chrono::DateTime<Utc>) -> String {
+        // The epoch marks "not known yet" (videos from a short listing).
         if time.timestamp() == 0 {
             return String::new();
         }
         let time = time.with_timezone(&Local);
         let date = time.date_naive();
-        let today = Utc::now().date_naive();
+        let today = now.with_timezone(&Local).date_naive();
+        let days_ago = (today - date).num_days();
 
-        if today == date {
-            // Translators: formatting of time of day in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
-            time.format(&gettextrs::gettext("%H:%M")).to_string()
-        } else if today + Days::new(1) == date {
-            gettextrs::gettext("Tomorrow")
-        } else if today - Days::new(1) == date {
-            gettextrs::gettext("Yesterday")
-        } else if today.year() == date.year() {
-            // Translators: formatting of dates without year in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
-            date.format(&gettextrs::gettext("%a, %d. %B")).to_string()
-        } else {
-            // Translators: formatting of dates with year in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
-            date.format(&gettextrs::gettext("%Y-%m-%d")).to_string()
+        match days_ago {
+            0 => {
+                // Translators: formatting of time of day in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+                time.format(&gettextrs::gettext("%H:%M")).to_string()
+            }
+            -1 => gettextrs::gettext("Tomorrow"),
+            1 => gettextrs::gettext("Yesterday"),
+            2..=6 => {
+                // Translators: formatting of the weekday of a date within the last week, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+                date.format(&gettextrs::gettext("%A")).to_string()
+            }
+            7..=29 => {
+                let weeks = (days_ago / 7) as u32;
+                // Translators: Relative date, e.g. "3 weeks ago".
+                gettextrs::ngettext("{} week ago", "{} weeks ago", weeks)
+                    .replace("{}", &weeks.to_string())
+            }
+            30..=364 => {
+                let months = ((days_ago as f64 / 30.4375) as u32).max(1);
+                // Translators: Relative date, e.g. "5 months ago".
+                gettextrs::ngettext("{} month ago", "{} months ago", months)
+                    .replace("{}", &months.to_string())
+            }
+            365.. => {
+                let years = (days_ago / 365) as u32;
+                // Translators: Relative date, e.g. "4 years ago".
+                gettextrs::ngettext("{} year ago", "{} years ago", years)
+                    .replace("{}", &years.to_string())
+            }
+            // In the future (e.g. scheduled premieres), where the date is exact.
+            _ => {
+                if today.year() == date.year() {
+                    // Translators: formatting of dates without year in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+                    date.format(&gettextrs::gettext("%a, %d. %B")).to_string()
+                } else {
+                    // Translators: formatting of dates with year in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+                    date.format(&gettextrs::gettext("%Y-%m-%d")).to_string()
+                }
+            }
         }
     }
 
@@ -290,5 +323,44 @@ impl Utility {
         })
         .await
         .expect("Failed to spawn tokio")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    fn ago(days: i64) -> String {
+        // Midday UTC, so that the local date is the same in (almost) every timezone.
+        let now = Utc.with_ymd_and_hms(2026, 11, 14, 12, 0, 0).unwrap();
+        Utility::format_date_human_at(&(now - TimeDelta::days(days)), now)
+    }
+
+    #[test]
+    fn unknown_date_is_empty() {
+        let epoch = Utc.timestamp_opt(0, 0).unwrap();
+        assert_eq!(Utility::format_date_human(&epoch), "");
+    }
+
+    #[test]
+    fn recent_dates_use_day_names() {
+        assert_eq!(ago(1), "Yesterday");
+        // 2 to 6 days ago is a weekday name.
+        for days in 2..=6 {
+            assert!(ago(days).ends_with("day"), "{}", ago(days));
+        }
+    }
+
+    #[test]
+    fn older_dates_are_relative() {
+        assert_eq!(ago(7), "1 week ago");
+        assert_eq!(ago(21), "3 weeks ago");
+        assert_eq!(ago(29), "4 weeks ago");
+        assert_eq!(ago(30), "1 month ago");
+        assert_eq!(ago(150), "4 months ago");
+        assert_eq!(ago(364), "11 months ago");
+        assert_eq!(ago(365), "1 year ago");
+        assert_eq!(ago(4 * 365 + 20), "4 years ago");
     }
 }
