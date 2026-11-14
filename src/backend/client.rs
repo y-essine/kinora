@@ -1035,16 +1035,34 @@ impl Client {
     /// Kinora: look a video's streams up ahead of time (e.g. the first "Up next"
     /// video), so it starts at once when picked or autoplayed.
     pub fn prepare_playback(&self, video: &Video) {
-        if video.platform() != "youtube" || !self.imp().settings.boolean("fast-start") {
+        if video.platform() != "youtube" {
             return;
         }
         let (storage_dir, cache_dir) = Self::stream_dirs();
         let id = video.id().id;
-        tspawn!(async move {
-            if let Err(e) = super::streams::playback_uri(storage_dir, cache_dir, id.clone()).await {
-                log::debug!("Could not prepare {id}: {e}");
-            }
-        });
+        if self.imp().settings.boolean("fast-start") {
+            tspawn!(async move {
+                if let Err(e) =
+                    super::streams::playback_uri(storage_dir, cache_dir, id.clone()).await
+                {
+                    log::debug!("Could not prepare {id}: {e}");
+                }
+            });
+        } else {
+            tspawn!(async move {
+                if let Err(e) = super::streams::prepare_with_ytdlp(cache_dir, id.clone()).await {
+                    log::warn!("Could not prepare {id}: {e}");
+                }
+            });
+        }
+    }
+
+    /// Kinora: a prepared playback URI for this video (see `prepare_playback`).
+    pub fn prepared_playback_uri(&self, video: &Video) -> Option<String> {
+        if video.platform() != "youtube" {
+            return None;
+        }
+        super::streams::prepared(&video.id().id)
     }
 
     fn stream_dirs() -> (PathBuf, PathBuf) {

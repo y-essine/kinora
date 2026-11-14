@@ -155,8 +155,8 @@
       <summary>How the connected YouTube account is shown, e.g. "hellyeah · Chromium"</summary>
     </key>
     <key name="fast-start" type="b">
-      <default>true</default>
-      <summary>Start YouTube videos with Kinora's own stream lookup (about a second) instead of yt-dlp (several seconds); yt-dlp stays the fallback</summary>
+      <default>false</default>
+      <summary>Experimental: start YouTube videos with Kinora's own stream lookup (RustyPipe) instead of yt-dlp. Off: with RustyPipe 0.11.4 only the iOS client still works, and YouTube refuses its links (403) past the first megabyte without a PO token.</summary>
     </key>
     <key name="autoplay-next" type="b">
       <default>true</default>

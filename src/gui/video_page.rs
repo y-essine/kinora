@@ -49,6 +49,13 @@ impl VideoPage {
                 imp.fast_start_active.set(false);
                 queue.add_item(&MediaItem::new(&fallback));
                 player.play();
+            } else if let Some(prepared) = self.client().prepared_playback_uri(&video) {
+                // Kinora: prepared in the background; starts in a second or two.
+                log::info!("Playing prepared {}", video.id().id);
+                imp.fast_start_active.set(true);
+                queue.add_item(&MediaItem::new(&prepared));
+                player.play();
+                self.fall_back_if_stuck(&video);
             } else {
                 // Kinora: fast start (streams in ~0.2 s instead of ~9 s); the
                 // yt-dlp path is the fallback, here and on a playback error.
@@ -61,8 +68,12 @@ impl VideoPage {
                         return;
                     }
                     page.imp().fast_start_active.set(fast.is_some());
+                    let watchdog = fast.is_some();
                     queue.add_item(&MediaItem::new(&fast.unwrap_or(fallback)));
                     player.play();
+                    if watchdog {
+                        page.fall_back_if_stuck(&video);
+                    }
                 });
             }
             // Kinora: count it on the YouTube account once it was really watched.
@@ -186,6 +197,38 @@ impl VideoPage {
         // Stopping or clearing the queue here raced with Clapper's player thread
         // (a crash, or the next page's player never starting).
         player.pause();
+    }
+
+    /// Kinora: if a prepared or fast-start stream isn't playing after 10 seconds
+    /// (it can stall without an error), start over with yt-dlp.
+    fn fall_back_if_stuck(&self, video: &Video) {
+        let page = glib::prelude::ObjectExt::downgrade(self);
+        let video = video.clone();
+        glib::timeout_add_seconds_local_once(10, move || {
+            let Some(page) = page.upgrade() else { return };
+            let imp = page.imp();
+            if page.video().as_ref() != Some(&video) || !imp.fast_start_active.get() {
+                return;
+            }
+            let Some(player) = imp.clapper.player() else {
+                return;
+            };
+            if matches!(player.state(), clapper::PlayerState::Playing) || player.position() > 0.0 {
+                return;
+            }
+            log::warn!(
+                "Prepared stream for {} stalled; using yt-dlp",
+                video.id().id
+            );
+            imp.fast_start_active.set(false);
+            if let Some(queue) = player.queue() {
+                queue.clear();
+                queue.add_item(&MediaItem::new(
+                    &page.convert_to_clapper_playable_url(&video),
+                ));
+            }
+            player.play();
+        });
     }
 
     /// Kinora: mark the video watched on the YouTube account after 30 seconds

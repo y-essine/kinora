@@ -1,4 +1,11 @@
-//! Kinora: fast start. Gets a YouTube video's streams with RustyPipe, which
+//! Kinora: getting videos ready to play quickly.
+//!
+//! **Prepared playback** (`prepare_with_ytdlp`): for the video you're most
+//! likely to watch next, run `kinora-prepare` in the background — the same
+//! extraction Clapper's yt-dlp enhancer would do at play time, written to a
+//! manifest file. Playing that file starts in 1-3 s instead of ~10 s.
+//!
+//! **Experimental fast start** (`playback_uri`, setting `fast-start`): gets a YouTube video's streams with RustyPipe, which
 //! solves YouTube's signature challenge in-process and caches it (about 0.2 s,
 //! against ~9 s for yt-dlp starting Python and Node.js for every video), and
 //! hands Clapper a DASH manifest so playback starts low and adapts upward.
@@ -11,12 +18,17 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use rustypipe::model::{AudioCodec, AudioStream, VideoCodec, VideoPlayer, VideoStream};
-use tokio::sync::Mutex;
+use std::collections::HashSet;
+use std::sync::Mutex;
 
 use super::account::{self, Error};
 
 /// Prepared playback URIs, reused until shortly before YouTube's links expire.
-static PREPARED: Mutex<Option<HashMap<String, (String, Instant)>>> = Mutex::const_new(None);
+static PREPARED: Mutex<Option<HashMap<String, (String, Instant)>>> = Mutex::new(None);
+/// Videos being prepared right now, so a video is prepared only once at a time.
+static PREPARING: Mutex<Option<HashSet<String>>> = Mutex::new(None);
+/// How long a prepared file is reused (YouTube's links last about six hours).
+const PREPARED_TTL: Duration = Duration::from_secs(60 * 60);
 
 /// A URI Clapper can play for this YouTube video: a local DASH manifest, or an
 /// HLS URL for live streams.
@@ -25,7 +37,7 @@ pub async fn playback_uri(
     cache_dir: PathBuf,
     video_id: String,
 ) -> Result<String, Error> {
-    if let Some(uri) = prepared(&video_id).await {
+    if let Some(uri) = prepared(&video_id) {
         return Ok(uri);
     }
     let rp = account::rusty_pipe(storage_dir).await?;
@@ -50,19 +62,72 @@ pub async fn playback_uri(
 
     // YouTube's links stay valid for hours; stop reusing them well before that.
     let lifetime = Duration::from_secs(player.expires_in_seconds.saturating_sub(600) as u64);
-    PREPARED
-        .lock()
-        .await
-        .get_or_insert_with(HashMap::new)
-        .insert(video_id, (uri.clone(), Instant::now() + lifetime));
+    remember(video_id, uri.clone(), lifetime);
     Ok(uri)
 }
 
-async fn prepared(video_id: &str) -> Option<String> {
-    let mut guard = PREPARED.lock().await;
+/// A prepared playback URI for this video, if there is a fresh one.
+pub fn prepared(video_id: &str) -> Option<String> {
+    let mut guard = PREPARED.lock().unwrap();
     let map = guard.as_mut()?;
     map.retain(|_, (_, until)| *until > Instant::now());
     map.get(video_id).map(|(uri, _)| uri.clone())
+}
+
+fn remember(video_id: String, uri: String, lifetime: Duration) {
+    PREPARED
+        .lock()
+        .unwrap()
+        .get_or_insert_with(HashMap::new)
+        .insert(video_id, (uri, Instant::now() + lifetime));
+}
+
+/// Prepare a YouTube video in the background with `kinora-prepare` (see the
+/// module docs). Does nothing if it is already prepared or being prepared.
+pub async fn prepare_with_ytdlp(cache_dir: PathBuf, video_id: String) -> Result<(), Error> {
+    if prepared(&video_id).is_some()
+        || !PREPARING
+            .lock()
+            .unwrap()
+            .get_or_insert_with(HashSet::new)
+            .insert(video_id.clone())
+    {
+        return Ok(());
+    }
+    let result = async {
+        std::fs::create_dir_all(&cache_dir)?;
+        let started = Instant::now();
+        let out = tokio::process::Command::new("kinora-prepare")
+            .arg(format!("https://www.youtube.com/watch?v={video_id}"))
+            .arg(cache_dir.join(&video_id))
+            .output()
+            .await?;
+        if !out.status.success() {
+            let err = String::from_utf8_lossy(&out.stderr);
+            return Err::<(), Error>(
+                err.lines()
+                    .last()
+                    .unwrap_or("kinora-prepare failed")
+                    .to_owned()
+                    .into(),
+            );
+        }
+        let path = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+        let uri = url::Url::from_file_path(&path)
+            .map_err(|_| format!("not an absolute path: {path}"))?
+            .to_string();
+        log::info!(
+            "Prepared {video_id} in {:.1} s",
+            started.elapsed().as_secs_f64()
+        );
+        remember(video_id.clone(), uri, PREPARED_TTL);
+        Ok(())
+    }
+    .await;
+    if let Some(set) = PREPARING.lock().unwrap().as_mut() {
+        set.remove(&video_id);
+    }
+    result
 }
 
 /// A DASH manifest of one video family and one audio family that this system

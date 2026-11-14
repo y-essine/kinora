@@ -1,0 +1,63 @@
+#!/usr/bin/python3
+"""Prepare a video for instant playback, ahead of time.
+
+    kinora-prepare URL OUT_PATH_WITHOUT_EXTENSION
+
+Runs the same extraction as Clapper's yt-dlp enhancer (same options, its
+YouTube extractor override and its manifest generators), writes the resulting
+HLS or DASH manifest next to OUT_PATH and prints the written path. Kinora runs
+this in the background for the video you're most likely to watch next (the
+first "Up next"); playing the prepared file then skips the several seconds of
+extraction. The stream links in it stay valid for hours.
+"""
+import os
+import sys
+
+ENHANCER = "/usr/lib/clapper-0.0/enhancers/yt-dlp"
+sys.path.insert(0, ENHANCER)
+
+import clapper_yt_dlp as clapper  # noqa: E402  (options, as Clapper uses them)
+import clapper_yt_dlp_dash as dash  # noqa: E402
+import clapper_yt_dlp_hls as hls  # noqa: E402
+from clapper_yt_dlp_overrides import BLACKLIST, ClapperYoutubeIE  # noqa: E402
+from yt_dlp import YoutubeDL  # noqa: E402
+from yt_dlp.extractor import gen_extractor_classes  # noqa: E402
+
+# Clapper's default "codecs-order" setting.
+CODECS_ORDER = "avc1,av01,hev1,vp09"
+
+
+def main():
+    if len(sys.argv) != 3:
+        sys.exit(__doc__)
+    url, out = sys.argv[1], sys.argv[2]
+
+    opts = dict(clapper.YTDL_OPTS)
+    opts.update(quiet=True, verbose=False, noprogress=True)
+    opts["format_sort"] = ["vcodec:" + c for c in CODECS_ORDER.split(",")] + [
+        "acodec:mp4a", "acodec:opus", "acodec:vorbis", "acodec:*"]
+
+    ytdl = YoutubeDL(opts, auto_init=False)
+    ytdl.add_info_extractor(ClapperYoutubeIE())
+    for ie in gen_extractor_classes():
+        if ie._ENABLED and ie.ie_key() not in BLACKLIST:
+            ytdl.add_info_extractor(ie)
+    info = ytdl.extract_info(url, download=False)
+
+    if manifest := hls.generate_manifest(info):
+        path = out + ".m3u8"
+    elif manifest := dash.generate_manifest(info):
+        path = out + ".mpd"
+    else:
+        sys.exit("kinora-prepare: no playable manifest")
+
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    tmp = path + ".part"
+    with open(tmp, "w") as f:
+        f.write(manifest)
+    os.replace(tmp, path)
+    print(path)
+
+
+if __name__ == "__main__":
+    main()
