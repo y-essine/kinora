@@ -54,6 +54,7 @@ kicker 11/700 uppercase in the accent.
 | **Featured banner** `TFFeaturedBanner` | `featured_banner.{rs,blp}` | One video, large: picture, kicker, display title, Play and Watch Later. |
 | **Home** `TFHomeView` | `home_view.{rs,blp}` | The banner and a column of rows. |
 | **Stage** `.k-stage` | `video_page.blp` | The player on its ambient glow. |
+| **Player sheet** `TFPlayerSheet` | `player_sheet.{rs,blp}` | Holds the one video page over the window, and the mini-player it shrinks into. See *Player*. |
 | **Panel** `.k-panel` | CSS | A quiet container for text (the description). |
 | **Badge** `.k-badge` | CSS | Small label on a picture (duration, downloaded). |
 | **Buttons on pictures** `.k-glass`, `.k-play` | CSS | Secondary and primary action over an image. |
@@ -74,6 +75,78 @@ reduced to soft patches of its colours (`Utility::ambient_texture`): it is
 scaled down to 16×9 pixels, blurred once on the CPU at 64×36, and stretched by
 the GPU. Showing it costs the same as showing any small image. It is also
 darkened, so text lying on it always keeps its contrast.
+
+## Player
+
+**The player is a place, not a page.** A video does not take you away from
+what you were browsing: it rises over it, and can be put down at the bottom of
+the window, still playing, while Home, Search and the rest stay fully usable.
+There is one player. Whatever is opened next plays in it.
+
+### Rules
+
+1. **The hand leads.** Dragging moves the player exactly as far as the hand
+   moved; letting go sends it to the nearer end, or where it was heading if it
+   was flicked. A new gesture can take over at any moment, also mid-animation.
+2. **The video never stops or jumps.** It is the same picture all the way from
+   card to page to mini-player: it only changes size and place.
+3. **Motion explains, and then stops.** One spring, critically damped (no
+   bounce), about 0.3 s, for every move of the sheet. Nothing else animates:
+   no ripples, no flourishes. With *reduce effects*, the same moves take
+   0.14 s with a plain ease.
+4. **It costs one transform.** The page is laid out once, at full size.
+   Shrinking it only scales and moves what is already drawn (the GPU's work),
+   so a transition lays nothing out again and an idle mini-player costs what a
+   small video costs.
+
+### States
+
+| State | What you see |
+|---|---|
+| **Closed** | Nothing. |
+| **Expanded** | The video page (stage, title, description, Up next) over everything but the sidebar. |
+| **Minimized** | The mini-player. Wide windows: a card in a bottom corner (336 px: the live video, under it title, channel, play/pause, next, close). Narrow windows: a bar across the bottom, above the tab bar, with the video on its left. A 3 px line in the accent shows how far the video is. The card carries the video's ambient colours, like the stage. |
+| **Fullscreen** | As before (F: screen, T: window); only from expanded. |
+
+Opening a video grows the player out of the picture that was clicked (card or
+banner), and the page fades in around it. Without such a picture on screen, it
+rises from the bottom. Between expanded and minimized, the page fades first
+and the bare video travels the rest of the way, taking the mini-player's
+corners as it arrives.
+
+### Gestures and keys
+
+| Where | Do | Result |
+|---|---|---|
+| Expanded, on the stage | drag down | follows the hand; release to minimize or return |
+| Expanded, page at its top | touchpad: two fingers down | the same |
+| Expanded, on the stage | touchpad: two fingers sideways | next video (to the left), previous (to the right) |
+| Expanded | Esc, I, or the chevron in the header | minimize |
+| Expanded, on the video | double click on the left or right third | 10 seconds back or forward (the middle: fullscreen) |
+| Expanded | Shift+N, Shift+P | next, previous video |
+| Minimized | click, drag up, or touchpad two fingers up | expand |
+| Minimized | drag or swipe over the nearer window edge | close |
+| Minimized (card) | drag or swipe towards the middle | moves to the other bottom corner |
+| Anywhere | Ctrl+I | minimize or expand |
+
+Past its ends the sheet resists (it gives 5 % at most). Opening a channel from
+the player, or picking a page in the sidebar, minimizes it: the new page is
+what you asked for, the video comes along. A video opened from a card expands
+the player; one started by the player itself (Up next, autoplay, next) keeps
+it as it is, so a minimized player plays on as a playlist.
+
+"Previous" is the video played before in this sitting. "Next" is the first of
+Up next.
+
+### Not built yet
+
+- **Up next as a queue**: a sheet pulled up from the bottom of the player, with
+  "Play next" and reordering. Today Up next is the column beside the details.
+- **Free picture-in-picture**: the card snaps to the two bottom corners only;
+  top corners and a resizable card are left out.
+- **Mini-player straight to fullscreen** (F while minimized).
+- **Room for the bar**: in narrow windows the mini-player covers the last
+  64 px of the list behind it.
 
 ### Extensions
 
