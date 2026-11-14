@@ -208,3 +208,15 @@ progressbar.rgb progress {
     filter:hue-rotate(360deg);
   }
 }
+
+/* Kinora: the Home filter chips. */
+.home-chip {
+  border-radius: 999px;
+  padding: 4px 14px;
+  min-height: 0;
+}
+
+.home-chip:checked {
+  background-color: @window_fg_color;
+  color: @window_bg_color;
+}
