@@ -39,7 +39,7 @@ const TICK: Duration = Duration::from_millis(200);
 const FADE_STEP: Duration = Duration::from_millis(50);
 /// The next player is opened this long before the planned start: about what
 /// a prepared stream needs to begin playing.
-const LEAD: Duration = Duration::from_millis(1500);
+const LEAD: Duration = Duration::from_millis(2000);
 /// A skipped track does not wait for the next one: it fades out at once.
 const SKIP_FADE: Duration = Duration::from_millis(450);
 /// Give up waiting for the incoming player after this long.

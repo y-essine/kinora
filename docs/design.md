@@ -205,7 +205,7 @@ session.
   next over the *Crossfade* setting (0 to 12 s, a slider in Preferences →
   Extensions; short tracks fade shorter, live and very short ones cut). The
   curve is equal power, so the loudness does not dip halfway.
-- The picture **cuts**: the next track's page takes the stage about 1.5 s
+- The picture **cuts**: the next track's page takes the stage about 2 s
   before the fade is due (its artwork and a spinner while it starts), and the
   old track plays on unseen until it has faded out. No visual crossfade.
 - **Skip** does not wait: the old track fades out in under half a second and

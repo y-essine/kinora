@@ -45,7 +45,6 @@ template $TFHomeView: Adw.Bin {
         Box {
           orientation: vertical;
           valign: center;
-          hexpand: true;
           spacing: 2;
 
           Label {
@@ -75,8 +74,10 @@ template $TFHomeView: Adw.Bin {
             "suggested-action",
           ]
 
+          // Beside the text, not at the far end: the mini-player docks there.
           label: _("Start DJ");
           valign: center;
+          margin-start: 8;
           action-name: "win.dj-start-mix";
         }
       }
