@@ -32,7 +32,7 @@ impl HomeChipsExtension {
                 id: ID.to_owned(),
                 name: "Home Filters".to_owned(),
                 version: env!("CARGO_PKG_VERSION").to_owned(),
-                description: "Topic chips above Home, like Music or Gaming".to_owned(),
+                description: "Topic rows on Home, like Music or Gaming".to_owned(),
                 permissions: Vec::new(),
                 settings: vec![Setting::toggle(
                     HIDE_PLAYLIST_CHIPS,

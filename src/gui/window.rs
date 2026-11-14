@@ -1424,6 +1424,11 @@ pub mod imp {
                 obj,
                 move |_, _| {
                     let settings = PreferencesDialog::new(obj.client());
+                    // Test hook: `KH_PREFS_PAGE=extensions` opens on that page.
+                    #[cfg(feature = "dev-hooks")]
+                    if let Ok(page) = std::env::var("KH_PREFS_PAGE") {
+                        adw::prelude::PreferencesDialogExt::set_visible_page_name(&settings, &page);
+                    }
                     settings.present(Some(&obj));
                 }
             ));
