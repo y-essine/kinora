@@ -497,6 +497,47 @@ template $TFVideoPage: Adw.Bin {
                 xalign: 0.0;
               }
             }
+
+            // Pipeline Home: YouTube's "Up next", personalised by the account.
+            Gtk.Box up_next_box {
+              orientation: vertical;
+              spacing: 6;
+              visible: false;
+
+              Gtk.Box {
+                spacing: 8;
+                margin-top: 6;
+
+                Label {
+                  label: _("Up next");
+                  halign: start;
+                  hexpand: true;
+
+                  styles [
+                    "title-4",
+                  ]
+                }
+
+                Label {
+                  label: _("Autoplay");
+
+                  styles [
+                    "dim-label",
+                  ]
+                }
+
+                Switch autoplay_switch {
+                  valign: center;
+                  tooltip-text: _("Play the first Up next video when this one ends");
+                }
+              }
+
+              $TFFiniteVideoList up_next_list {
+                compact: true;
+                client: bind template.client;
+                play-video => $up_next_play_video() swapped;
+              }
+            }
           }
         }
       }

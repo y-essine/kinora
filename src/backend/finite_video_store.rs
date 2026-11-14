@@ -25,11 +25,15 @@ pub enum VideoSort {
     UploadedDescending,
     WatchedAscending,
     WatchedDescending,
+    /// Keep the order videos were added in (Pipeline Home: YouTube's own ranking).
+    AsAdded,
 }
 
 impl VideoSort {
     fn compare(&self, a: &Video, b: &Video) -> std::cmp::Ordering {
         let primary_comparison = match self {
+            // Every existing video counts as "before" the new one, so it is appended.
+            VideoSort::AsAdded => return std::cmp::Ordering::Less,
             VideoSort::UploadedAscending => a.uploaded().cmp(&b.uploaded()).reverse(),
             VideoSort::UploadedDescending => a.uploaded().cmp(&b.uploaded()),
             VideoSort::WatchedAscending => a.watched_at().cmp(&b.watched_at()).reverse(),
@@ -67,8 +71,11 @@ impl FiniteVideoStore {
     ///
     /// Returns `true` if the video was added to the list, and `false` if it was removed.
     pub fn toggle(&self, video: Video) -> bool {
-        let mut videos = self.imp().videos.borrow_mut();
         let sort = self.imp().sort.get();
+        if matches!(sort, VideoSort::AsAdded) {
+            return self.toggle_as_added(video);
+        }
+        let mut videos = self.imp().videos.borrow_mut();
         let index = videos.binary_search_by(|v| sort.compare(&video, v));
 
         match index {
@@ -116,6 +123,26 @@ impl FiniteVideoStore {
         }
     }
 
+    /// [`VideoSort::AsAdded`]: append, or remove by identity. No re-sorting when a
+    /// video's upload date is filled in later.
+    fn toggle_as_added(&self, video: Video) -> bool {
+        let mut videos = self.imp().videos.borrow_mut();
+        if let Some(index) = videos.iter().position(|v| v == &video) {
+            videos.remove(index);
+            drop(videos);
+            self.items_changed(index as u32, 1, 0);
+            self.notify_is_empty();
+            false
+        } else {
+            let index = videos.len();
+            videos.push(video);
+            drop(videos);
+            self.items_changed(index as u32, 0, 1);
+            self.notify_is_empty();
+            true
+        }
+    }
+
     fn remove_video_full_search(&self, video: &Video) {
         let mut videos = self.imp().videos.borrow_mut();
         if let Some(index) = videos.iter().position(|v| v == video) {
@@ -136,6 +163,9 @@ impl FiniteVideoStore {
 
     pub fn set_sort(&self, sort: VideoSort) {
         self.imp().sort.set(sort);
+        if matches!(sort, VideoSort::AsAdded) {
+            return;
+        }
 
         // Re-sort the videos using the same comparator as binary search
         let mut videos = self.imp().videos.borrow_mut();
@@ -153,6 +183,7 @@ impl FiniteVideoStore {
         videos.clear();
         drop(videos);
         self.items_changed(0, removed as u32, 0);
+        self.notify_is_empty();
     }
 
     fn items_changed(&self, position: u32, removed: u32, added: u32) {

@@ -617,6 +617,117 @@ impl Client {
         Ok(())
     }
 
+    // ---- Pipeline Home: the signed-in YouTube account ----
+
+    fn account_cookies_command(&self) -> String {
+        self.imp().settings.string("account-cookies-command").to_string()
+    }
+
+    /// Reload the Home page from the account's YouTube home feed.
+    pub async fn refresh_home(&self) {
+        if self.home_loading() {
+            return;
+        }
+        self.set_home_loading(true);
+        self.set_home_error(String::new());
+
+        let command = self.account_cookies_command();
+        let result = tspawn!(async move {
+            let cookies = super::account::cookies_file(&command)
+                .await?
+                .ok_or("No YouTube account is set up. Set the account cookies command in the preferences.")?;
+            super::account::home_feed(&cookies).await
+        })
+        .await
+        .expect("Failed to spawn tokio");
+
+        let videos: Vec<Video> = match result {
+            Ok(videos) => videos.into_iter().map(|v| self.construct_video(v)).collect(),
+            Err(e) => {
+                log::error!("Failed to load the home feed: {e}");
+                self.set_home_error(e.to_string());
+                self.set_home_loading(false);
+                return;
+            }
+        };
+
+        let store = self.home_store();
+        store.clear();
+        for video in &videos {
+            store.add(video.clone());
+        }
+        if videos.is_empty() {
+            self.set_home_error(
+                "YouTube returned no recommendations. Watch a few videos on the account first."
+                    .to_owned(),
+            );
+        }
+        self.set_home_loading(false);
+
+        // The listing has no upload dates or view counts; fill them in. That can
+        // swap the thumbnail URL, which clears the loaded thumbnail, so reload it.
+        for video in videos {
+            if let Err(e) = self.populate_video_information(&video.id()).await {
+                log::debug!("Home: no extra information for {}: {e}", video.id().id);
+            }
+            self.populate_thumbnail(&video).await;
+        }
+    }
+
+    /// YouTube's "Up next" for a video, personalised when an account is set up.
+    pub async fn up_next(&self, video: &Video) -> Vec<Video> {
+        if video.platform() != "youtube" {
+            return Vec::new();
+        }
+        let command = self.account_cookies_command();
+        let mut storage_dir = glib::user_cache_dir();
+        storage_dir.push("tubefeeder");
+        storage_dir.push("account");
+        let id = video.id().id;
+
+        let result = tspawn!(async move {
+            let cookies = super::account::cookies_file(&command)
+                .await
+                .unwrap_or_else(|e| {
+                    log::warn!("Up next: {e}");
+                    None
+                });
+            super::account::up_next(storage_dir, cookies, id).await
+        })
+        .await
+        .expect("Failed to spawn tokio");
+
+        match result {
+            Ok(videos) => videos.into_iter().map(|v| self.construct_video(v)).collect(),
+            Err(e) => {
+                log::error!("Failed to load Up next: {e}");
+                Vec::new()
+            }
+        }
+    }
+
+    /// Mark a video as watched on the YouTube account (in the background).
+    pub fn mark_watched_on_account(&self, video: &Video) {
+        if video.platform() != "youtube" {
+            return;
+        }
+        let command = self.account_cookies_command();
+        let id = video.id().id;
+        tspawn!(async move {
+            let result = async {
+                if let Some(cookies) = super::account::cookies_file(&command).await? {
+                    super::account::mark_watched(&cookies, &id).await?;
+                    log::info!("Marked {id} watched on the YouTube account");
+                }
+                Ok::<_, super::account::Error>(())
+            }
+            .await;
+            if let Err(e) = result {
+                log::warn!("Could not mark {id} watched on the YouTube account: {e}");
+            }
+        });
+    }
+
     pub fn toggle_subscription(&self, channel: Channel) {
         self.toggle_subscription_internal(channel, true);
     }
@@ -856,7 +967,11 @@ mod imp {
     use gdk::subclass::prelude::{DerivedObjectProperties, ObjectImpl, ObjectSubclass};
     use glib::{Properties, WeakRef};
     use gtk::glib;
-    use std::{cell::RefCell, collections::HashMap, sync::Arc};
+    use std::{
+        cell::{Cell, RefCell},
+        collections::HashMap,
+        sync::Arc,
+    };
     use tokio::sync::Mutex;
 
     use crate::backend::{Channel, FilterStore, FiniteVideoStore, SubscriptionsStore, Video};
@@ -886,6 +1001,14 @@ mod imp {
         #[property(get, set)]
         pub(super) filter_store: RefCell<FilterStore>,
 
+        // Pipeline Home
+        #[property(get, set)]
+        pub(super) home_store: RefCell<FiniteVideoStore>,
+        #[property(get, set)]
+        pub(super) home_loading: Cell<bool>,
+        #[property(get, set)]
+        pub(super) home_error: RefCell<String>,
+
         pub(super) setup_finished_watch_channel: tokio::sync::watch::Sender<bool>,
 
         pub(super) settings: Settings,
@@ -905,6 +1028,11 @@ mod imp {
                 watch_later_store: Default::default(),
                 downloaded_store: Default::default(),
                 filter_store: Default::default(),
+                home_store: RefCell::new(FiniteVideoStore::with_sort(
+                    crate::backend::finite_video_store::VideoSort::AsAdded,
+                )),
+                home_loading: Default::default(),
+                home_error: Default::default(),
                 watched_store: RefCell::new(FiniteVideoStore::with_sort(
                     crate::backend::finite_video_store::VideoSort::WatchedDescending,
                 )),

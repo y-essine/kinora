@@ -3047,6 +3047,7 @@ dependencies = [
  "reqwest",
  "rusqlite",
  "rusqlite_migration",
+ "rustypipe",
  "serde",
  "serde_json",
  "tokio",

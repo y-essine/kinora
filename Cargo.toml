@@ -49,5 +49,8 @@ pytdlp = { package = "pipeline-provider-yt-dlp", git = "https://gitlab.com/schmi
 pyoutuberss = { package = "pipeline-provider-youtube-rss", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
 ppeertube = { package = "pipeline-provider-peertube", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
 
+# Pipeline Home: signed-in Up next recommendations.
+rustypipe = { git = "https://gitlab.com/schmiddi-on-mobile/rustypipe.git", rev = "a5c9ca89f26651419a53ca73e81ffdd572c80011" }
+
 clapper = { package = "clapper-player", version = "0.10", features = ["v0_10"] }
 clapper-gtk = { package = "clapper-player-gtk", version = "0.10", features = ["v0_10"]  }

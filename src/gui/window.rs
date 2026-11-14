@@ -360,6 +360,11 @@ pub mod imp {
         }
 
         #[template_callback(function)]
+        fn reload_visible(page: Option<&str>) -> bool {
+            page == Some("feed") || page == Some("home")
+        }
+
+        #[template_callback(function)]
         fn is_video_visible(page: Option<&str>) -> bool {
             page == Some("video-page")
         }
@@ -573,6 +578,27 @@ pub mod imp {
                             .get()
                             .expect("copy-video-url-to-clipboard argument to be of type Video");
                         obj.imp().copy_video_url(video);
+                        None
+                    }
+                ),
+            );
+
+            // Pipeline Home: a video picked from "Up next", or autoplay.
+            video_page.connect_local(
+                "play-video",
+                false,
+                clone!(
+                    #[weak]
+                    obj,
+                    #[upgrade_or_default]
+                    move |args| {
+                        let video: Video = args[1]
+                            .get()
+                            .expect("play-video argument to be of type Video");
+                        let play_type: PlayType = args[2]
+                            .get()
+                            .expect("play-video argument to be of type PlayType");
+                        obj.imp().play_video(video, play_type);
                         None
                     }
                 ),
@@ -1366,6 +1392,10 @@ pub mod imp {
                 move |_, _| {
                     if let Some(channel_page) = obj.imp().visible_channel_page() {
                         channel_page.reload();
+                    } else if obj.imp().main_stack.visible_child_name().as_deref() == Some("home")
+                    {
+                        let client = obj.client();
+                        gspawn!(async move { client.refresh_home().await });
                     } else {
                         obj.imp().video_list.reload();
                     }
@@ -1475,6 +1505,8 @@ pub mod imp {
                     if s.settings.boolean("reload-on-startup") {
                         s.video_list.reload();
                     }
+                    // Pipeline Home: load the account's home feed.
+                    s.obj().client().refresh_home().await;
                 }
             ));
         }

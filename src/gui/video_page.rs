@@ -46,6 +46,8 @@ impl VideoPage {
                 &self.convert_to_clapper_playable_url(&video),
             ));
             player.play();
+            // Pipeline Home: count it on the YouTube account.
+            self.client().mark_watched_on_account(&video);
         } else {
             self.pause();
         }
@@ -101,6 +103,8 @@ impl VideoPage {
 
         if let Some(video) = self.video() {
             let imp = self.imp();
+            // Pipeline Home: count it on the YouTube account.
+            self.client().mark_watched_on_account(&video);
 
             let player = imp.settings.string("player");
 
@@ -257,7 +261,11 @@ pub mod imp {
 
     use crate::backend::Channel;
     use crate::backend::Client;
+    use crate::backend::FiniteVideoStore;
+    use crate::backend::PlayType;
     use crate::backend::Video;
+    use crate::backend::VideoSort;
+    use crate::gui::finite_video_list::FiniteVideoList;
     use crate::config::APP_ID;
     use crate::config::BASE_ID;
     use crate::gspawn;
@@ -283,6 +291,16 @@ pub mod imp {
         #[template_child]
         billboard: TemplateChild<clapper_gtk::Billboard>,
 
+        // Pipeline Home: "Up next"
+        #[template_child]
+        up_next_box: TemplateChild<gtk::Box>,
+        #[template_child]
+        up_next_list: TemplateChild<FiniteVideoList>,
+        #[template_child]
+        autoplay_switch: TemplateChild<gtk::Switch>,
+        up_next_store: FiniteVideoStore,
+        autoplay_done: Cell<bool>,
+
         #[property(get, set)]
         fullscreened: Cell<bool>,
         #[property(get, set)]
@@ -306,6 +324,11 @@ pub mod imp {
                 clapper: Default::default(),
                 video: Default::default(),
                 billboard: Default::default(),
+                up_next_box: Default::default(),
+                up_next_list: Default::default(),
+                autoplay_switch: Default::default(),
+                up_next_store: FiniteVideoStore::with_sort(VideoSort::AsAdded),
+                autoplay_done: Default::default(),
                 fullscreened: Default::default(),
                 state: Default::default(),
                 position: Default::default(),
@@ -329,6 +352,33 @@ pub mod imp {
             if let Some(video) = video {
                 let obj = self.obj();
                 let client = obj.client();
+
+                // Pipeline Home: load "Up next" alongside the video information.
+                self.autoplay_done.set(false);
+                self.up_next_store.clear();
+                self.up_next_box.set_visible(false);
+                gspawn!(clone!(
+                    #[weak]
+                    obj,
+                    #[weak]
+                    client,
+                    #[weak]
+                    video,
+                    async move {
+                        let videos = client.up_next(&video).await;
+                        let imp = obj.imp();
+                        // The page may have moved on to another video meanwhile.
+                        if obj.video().as_ref() != Some(&video) {
+                            return;
+                        }
+                        imp.up_next_store.clear();
+                        for v in videos {
+                            imp.up_next_store.add(v);
+                        }
+                        imp.up_next_box
+                            .set_visible(imp.up_next_store.n_items() > 0);
+                    }
+                ));
 
                 // Load additional data
                 gspawn!(
@@ -369,6 +419,39 @@ pub mod imp {
             }
         }
 
+        /// When the video has played to its end, continue with the first "Up next" video.
+        fn maybe_autoplay(&self, player: &clapper::Player) {
+            let obj = self.obj();
+            if self.autoplay_done.get()
+                || obj.external()
+                || !self.settings.boolean("autoplay-next")
+                || !matches!(
+                    player.state(),
+                    clapper::PlayerState::Stopped | clapper::PlayerState::Paused
+                )
+            {
+                return;
+            }
+            let duration = player
+                .queue()
+                .and_then(|q| q.current_item())
+                .map(|i| i.duration())
+                .unwrap_or(0.0);
+            // Only at the very end, not on an ordinary pause.
+            if duration <= 0.0 || player.position() < duration - 0.75 {
+                return;
+            }
+            let Some(next) = self
+                .up_next_store
+                .item(0)
+                .and_then(|o| o.downcast::<Video>().ok())
+            else {
+                return;
+            };
+            self.autoplay_done.set(true);
+            obj.emit_by_name::<()>("play-video", &[&next, &PlayType::Default]);
+        }
+
         fn get_state(&self) -> clapper::PlayerState {
             self.clapper
                 .player()
@@ -400,6 +483,12 @@ pub mod imp {
         #[template_callback(function)]
         fn format_uploaded(uploaded: String) -> String {
             gettextrs::gettext("Uploaded {}").replace("{}", &uploaded)
+        }
+
+        #[template_callback]
+        fn up_next_play_video(&self, video: Video, play_type: PlayType) {
+            self.obj()
+                .emit_by_name::<()>("play-video", &[&video, &play_type]);
         }
 
         #[template_callback]
@@ -618,6 +707,19 @@ pub mod imp {
                 }
             ));
 
+            // Pipeline Home: "Up next" list and autoplay.
+            self.up_next_list.set_model(self.up_next_store.clone());
+            settings
+                .bind("autoplay-next", &*self.autoplay_switch, "active")
+                .build();
+            player.connect_state_notify(clone!(
+                #[weak]
+                obj,
+                move |player| {
+                    obj.imp().maybe_autoplay(player);
+                }
+            ));
+
             // Set up player settings
             settings.bind("player-volume", &player, "volume").build();
             settings.bind("player-speed", &player, "speed").build();
@@ -697,6 +799,7 @@ pub mod imp {
         fn class_init(klass: &mut Self::Class) {
             clapper_gtk::Video::ensure_type();
             clapper_gtk::Billboard::ensure_type();
+            FiniteVideoList::ensure_type();
             Self::bind_template(klass);
             Self::bind_template_callbacks(klass);
             Utility::bind_template_callbacks(klass);
@@ -729,6 +832,10 @@ pub mod imp {
                         .build(),
                     Signal::builder("copy-video-url-to-clipboard")
                         .param_types([Video::static_type()])
+                        .build(),
+                    // Pipeline Home: play a video from "Up next" (or autoplay).
+                    Signal::builder("play-video")
+                        .param_types([Video::static_type(), PlayType::static_type()])
                         .build(),
                 ]
             });

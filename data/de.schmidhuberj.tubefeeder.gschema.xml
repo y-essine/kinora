@@ -135,5 +135,14 @@
       <default>1600000</default>
       <summary>Stores initial adaptive streaming bitrate to apply on startup</summary>
     </key>
+    <!-- Pipeline Home -->
+    <key name="account-cookies-command" type="s">
+      <default>'yt-burner-cookies'</default>
+      <summary>Command that prints the path to a Netscape cookies.txt of the YouTube account used for Home, Up next and watch history. Empty disables the account.</summary>
+    </key>
+    <key name="autoplay-next" type="b">
+      <default>true</default>
+      <summary>Play the first Up next video when a video ends</summary>
+    </key>
   </schema>
 </schemalist>

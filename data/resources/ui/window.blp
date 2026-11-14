@@ -102,9 +102,12 @@ Adw.NavigationPage main_page {
       [start]
       Gtk.Stack {
         transition-type: crossfade;
-        visible: bind $feed_visible(main_stack.visible-child-name) as <bool>;
+        visible: bind $reload_visible(main_stack.visible-child-name) as <bool>;
         visible-child-name: bind $refresh_button_visible_child_name(
-          video_list.model as <$TFVideoFetcherStream>.loading
+          $or(
+            video_list.model as <$TFVideoFetcherStream>.loading,
+            template.client as <$TFClient>.home-loading
+            ) as <bool>
           ) as <string>;
 
         StackPage {
@@ -162,6 +165,64 @@ Adw.NavigationPage main_page {
 
 Adw.ViewStack main_stack {
   notify::visible-child-name => $sidebar_child_changed() swapped;
+
+  // Pipeline Home: the YouTube account's home feed.
+  Adw.ViewStackPage {
+    name: "home";
+    title: _("Home");
+    icon-name: "starred-symbolic";
+
+    child: Box {
+      $TFFiniteVideoList home_list {
+        visible: bind $not(
+          template.client as <$TFClient>.home-store as <$TFFiniteVideoStore>.is-empty
+          ) as <bool>;
+        client: bind template.client;
+        model: bind template.client as <$TFClient>.home-store;
+        compact: bind template.breakpoint_collapsed;
+        play-video => $play_video() swapped;
+        copy-video-url => $copy_video_url() swapped;
+        download => $download() swapped;
+        remove-downloaded => $remove_downloaded() swapped;
+      }
+
+      Adw.StatusPage status_home_loading {
+        visible: bind $and(
+          template.client as <$TFClient>.home-loading,
+          template.client as <$TFClient>.home-store as <$TFFiniteVideoStore>.is-empty
+          ) as <bool>;
+        hexpand: true;
+        vexpand: true;
+        title: _("Loading Recommendations");
+
+        paintable: Adw.SpinnerPaintable {
+          widget: status_home_loading;
+        };
+      }
+
+      Adw.StatusPage {
+        visible: bind $and(
+          $not(template.client as <$TFClient>.home-loading) as <bool>,
+          template.client as <$TFClient>.home-store as <$TFFiniteVideoStore>.is-empty
+          ) as <bool>;
+        hexpand: true;
+        vexpand: true;
+        title: _("No Recommendations");
+        description: bind template.client as <$TFClient>.home-error;
+        icon-name: "starred-symbolic";
+
+        child: Button {
+          styles [
+            "pill",
+          ]
+
+          halign: center;
+          label: _("Reload");
+          action-name: "win.reload";
+        };
+      }
+    };
+  }
 
   Adw.ViewStackPage {
     name: "feed";

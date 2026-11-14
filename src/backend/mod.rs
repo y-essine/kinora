@@ -1,3 +1,4 @@
+mod account;
 mod channel;
 mod client;
 mod filter;
@@ -13,7 +14,7 @@ pub use channel::Channel;
 pub use client::Client;
 pub use filter::Filter;
 pub use filter_store::FilterStore;
-pub use finite_video_store::FiniteVideoStore;
+pub use finite_video_store::{FiniteVideoStore, VideoSort};
 pub use search_item::SearchItem;
 pub use search_stream::SearchStream;
 pub use subscriptions_store::SubscriptionsStore;
