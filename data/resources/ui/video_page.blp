@@ -161,6 +161,23 @@ template $TFVideoPage: Adw.Bin {
           valign: end;
         }
 
+        // Pipeline Home: fill the window (not the screen) with the video.
+        [fading-overlay]
+        Gtk.Button {
+          halign: end;
+          valign: start;
+          margin-top: 8;
+          margin-end: 8;
+          icon-name: bind $window_fullscreen_icon(template.fullscreened, template.window-mode) as <string>;
+          tooltip-text: bind $window_fullscreen_tooltip(template.fullscreened, template.window-mode) as <string>;
+          clicked => $toggle_window_fullscreen() swapped;
+
+          styles [
+            "osd",
+            "circular",
+          ]
+        }
+
         [overlay]
         ClapperGtk.Billboard billboard {}
 

@@ -171,7 +171,8 @@ impl VideoPage {
             .and_then(|q| q.current_item())
             .map(|i| i.duration())
         {
-            duration == player.position()
+            // Pipeline Home: the player can stop a hair past the duration.
+            player.position() >= duration - 0.75
         } else {
             true
         }
@@ -265,10 +266,10 @@ pub mod imp {
     use crate::backend::PlayType;
     use crate::backend::Video;
     use crate::backend::VideoSort;
-    use crate::gui::finite_video_list::FiniteVideoList;
     use crate::config::APP_ID;
     use crate::config::BASE_ID;
     use crate::gspawn;
+    use crate::gui::finite_video_list::FiniteVideoList;
     use crate::gui::utility::Utility;
 
     static INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -303,6 +304,9 @@ pub mod imp {
 
         #[property(get, set)]
         fullscreened: Cell<bool>,
+        /// Pipeline Home: while fullscreened, fill the window instead of the screen.
+        #[property(get, set)]
+        window_mode: Cell<bool>,
         #[property(get, set)]
         show_sidebar_visible: Cell<bool>,
         #[property(get, set)]
@@ -330,6 +334,7 @@ pub mod imp {
                 up_next_store: FiniteVideoStore::with_sort(VideoSort::AsAdded),
                 autoplay_done: Default::default(),
                 fullscreened: Default::default(),
+                window_mode: Default::default(),
                 state: Default::default(),
                 position: Default::default(),
                 duration: Default::default(),
@@ -375,8 +380,7 @@ pub mod imp {
                         for v in videos {
                             imp.up_next_store.add(v);
                         }
-                        imp.up_next_box
-                            .set_visible(imp.up_next_store.n_items() > 0);
+                        imp.up_next_box.set_visible(imp.up_next_store.n_items() > 0);
                     }
                 ));
 
@@ -419,9 +423,34 @@ pub mod imp {
             }
         }
 
+        /// Pipeline Home: toggle screen (`window_mode == false`) or window fullscreen.
+        /// Pressing the other mode's button switches straight over.
+        pub(super) fn toggle_fullscreen_mode(&self, window_mode: bool) {
+            let obj = self.obj();
+            if obj.fullscreened() {
+                let same_mode = obj.window_mode() == window_mode;
+                obj.set_fullscreened(false);
+                if same_mode {
+                    return;
+                }
+            }
+            obj.set_window_mode(window_mode);
+            obj.set_fullscreened(true);
+        }
+
         /// When the video has played to its end, continue with the first "Up next" video.
         fn maybe_autoplay(&self, player: &clapper::Player) {
             let obj = self.obj();
+            log::debug!(
+                "autoplay check: state {:?}, position {:.2}, duration {:?}, up next {}",
+                player.state(),
+                player.position(),
+                player
+                    .queue()
+                    .and_then(|q| q.current_item())
+                    .map(|i| i.duration()),
+                self.up_next_store.n_items()
+            );
             if self.autoplay_done.get()
                 || obj.external()
                 || !self.settings.boolean("autoplay-next")
@@ -501,8 +530,31 @@ pub mod imp {
 
         #[template_callback]
         fn toggle_fullscreen(&self) {
-            let obj = self.obj();
-            obj.set_fullscreened(!obj.fullscreened());
+            self.toggle_fullscreen_mode(false);
+        }
+
+        /// Pipeline Home: the video fills the window, not the screen.
+        #[template_callback]
+        fn toggle_window_fullscreen(&self) {
+            self.toggle_fullscreen_mode(true);
+        }
+
+        #[template_callback(function)]
+        fn window_fullscreen_icon(fullscreened: bool, window_mode: bool) -> &'static str {
+            if fullscreened && window_mode {
+                "window-restore-symbolic"
+            } else {
+                "window-maximize-symbolic"
+            }
+        }
+
+        #[template_callback(function)]
+        fn window_fullscreen_tooltip(fullscreened: bool, window_mode: bool) -> String {
+            if fullscreened && window_mode {
+                gettextrs::gettext("Exit Window Fullscreen (T)")
+            } else {
+                gettextrs::gettext("Window Fullscreen (T)")
+            }
         }
 
         #[template_callback]
@@ -670,9 +722,24 @@ pub mod imp {
                 ))),
             );
 
+            // Pipeline Home: "T" fills the window, like YouTube's theater mode.
+            let shortcut_window_fullscreen = Shortcut::new(
+                Some(ShortcutTrigger::parse_string("T").expect("T to be a valid shortcut trigger")),
+                Some(CallbackAction::new(clone!(
+                    #[weak]
+                    obj,
+                    #[upgrade_or_panic]
+                    move |_, _| {
+                        obj.imp().toggle_fullscreen_mode(true);
+                        Propagation::Stop
+                    }
+                ))),
+            );
+
             let shortcut_controller = ShortcutController::new();
             shortcut_controller.add_shortcut(shortcut_escape);
             shortcut_controller.add_shortcut(shortcut_fullscreen);
+            shortcut_controller.add_shortcut(shortcut_window_fullscreen);
             obj.add_controller(shortcut_controller);
 
             // Set up MPRIS

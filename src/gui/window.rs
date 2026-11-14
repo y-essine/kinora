@@ -610,7 +610,8 @@ pub mod imp {
                 #[upgrade_or_default]
                 move |page| {
                     let fullscreen = page.fullscreened();
-                    obj.set_fullscreened(fullscreen);
+                    // Pipeline Home: window fullscreen keeps the window as it is.
+                    obj.set_fullscreened(fullscreen && !page.window_mode());
                     if fullscreen {
                         obj.set_split_view_collapsed_before_fullscreen(
                             obj.imp().split_view.is_collapsed(),
@@ -1392,8 +1393,7 @@ pub mod imp {
                 move |_, _| {
                     if let Some(channel_page) = obj.imp().visible_channel_page() {
                         channel_page.reload();
-                    } else if obj.imp().main_stack.visible_child_name().as_deref() == Some("home")
-                    {
+                    } else if obj.imp().main_stack.visible_child_name().as_deref() == Some("home") {
                         let client = obj.client();
                         gspawn!(async move { client.refresh_home().await });
                     } else {
@@ -1570,7 +1570,10 @@ pub mod imp {
                     let Some(video_page) = obj.imp().visible_video_page() else {
                         return;
                     };
-                    if !obj.is_fullscreen() && video_page.fullscreened() {
+                    if !obj.is_fullscreen()
+                        && video_page.fullscreened()
+                        && !video_page.window_mode()
+                    {
                         video_page.set_fullscreened(false);
                     }
                 }

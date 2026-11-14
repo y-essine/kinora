@@ -500,6 +500,7 @@ impl Client {
         if let Some(cached) = cache.get(&video.id).and_then(|r| r.upgrade()) {
             if cached.video() != video {
                 let requires_thumbnail_update = cached.thumbnail_url() != video.thumbnail;
+                let new_uploader = video.uploader.clone();
 
                 // Preserve the originally cached title when video metadata is refreshed.
                 // External sources may provide incomplete or placeholder titles during metadata
@@ -514,6 +515,11 @@ impl Client {
                 }
 
                 cached.update(video);
+
+                // Pipeline Home: "Up next" videos can arrive without their channel.
+                if !new_uploader.id.id.is_empty() && cached.uploader().id() != new_uploader.id {
+                    cached.set_uploader(self.construct_channel(new_uploader));
+                }
 
                 let mut binding = self.imp().store.borrow_mut();
                 let store = binding.as_mut().expect("Store to be set up");
@@ -620,7 +626,10 @@ impl Client {
     // ---- Pipeline Home: the signed-in YouTube account ----
 
     fn account_cookies_command(&self) -> String {
-        self.imp().settings.string("account-cookies-command").to_string()
+        self.imp()
+            .settings
+            .string("account-cookies-command")
+            .to_string()
     }
 
     /// Reload the Home page from the account's YouTube home feed.
@@ -633,16 +642,19 @@ impl Client {
 
         let command = self.account_cookies_command();
         let result = tspawn!(async move {
-            let cookies = super::account::cookies_file(&command)
-                .await?
-                .ok_or("No YouTube account is set up. Set the account cookies command in the preferences.")?;
+            let cookies = super::account::cookies_file(&command).await?.ok_or(
+                "No YouTube account is set up. Set the account cookies command in the preferences.",
+            )?;
             super::account::home_feed(&cookies).await
         })
         .await
         .expect("Failed to spawn tokio");
 
         let videos: Vec<Video> = match result {
-            Ok(videos) => videos.into_iter().map(|v| self.construct_video(v)).collect(),
+            Ok(videos) => videos
+                .into_iter()
+                .map(|v| self.construct_video(v))
+                .collect(),
             Err(e) => {
                 log::error!("Failed to load the home feed: {e}");
                 self.set_home_error(e.to_string());
@@ -664,14 +676,26 @@ impl Client {
         }
         self.set_home_loading(false);
 
-        // The listing has no upload dates or view counts; fill them in. That can
-        // swap the thumbnail URL, which clears the loaded thumbnail, so reload it.
-        for video in videos {
-            if let Err(e) = self.populate_video_information(&video.id()).await {
-                log::debug!("Home: no extra information for {}: {e}", video.id().id);
+        // The listing has no upload dates or view counts.
+        self.fill_in_details_later(videos);
+    }
+
+    /// Load the full information of videos that came from a short listing (upload
+    /// date, views, channel), one after another in the background. That can swap
+    /// the thumbnail URL, which clears the loaded thumbnail, so reload it too.
+    fn fill_in_details_later(&self, videos: Vec<Video>) {
+        gspawn!(clone!(
+            #[weak(rename_to = s)]
+            self,
+            async move {
+                for video in videos {
+                    if let Err(e) = s.populate_video_information(&video.id()).await {
+                        log::debug!("No extra information for {}: {e}", video.id().id);
+                    }
+                    s.populate_thumbnail(&video).await;
+                }
             }
-            self.populate_thumbnail(&video).await;
-        }
+        ));
     }
 
     /// YouTube's "Up next" for a video, personalised when an account is set up.
@@ -698,7 +722,16 @@ impl Client {
         .expect("Failed to spawn tokio");
 
         match result {
-            Ok(videos) => videos.into_iter().map(|v| self.construct_video(v)).collect(),
+            Ok(videos) => {
+                log::info!("Up next: {} videos for {}", videos.len(), video.id().id);
+                let videos: Vec<Video> = videos
+                    .into_iter()
+                    .map(|v| self.construct_video(v))
+                    .collect();
+                // YouTube's newer layout leaves out the channel and date; fetch them.
+                self.fill_in_details_later(videos.clone());
+                videos
+            }
             Err(e) => {
                 log::error!("Failed to load Up next: {e}");
                 Vec::new()

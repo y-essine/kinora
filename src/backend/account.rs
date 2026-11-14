@@ -45,7 +45,8 @@ pub async fn cookies_file(command: &str) -> Result<Option<PathBuf>, Error> {
     if !out.status.success() {
         return Err(format!(
             "The account cookies command failed: {}",
-            last_line(&out.stderr).unwrap_or_else(|| format!("`{command}` exited with {}", out.status))
+            last_line(&out.stderr)
+                .unwrap_or_else(|| format!("`{command}` exited with {}", out.status))
         )
         .into());
     }
@@ -100,12 +101,24 @@ pub async fn up_next(
         }
     }
 
-    let query = if signed_in {
-        rp.query().authenticated()
-    } else {
-        rp.query().unauthenticated()
+    // One retry: a single dropped request shouldn't leave "Up next" empty.
+    let mut attempt = 0;
+    let details = loop {
+        let query = if signed_in {
+            rp.query().authenticated()
+        } else {
+            rp.query().unauthenticated()
+        };
+        match query.video_details(&video_id).await {
+            Ok(details) => break details,
+            Err(e) if attempt == 0 => {
+                log::warn!("Up next: retrying after: {e}");
+                attempt += 1;
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+            Err(e) => return Err(e.into()),
+        }
     };
-    let details = query.video_details(&video_id).await?;
     Ok(details
         .recommended
         .items
@@ -167,7 +180,10 @@ fn feed_entry_to_video(e: &serde_json::Value) -> Option<Video> {
         return None;
     }
     let title = e["title"].as_str()?;
-    let channel_name = e["channel"].as_str().or(e["uploader"].as_str()).unwrap_or_default();
+    let channel_name = e["channel"]
+        .as_str()
+        .or(e["uploader"].as_str())
+        .unwrap_or_default();
     let channel_id = e["channel_id"].as_str().unwrap_or_default();
     let thumbnail = e["thumbnails"]
         .as_array()
@@ -175,7 +191,10 @@ fn feed_entry_to_video(e: &serde_json::Value) -> Option<Video> {
         .and_then(|u| Url::parse(u).ok());
 
     Some(Video {
-        id: VideoId { id: id.to_owned(), platform: PLATFORM.into() },
+        id: VideoId {
+            id: id.to_owned(),
+            platform: PLATFORM.into(),
+        },
         playable_url: watch_url(id),
         uploader: channel(channel_id, channel_name),
         title: title.to_owned(),
@@ -193,13 +212,23 @@ fn feed_entry_to_video(e: &serde_json::Value) -> Option<Video> {
 }
 
 fn video_item_to_video(v: &rustypipe::model::VideoItem) -> Option<Video> {
-    let c = v.channel.as_ref()?;
-    let mut uploader = channel(&c.id, &c.name);
-    uploader.avatar = c.avatar.iter().rev().find_map(|t| Url::parse(&t.url).ok());
-    uploader.subscribers = c.subscriber_count;
+    // YouTube's newer "lockup" layout leaves the channel out of the Up next
+    // items; the caller fills it in afterwards from the video information.
+    let uploader = match v.channel.as_ref() {
+        Some(c) => {
+            let mut uploader = channel(&c.id, &c.name);
+            uploader.avatar = c.avatar.iter().rev().find_map(|t| Url::parse(&t.url).ok());
+            uploader.subscribers = c.subscriber_count;
+            uploader
+        }
+        None => channel("", ""),
+    };
 
     Some(Video {
-        id: VideoId { id: v.id.clone(), platform: PLATFORM.into() },
+        id: VideoId {
+            id: v.id.clone(),
+            platform: PLATFORM.into(),
+        },
         playable_url: watch_url(&v.id),
         uploader,
         title: v.name.clone(),
@@ -208,7 +237,11 @@ fn video_item_to_video(v: &rustypipe::model::VideoItem) -> Option<Video> {
             .and_then(|d| chrono::DateTime::from_timestamp(d.unix_timestamp(), 0))
             .unwrap_or_else(Utc::now),
         duration: v.duration.map(|s| TimeDelta::seconds(s as i64)),
-        thumbnail: v.thumbnail.iter().rev().find_map(|t| Url::parse(&t.url).ok()),
+        thumbnail: v
+            .thumbnail
+            .iter()
+            .rev()
+            .find_map(|t| Url::parse(&t.url).ok()),
         description: v.short_description.clone(),
         views: v.view_count,
         likes: None,
@@ -220,7 +253,10 @@ fn video_item_to_video(v: &rustypipe::model::VideoItem) -> Option<Video> {
 
 fn channel(id: &str, name: &str) -> Channel {
     Channel {
-        id: ChannelId { id: id.to_owned(), platform: PLATFORM.into() },
+        id: ChannelId {
+            id: id.to_owned(),
+            platform: PLATFORM.into(),
+        },
         name: name.to_owned(),
         avatar: None,
         banner: None,
