@@ -819,6 +819,7 @@ pub mod imp {
         #[cfg(feature = "dev-hooks")]
         fn dev_hooks(&self) {
             let obj = self.obj().clone();
+            let obj_open = obj.clone();
             if let Ok(page) = std::env::var("KH_PAGE") {
                 self.main_stack.set_visible_child_name(&page);
             }
@@ -827,11 +828,22 @@ pub mod imp {
                 self.search_entry.set_text(&q);
                 self.search();
             }
+            // Home may still be loading (it starts on its own): wait for it.
             if let Ok(n) = std::env::var("KH_OPEN") {
                 let n: u32 = n.parse().unwrap_or(0);
-                if let Some(v) = obj.client().home_store().item(n).and_downcast::<Video>() {
-                    self.play_video(v, PlayType::Default);
-                }
+                let mut tries = 0;
+                glib::timeout_add_local(std::time::Duration::from_millis(250), move || {
+                    tries += 1;
+                    let item = obj_open.client().home_store().item(n);
+                    match item.and_downcast::<Video>() {
+                        Some(v) => {
+                            obj_open.imp().play_video(v, PlayType::Default);
+                            glib::ControlFlow::Break
+                        }
+                        None if tries < 120 => glib::ControlFlow::Continue,
+                        None => glib::ControlFlow::Break,
+                    }
+                });
             }
             // `KH_HOME_SCROLL=pixels@seconds`: scroll Home down.
             if let Ok(spec) = std::env::var("KH_HOME_SCROLL") {
