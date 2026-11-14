@@ -123,7 +123,11 @@ def export(browser, profile):
         return save(cookies.extract_cookies_from_browser(ytdlp_name, profile), out_path(browser, profile))
     if browser not in CHROMIUM_FAMILY:
         sys.exit(f"kinora-account: unknown browser {browser!r}")
-    _, ytdlp_name, _, app = CHROMIUM_FAMILY[browser]
+    _, ytdlp_name, root, app = CHROMIUM_FAMILY[browser]
+    # Hand yt-dlp the profile's full path, so it doesn't go looking for the
+    # browser's folder itself (and finds the same one --list did).
+    if not os.path.isabs(profile):
+        profile = os.path.join(root, profile)
     original = cookies._get_gnome_keyring_password
 
     def keyring_password(browser_keyring_name, logger):
