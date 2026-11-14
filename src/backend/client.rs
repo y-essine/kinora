@@ -689,7 +689,7 @@ impl Client {
     }
 
     /// Show the filter bar's chips; the first one ("All") is selected.
-    fn set_home_chips_list(&self, chips: &[super::account::HomeChip]) {
+    fn set_home_chips_list(&self, chips: &[kinora_core::account::HomeChip]) {
         let imp = self.imp();
         *imp.home_chip_tokens.borrow_mut() = chips.iter().map(|c| c.token.clone()).collect();
         self.set_home_chip_selected(0);
@@ -761,13 +761,13 @@ impl Client {
         let command = self.account_cookies_command();
         let token = chip.as_ref().map(|(_, token)| token.clone());
         let result = tspawn!(async move {
-            let cookies = super::account::cookies_file(&command).await?.ok_or(
+            let cookies = kinora_core::account::cookies_file(&command).await?.ok_or(
                 "No YouTube account is set up. Set the account cookies command in the preferences.",
             )?;
             if let Some(token) = token {
-                return super::account::home_continuation(&cookies, &token).await;
+                return kinora_core::account::home_continuation(&cookies, &token).await;
             }
-            match super::account::home_page(&cookies).await {
+            match kinora_core::account::home_page(&cookies).await {
                 Ok(page) if !page.videos.is_empty() => Ok(page),
                 // The direct request failed or came back empty: ask yt-dlp (slower).
                 direct => {
@@ -775,12 +775,12 @@ impl Client {
                         Ok(_) => log::warn!("Home: YouTube sent no videos, trying yt-dlp"),
                         Err(e) => log::warn!("Home: direct request failed, trying yt-dlp: {e}"),
                     }
-                    super::account::home_feed(&cookies).await.map(|videos| {
-                        super::account::HomePage {
+                    kinora_core::account::home_feed(&cookies)
+                        .await
+                        .map(|videos| kinora_core::account::HomePage {
                             videos,
                             ..Default::default()
-                        }
-                    })
+                        })
                 }
             }
         })
@@ -850,10 +850,10 @@ impl Client {
 
         let command = self.account_cookies_command();
         let result = tspawn!(async move {
-            let cookies = super::account::cookies_file(&command)
+            let cookies = kinora_core::account::cookies_file(&command)
                 .await?
                 .ok_or("No YouTube account is set up.")?;
-            super::account::home_continuation(&cookies, &token).await
+            kinora_core::account::home_continuation(&cookies, &token).await
         })
         .await
         .expect("Failed to spawn tokio");
@@ -931,10 +931,10 @@ impl Client {
         storage_dir.push(crate::migrate::DIR);
         storage_dir.push("account");
         let result = tspawn!(async move {
-            let cookies = super::account::cookies_file(&command).await?.ok_or(
+            let cookies = kinora_core::account::cookies_file(&command).await?.ok_or(
                 "No YouTube account is set up. Set the account cookies command in the preferences.",
             )?;
-            super::account::subscriptions(storage_dir, cookies).await
+            kinora_core::account::subscriptions(storage_dir, cookies).await
         })
         .await
         .expect("Failed to spawn tokio");
@@ -973,13 +973,13 @@ impl Client {
         let id = video.id().id;
 
         let result = tspawn!(async move {
-            let cookies = super::account::cookies_file(&command)
+            let cookies = kinora_core::account::cookies_file(&command)
                 .await
                 .unwrap_or_else(|e| {
                     log::warn!("Up next: {e}");
                     None
                 });
-            super::account::up_next(storage_dir, cookies, id).await
+            kinora_core::account::up_next(storage_dir, cookies, id).await
         })
         .await
         .expect("Failed to spawn tokio");
@@ -1013,9 +1013,11 @@ impl Client {
         let id = video.id().id;
         let started = std::time::Instant::now();
         let result =
-            tspawn!(async move { super::streams::playback_uri(storage_dir, cache_dir, id).await })
-                .await
-                .expect("Failed to spawn tokio");
+            tspawn!(
+                async move { kinora_core::streams::playback_uri(storage_dir, cache_dir, id).await }
+            )
+            .await
+            .expect("Failed to spawn tokio");
         match result {
             Ok(uri) => {
                 log::info!(
@@ -1043,14 +1045,16 @@ impl Client {
         if self.imp().settings.boolean("fast-start") {
             tspawn!(async move {
                 if let Err(e) =
-                    super::streams::playback_uri(storage_dir, cache_dir, id.clone()).await
+                    kinora_core::streams::playback_uri(storage_dir, cache_dir, id.clone()).await
                 {
                     log::debug!("Could not prepare {id}: {e}");
                 }
             });
         } else {
             tspawn!(async move {
-                if let Err(e) = super::streams::prepare_with_ytdlp(cache_dir, id.clone()).await {
+                if let Err(e) =
+                    kinora_core::streams::prepare_with_ytdlp(cache_dir, id.clone()).await
+                {
                     log::warn!("Could not prepare {id}: {e}");
                 }
             });
@@ -1062,7 +1066,7 @@ impl Client {
         if video.platform() != "youtube" {
             return None;
         }
-        super::streams::prepared(&video.id().id)
+        kinora_core::streams::prepared(&video.id().id)
     }
 
     fn stream_dirs() -> (PathBuf, PathBuf) {
@@ -1079,11 +1083,11 @@ impl Client {
         let id = video.id().id;
         tspawn!(async move {
             let result = async {
-                if let Some(cookies) = super::account::cookies_file(&command).await? {
-                    super::account::mark_watched(&cookies, &id).await?;
+                if let Some(cookies) = kinora_core::account::cookies_file(&command).await? {
+                    kinora_core::account::mark_watched(&cookies, &id).await?;
                     log::info!("Marked {id} watched on the YouTube account");
                 }
-                Ok::<_, super::account::Error>(())
+                Ok::<_, kinora_core::account::Error>(())
             }
             .await;
             if let Err(e) = result {

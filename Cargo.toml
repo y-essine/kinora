@@ -8,6 +8,17 @@ authors = ["y-essine", "Julian Schmidhuber <mobile@schmidhuberj.de>", "Alexander
 edition = "2024"
 license = "GPL-3.0-or-later"
 
+# Kinora: the app (this package) and its UI-independent core, kinora-core
+# (see docs/architecture.md).
+[workspace]
+members = [".", "crates/kinora-core"]
+
+# Kinora: git dependencies both use; one place keeps their revisions in step,
+# so pcore::Video is the same type in the app and in the core.
+[workspace.dependencies]
+pcore = { package = "pipeline-core", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
+rustypipe = { git = "https://gitlab.com/schmiddi-on-mobile/rustypipe.git", rev = "a5c9ca89f26651419a53ca73e81ffdd572c80011", features = ["userdata"] }
+
 [profile.dev]
 debug = false
 
@@ -47,7 +58,7 @@ serde_json = "1.0"
 rusqlite = { version = "0.37.0", features = ["url", "chrono", "backup"] }
 rusqlite_migration = "2.3"
 
-pcore = { package = "pipeline-core", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
+pcore = { workspace = true }
 papi = { package = "pipeline-api", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
 ppiped = { package = "pipeline-provider-piped", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
 prustypipe = { package = "pipeline-provider-rustypipe", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
@@ -55,10 +66,8 @@ pytdlp = { package = "pipeline-provider-yt-dlp", git = "https://gitlab.com/schmi
 pyoutuberss = { package = "pipeline-provider-youtube-rss", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
 ppeertube = { package = "pipeline-provider-peertube", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
 
-# Kinora: signed-in Up next recommendations and the account's subscriptions (userdata).
-rustypipe = { git = "https://gitlab.com/schmiddi-on-mobile/rustypipe.git", rev = "a5c9ca89f26651419a53ca73e81ffdd572c80011", features = ["userdata"] }
-# Kinora: the SAPISIDHASH header of the direct Home feed request.
-sha1 = "0.10"
+# Kinora: Home, Up next, the account and prepared playback (no GTK).
+kinora-core = { path = "crates/kinora-core" }
 
 clapper = { package = "clapper-player", version = "0.10", features = ["v0_10"] }
 clapper-gtk = { package = "clapper-player-gtk", version = "0.10", features = ["v0_10"]  }

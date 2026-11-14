@@ -21,7 +21,7 @@ use rustypipe::model::{AudioCodec, AudioStream, VideoCodec, VideoPlayer, VideoSt
 use std::collections::HashSet;
 use std::sync::Mutex;
 
-use super::account::{self, Error};
+use crate::account::{self, Error};
 
 /// Prepared playback URIs, reused until shortly before YouTube's links expire.
 static PREPARED: Mutex<Option<HashMap<String, (String, Instant)>>> = Mutex::new(None);
