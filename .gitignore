@@ -14,3 +14,8 @@ result
 /subprojects/blueprint-compiler
 /_build
 /_dev
+/packaging/arch/built
+/packaging/arch/src
+/packaging/arch/pkg
+/packaging/arch/pipeline-home
+*.pkg.tar.zst
