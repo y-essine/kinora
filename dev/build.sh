@@ -6,6 +6,8 @@ ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
 cd "$ROOT"
 [ -d _dev ] || meson setup _dev -Dprofile=development >/dev/null
 cd _dev
+# Regenerate build.ninja when a meson.build changed (e.g. a blueprint was removed).
+ninja -C . build.ninja >/dev/null 2>&1
 eval "$(sed -n 's/^ COMMAND = \(\/usr\/bin\/blueprint-compiler batch-compile.*\)/\1/p' build.ninja)"
 ninja -C . data/resources/resources.gresource >/dev/null
 mkdir -p schemas && cp ../data/io.github.y_essine.Kinora.gschema.xml schemas/ && glib-compile-schemas schemas
