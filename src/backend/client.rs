@@ -910,16 +910,30 @@ impl Client {
         }
         self.set_importing_subscriptions(true);
 
-        let (core, account) = (self.core(), self.account_config());
-        let result = tspawn!(async move { core.account_subscriptions(&account).await })
+        // The account extension's menu item does the YouTube part.
+        use kinora_core::extension::{ActionOutcome, MenuTarget, builtin::account};
+        let (core, config) = (self.core(), self.account_config());
+        let result = tspawn!(async move {
+            core.activate(
+                &config,
+                account::ID,
+                account::IMPORT_SUBSCRIPTIONS,
+                MenuTarget::None,
+            )
             .await
-            .expect("Failed to spawn tokio");
+        })
+        .await
+        .expect("Failed to spawn tokio");
         self.set_importing_subscriptions(false);
 
-        let channels = result.map_err(|e| {
-            log::error!("Failed to load the account's subscriptions: {e}");
-            e.to_string()
-        })?;
+        let channels = match result {
+            Ok(ActionOutcome::Subscribe(channels)) => channels,
+            Ok(_) => Vec::new(),
+            Err(e) => {
+                log::error!("Failed to load the account's subscriptions: {e}");
+                return Err(e.to_string());
+            }
+        };
         let total = channels.len();
         let known: std::collections::HashSet<pcore::ChannelId> = self
             .subscriptions()
@@ -1020,23 +1034,15 @@ impl Client {
         self.core().prepared_uri(&video.id())
     }
 
-    /// Mark a video as watched on the YouTube account (in the background).
+    /// The video has really been watched: tell the extensions (in the
+    /// background). The account extension marks it watched on YouTube.
     pub fn mark_watched_on_account(&self, video: &Video) {
         if video.platform() != "youtube" {
             return;
         }
         let (core, account) = (self.core(), self.account_config());
-        let id = video.id();
-        tspawn!(async move {
-            match core.mark_watched(&account, &id).await {
-                Ok(true) => log::info!("Marked {} watched on the YouTube account", id.id),
-                Ok(false) => {}
-                Err(e) => log::warn!(
-                    "Could not mark {} watched on the YouTube account: {e}",
-                    id.id
-                ),
-            }
-        });
+        let video = video.video();
+        tspawn!(async move { core.watched(&account, &video).await });
     }
 
     pub fn toggle_subscription(&self, channel: Channel) {
