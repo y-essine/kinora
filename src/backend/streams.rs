@@ -29,6 +29,8 @@ static PREPARED: Mutex<Option<HashMap<String, (String, Instant)>>> = Mutex::new(
 static PREPARING: Mutex<Option<HashSet<String>>> = Mutex::new(None);
 /// How long a prepared file is reused (YouTube's links last about six hours).
 const PREPARED_TTL: Duration = Duration::from_secs(60 * 60);
+/// At most this many videos are prepared at the same time.
+const MAX_PREPARING: usize = 2;
 
 /// A URI Clapper can play for this YouTube video: a local DASH manifest, or an
 /// HLS URL for live streams.
@@ -85,14 +87,17 @@ fn remember(video_id: String, uri: String, lifetime: Duration) {
 /// Prepare a YouTube video in the background with `kinora-prepare` (see the
 /// module docs). Does nothing if it is already prepared or being prepared.
 pub async fn prepare_with_ytdlp(cache_dir: PathBuf, video_id: String) -> Result<(), Error> {
-    if prepared(&video_id).is_some()
-        || !PREPARING
-            .lock()
-            .unwrap()
-            .get_or_insert_with(HashSet::new)
-            .insert(video_id.clone())
-    {
+    if prepared(&video_id).is_some() {
         return Ok(());
+    }
+    {
+        let mut guard = PREPARING.lock().unwrap();
+        let preparing = guard.get_or_insert_with(HashSet::new);
+        // At most two at a time: sweeping the pointer over a grid shouldn't
+        // start a yt-dlp run per video.
+        if preparing.len() >= MAX_PREPARING || !preparing.insert(video_id.clone()) {
+            return Ok(());
+        }
     }
     let result = async {
         std::fs::create_dir_all(&cache_dir)?;

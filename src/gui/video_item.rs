@@ -116,6 +116,17 @@ pub mod imp {
         #[template_callback]
         pub fn handle_hover_enter(&self) {
             self.obj().set_hovering(true);
+            // Kinora: a pointer resting on a video for a moment usually means a
+            // click is coming; prepare it so it starts in a second or two.
+            let item = glib::prelude::ObjectExt::downgrade(&*self.obj());
+            glib::timeout_add_local_once(std::time::Duration::from_millis(500), move || {
+                let Some(item) = item.upgrade() else { return };
+                if item.hovering() {
+                    if let Some(video) = item.video() {
+                        item.client().prepare_playback(&video);
+                    }
+                }
+            });
         }
 
         #[template_callback]
