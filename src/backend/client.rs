@@ -791,6 +791,30 @@ impl Client {
         }
     }
 
+    /// Kinora: the first videos of a chip's feed, without showing them in Home
+    /// (Home's topic rows). Empty for "All", an unknown chip, or on an error.
+    pub async fn home_chip_videos(&self, index: u32) -> Vec<Video> {
+        let Some((_, Some(token))) = self.home_chip(index) else {
+            return Vec::new();
+        };
+        // A chip's feed, without replacing the Home list (see `load_home`).
+        let (core, account) = (self.core(), self.account_config());
+        let result = tspawn!(async move { core.home(&account, Some(&token)).await })
+            .await
+            .expect("Failed to spawn tokio");
+        match result {
+            Ok(page) => page
+                .videos
+                .into_iter()
+                .map(|v| self.construct_video(v))
+                .collect(),
+            Err(e) => {
+                log::warn!("Failed to load a Home topic: {e}");
+                Vec::new()
+            }
+        }
+    }
+
     /// Load the first page of Home: the plain home page, or a chip's feed.
     /// A load started while another is running replaces it.
     async fn load_home(&self, chip: Option<(u32, String)>) {

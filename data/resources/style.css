@@ -209,14 +209,421 @@ progressbar.rgb progress {
   }
 }
 
-/* Kinora: the Home filter chips. */
-.home-chip {
-  border-radius: 999px;
-  padding: 4px 14px;
-  min-height: 0;
+/* ==========================================================================
+   Kinora design system. The guide is docs/design.md; change tokens there too.
+   Everything Kinora-specific is prefixed "k-". Components only use tokens,
+   never raw values, so rows, cards and panels (also those contributed by
+   extensions) always look like Kinora.
+   ========================================================================== */
+
+/* --- Tokens --------------------------------------------------------------- */
+:root {
+  /* Colour: a near-black, slightly cool stage; one warm accent (the lamp). */
+  --k-bg: #0b0c0f;
+  --k-surface-1: #121419;
+  --k-surface-2: #1a1d24;
+  --k-surface-3: #252a33;
+  --k-line: rgba(255, 255, 255, 0.08);
+  --k-text: #f3f4f6;
+  --k-text-dim: rgba(243, 244, 246, 0.70);
+  --k-text-faint: rgba(243, 244, 246, 0.50);
+  --k-accent: #ffb454;
+  --k-on-accent: #1d1200;
+  --k-scrim: rgba(6, 7, 9, 0.78);
+  --k-glass: rgba(255, 255, 255, 0.12);
+  --k-glass-hover: rgba(255, 255, 255, 0.20);
+
+  /* Spacing: a 4 px scale. */
+  --k-space-1: 4px;
+  --k-space-2: 8px;
+  --k-space-3: 12px;
+  --k-space-4: 16px;
+  --k-space-5: 24px;
+  --k-space-6: 32px;
+  --k-space-7: 48px;
+  /* The page gutter: narrow windows use --k-space-4 (see .compact). */
+  --k-gutter: 24px;
+
+  /* Radii. */
+  --k-radius-s: 8px;
+  --k-radius-m: 12px;
+  --k-radius-l: 16px;
+  --k-radius-pill: 999px;
+
+  /* Shadows: depth for things that float over pictures. */
+  --k-shadow-1: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --k-shadow-2: 0 12px 32px rgba(0, 0, 0, 0.50);
+
+  /* Motion: opacity and transform only, short, ease-out. */
+  --k-dur-fast: 150ms;
+  --k-dur: 200ms;
+  --k-dur-slow: 250ms;
+  --k-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* libadwaita follows the tokens, so every stock widget fits in. */
+  --window-bg-color: var(--k-bg);
+  --window-fg-color: var(--k-text);
+  --view-bg-color: var(--k-bg);
+  --view-fg-color: var(--k-text);
+  --headerbar-bg-color: var(--k-bg);
+  --headerbar-fg-color: var(--k-text);
+  --headerbar-backdrop-color: var(--k-bg);
+  --headerbar-shade-color: transparent;
+  --headerbar-border-color: transparent;
+  --sidebar-bg-color: var(--k-surface-1);
+  --sidebar-fg-color: var(--k-text);
+  --sidebar-backdrop-color: var(--k-surface-1);
+  --sidebar-shade-color: transparent;
+  --sidebar-border-color: transparent;
+  --card-bg-color: var(--k-surface-2);
+  --card-fg-color: var(--k-text);
+  --card-shade-color: transparent;
+  --popover-bg-color: var(--k-surface-3);
+  --popover-fg-color: var(--k-text);
+  --dialog-bg-color: var(--k-surface-2);
+  --dialog-fg-color: var(--k-text);
+  --overview-bg-color: var(--k-surface-1);
+  --accent-bg-color: var(--k-accent);
+  --accent-fg-color: var(--k-on-accent);
+  --accent-color: var(--k-accent);
 }
 
-.home-chip:checked {
-  background-color: @window_fg_color;
-  color: @window_bg_color;
+/* --- Type ------------------------------------------------------------------
+   Interface: the desktop's own font (Adwaita Sans on GNOME), untouched.
+   Display: the same family set heavy and tight, for the few large titles. */
+.k-display {
+  font-family: "Inter Display", "Adwaita Sans", "Inter", "Cantarell", sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  line-height: 1.12;
+}
+
+.k-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--k-accent);
+}
+
+/* --- Chrome: as little as possible ---------------------------------------- */
+headerbar {
+  background: none;
+  box-shadow: none;
+}
+
+.navigation-sidebar > row {
+  border-radius: var(--k-radius-m);
+}
+
+/* Keyboard focus is always visible, and always the accent. */
+*:focus-visible {
+  outline-color: var(--k-accent);
+}
+
+/* --- Video card (TFVideoItem) ---------------------------------------------- */
+.k-thumb-frame {
+  border-radius: var(--k-radius-m);
+  background-color: var(--k-surface-2);
+}
+
+.k-thumb {
+  opacity: 0;
+  transition: opacity var(--k-dur-slow) var(--k-ease),
+              transform var(--k-dur-slow) var(--k-ease);
+}
+
+.k-thumb.loaded {
+  opacity: 1;
+}
+
+/* The picture grows inside its frame; the card itself never moves. */
+.k-card.hovering .k-thumb.loaded {
+  transform: scale(1.04);
+}
+
+.k-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--k-text);
+}
+
+.k-card.compact .k-card-title {
+  font-size: 14px;
+}
+
+.k-card-meta {
+  font-size: 13px;
+  color: var(--k-text-dim);
+}
+
+.k-badge {
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: var(--k-scrim);
+}
+
+.k-card-actions {
+  opacity: 0;
+  transition: opacity var(--k-dur-fast) var(--k-ease);
+}
+
+.k-card.hovering .k-card-actions,
+.k-card-actions:focus-within {
+  opacity: 1;
+}
+
+.k-avatar,
+.k-avatar > image {
+  border-radius: 50%;
+  background-color: var(--k-surface-3);
+}
+
+/* Cells of the grids and lists that hold cards. */
+gridview.background-view > child,
+listview.k-row-list > row {
+  padding: 6px;
+  border-radius: var(--k-radius-l);
+  background: none;
+  transition: background-color var(--k-dur-fast) var(--k-ease);
+}
+
+gridview.background-view > child:hover,
+listview.k-row-list > row:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+gridview.background-view > child:focus-visible,
+listview.k-row-list > row:focus-visible {
+  outline: 2px solid var(--k-accent);
+  outline-offset: -2px;
+}
+
+/* --- Row of cards (TFVideoRow) ---------------------------------------------- */
+.k-rows {
+  border-spacing: var(--k-space-4);
+}
+
+.k-row-header {
+  margin: 0 var(--k-gutter);
+  min-height: 34px;
+}
+
+.k-row-title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.k-row-subtitle {
+  font-size: 13px;
+  color: var(--k-text-dim);
+}
+
+.k-row-nav {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  color: var(--k-text-dim);
+}
+
+.k-row-nav:disabled {
+  opacity: 0.3;
+}
+
+listview.k-row-list {
+  background: none;
+  /* Cards line up with the row title: gutter minus the cell padding. */
+  padding: 0 18px;
+}
+
+.k-row-placeholder {
+  margin: 6px var(--k-gutter) 64px;
+}
+
+.k-skeleton {
+  border-radius: var(--k-radius-m);
+  background-color: var(--k-surface-1);
+}
+
+/* --- Featured banner (TFFeaturedBanner) ------------------------------------- */
+.k-banner {
+  background-color: var(--k-surface-1);
+}
+
+.k-banner-picture {
+  opacity: 0;
+  transition: opacity var(--k-dur-slow) var(--k-ease);
+}
+
+.k-banner-picture.loaded {
+  opacity: 1;
+}
+
+.k-banner-glow {
+  opacity: 0.7;
+}
+
+/* The glow dims to the page colour just before the picture begins. */
+.k-banner-lead {
+  background-image: linear-gradient(to right, rgba(11, 12, 15, 0), var(--k-bg));
+}
+
+/* The picture's left edge dissolves into the glow. */
+.k-banner-edge {
+  background-image: linear-gradient(to right, var(--k-bg) 0%, rgba(11, 12, 15, 0.55) 22%, rgba(11, 12, 15, 0) 50%);
+}
+
+/* Text stays readable on any picture, and the banner melts into the page. */
+.k-banner-scrim {
+  background-image: linear-gradient(to top, var(--k-bg) 0%, rgba(11, 12, 15, 0.82) 22%, rgba(11, 12, 15, 0.25) 55%, rgba(11, 12, 15, 0) 78%);
+}
+
+.k-banner-meta {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+button.k-play {
+  font-weight: 700;
+  padding-left: 22px;
+  padding-right: 26px;
+}
+
+button.k-glass {
+  color: #ffffff;
+  background-color: var(--k-glass);
+  transition: background-color var(--k-dur-fast) var(--k-ease);
+}
+
+button.k-glass:hover {
+  background-color: var(--k-glass-hover);
+}
+
+/* --- Home ------------------------------------------------------------------- */
+.k-home.compact {
+  --k-gutter: 16px;
+}
+
+.k-home.compact listview.k-row-list {
+  padding: 0 10px;
+}
+
+.k-home.compact .k-display {
+  font-size: 24px;
+}
+
+/* --- Video page: the stage --------------------------------------------------
+   The player sits on a soft light in the video's own colours. The light is
+   one tiny pre-blurred image stretched by the GPU: it costs nothing to show. */
+.k-stage-glow {
+  opacity: 0.95;
+}
+
+/* The light is strongest around and below the player, and gone at the edges
+   of the page. */
+.k-stage-scrim {
+  background-image:
+    linear-gradient(to bottom, var(--k-bg), rgba(11, 12, 15, 0)),
+    linear-gradient(to top, var(--k-bg), rgba(11, 12, 15, 0)),
+    linear-gradient(to right, var(--k-bg) 0%, rgba(11, 12, 15, 0) 10%, rgba(11, 12, 15, 0) 90%, var(--k-bg) 100%);
+  background-size: 100% 28px, 100% 120px, 100% 100%;
+  background-position: top, bottom, center;
+  background-repeat: no-repeat;
+}
+
+.k-stage > clamp {
+  margin: 20px 24px 76px;
+}
+
+.k-player {
+  border-radius: var(--k-radius-l);
+  background-color: #000000;
+  box-shadow: var(--k-shadow-2);
+}
+
+/* Narrow windows: the player runs edge to edge, the light spills below it. */
+.k-stage.edge > clamp {
+  margin: 0 0 68px;
+}
+
+.k-stage.edge .k-player {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.k-stage.fullscreen > clamp {
+  margin: 0;
+}
+
+.k-stage.fullscreen .k-player {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Player controls: a quiet glass bar that fades away with the pointer
+   (Clapper hides it; here it only gets Kinora's look). */
+.k-player clapper-gtk-simple-controls .mainbox,
+.k-player clapper-gtk-simple-controls .fullscreenbutton,
+.k-player clapper-gtk-title-header {
+  background-color: rgba(11, 12, 15, 0.66);
+  color: #ffffff;
+}
+
+.k-player clapper-gtk-simple-controls .mainbox {
+  border-radius: var(--k-radius-m);
+}
+
+/* The title rises a little into the light. */
+.k-video-body {
+  margin: -56px var(--k-gutter) var(--k-space-7);
+}
+
+.k-video-title {
+  font-size: 26px;
+}
+
+.k-panel {
+  border-radius: var(--k-radius-l);
+  background-color: var(--k-surface-1);
+}
+
+/* Up next: the same cards, as a list. */
+.k-upnext-list {
+  background: none;
+}
+
+.k-upnext-list > row {
+  padding: 8px;
+  border-radius: var(--k-radius-l);
+  transition: background-color var(--k-dur-fast) var(--k-ease);
+}
+
+.k-upnext-list > row:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.k-upnext-list > row:focus-visible {
+  outline: 2px solid var(--k-accent);
+  outline-offset: -2px;
+}
+
+/* --- Lite: effects off (the reduce-effects setting) ------------------------- */
+window.reduce-effects * {
+  transition: none;
+  animation: none;
+}
+
+window.reduce-effects .k-card.hovering .k-thumb.loaded {
+  transform: none;
+}
+
+window.reduce-effects .k-glow {
+  opacity: 0;
 }

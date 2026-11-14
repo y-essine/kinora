@@ -230,38 +230,18 @@ Adw.ViewStack main_stack {
     child: Box {
       orientation: vertical;
 
-      // Kinora: the Home filter chips ("All", "Music", "Gaming", ...).
-      ScrolledWindow home_chips_scroll {
-        visible: false;
-        hscrollbar-policy: external;
-        vscrollbar-policy: never;
-        propagate-natural-height: true;
-
-        Adw.Clamp {
-          maximum-size: 1862;
-          tightening-threshold: 1862;
-
-          Box home_chips_box {
-            spacing: 8;
-            margin-top: 12;
-            margin-start: 12;
-            margin-end: 12;
-          }
-        }
-      }
-
-      $TFFiniteVideoList home_list {
+      // Kinora: a featured banner and rows of videos (see docs/design.md).
+      $TFHomeView home_view {
         visible: bind $not(
           template.client as <$TFClient>.home-store as <$TFFiniteVideoStore>.is-empty
           ) as <bool>;
         client: bind template.client;
-        model: bind template.client as <$TFClient>.home-store;
         compact: bind template.breakpoint_collapsed;
+        feed-model: bind video_list.model;
         play-video => $play_video() swapped;
         copy-video-url => $copy_video_url() swapped;
         download => $download() swapped;
         remove-downloaded => $remove_downloaded() swapped;
-        scroll-end => $home_load_more() swapped;
       }
 
       Adw.StatusPage {

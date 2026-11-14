@@ -227,6 +227,16 @@ template $TFPreferencesDialog: Adw.PreferencesDialog {
       }
     }
 
+    // Kinora: the effects of the interface (see docs/design.md, "Lite").
+    Adw.PreferencesGroup {
+      title: _("Appearance");
+
+      Adw.SwitchRow switch_reduce_effects {
+        title: _("Reduce Effects");
+        subtitle: _("No glow behind the player, no motion, and videos are not prepared when the pointer rests on them.");
+      }
+    }
+
     Adw.PreferencesGroup {
       // Translators: Preferences section containing some fun features of the application, like showing a random splash text or seasonal styling.
       title: _("Fun");

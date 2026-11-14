@@ -170,5 +170,9 @@
       <default>{}</default>
       <summary>The extensions' settings, keyed 'EXTENSION.SETTING' (e.g. 'account.mark-watched'): booleans for toggles, strings for choices and text. Missing keys use the extension's default.</summary>
     </key>
+    <key name="reduce-effects" type="b">
+      <default>false</default>
+      <summary>Lite: switch off the ambient glow, hover effects, motion and preparing videos on hover.</summary>
+    </key>
   </schema>
 </schemalist>

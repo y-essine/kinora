@@ -1,0 +1,124 @@
+using Gtk 4.0;
+
+// Kinora: a titled, horizontally scrolling row of video cards ("shelf").
+// Reusable: Home builds its rows from it, and extensions will contribute rows
+// that are rendered by this same component (see docs/design.md).
+template $TFVideoRow: Box {
+  styles [
+    "k-row",
+  ]
+
+  orientation: vertical;
+  accessible-role: group;
+
+  Box {
+    styles [
+      "k-row-header",
+    ]
+
+    spacing: 4;
+
+    Box {
+      orientation: vertical;
+      hexpand: true;
+      valign: center;
+
+      Label label_title {
+        styles [
+          "k-row-title",
+        ]
+
+        label: bind template.title;
+        accessible-role: heading;
+        xalign: 0;
+        ellipsize: end;
+      }
+
+      Label {
+        styles [
+          "k-row-subtitle",
+        ]
+
+        label: bind template.subtitle;
+        visible: bind $has_text(template.subtitle) as <bool>;
+        xalign: 0;
+        ellipsize: end;
+      }
+    }
+
+    Button btn_prev {
+      styles [
+        "flat",
+        "circular",
+        "k-row-nav",
+      ]
+
+      icon-name: "go-previous-symbolic";
+      tooltip-text: _("Scroll Back");
+      valign: center;
+      sensitive: false;
+      clicked => $scroll_back() swapped;
+    }
+
+    Button btn_next {
+      styles [
+        "flat",
+        "circular",
+        "k-row-nav",
+      ]
+
+      icon-name: "go-next-symbolic";
+      tooltip-text: _("Scroll Forward");
+      valign: center;
+      sensitive: false;
+      clicked => $scroll_forward() swapped;
+    }
+  }
+
+  Stack stack {
+    hhomogeneous: false;
+    vhomogeneous: false;
+
+    StackPage {
+      name: "list";
+
+      child: ScrolledWindow scroller {
+        hscrollbar-policy: external;
+        vscrollbar-policy: never;
+        propagate-natural-height: true;
+
+        ListView list {
+          styles [
+            "k-row-list",
+          ]
+
+          orientation: horizontal;
+          single-click-activate: true;
+          tab-behavior: item;
+        }
+      };
+    }
+
+    // Shown while the row's videos are on their way: quiet, static blocks.
+    StackPage {
+      name: "placeholder";
+
+      // (In a scrolled window only so that it never asks for width.)
+      child: ScrolledWindow {
+        hscrollbar-policy: external;
+        vscrollbar-policy: never;
+        can-target: false;
+        can-focus: false;
+
+        Box placeholder {
+          styles [
+            "k-row-placeholder",
+          ]
+
+          spacing: 16;
+          accessible-role: presentation;
+        }
+      };
+    }
+  }
+}

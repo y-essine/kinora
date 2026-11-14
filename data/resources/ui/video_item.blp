@@ -2,11 +2,13 @@ using Gtk 4.0;
 using Adw 1;
 using Gdk 4.0;
 
+// Kinora: the video card (see docs/design.md). "wide" is the poster card used
+// in grids and rows, "compact" the list card used in narrow windows and Up next.
 template $TFVideoItem: Box {
-  margin-end: 6;
-  margin-start: 6;
-  margin-top: 6;
-  margin-bottom: 6;
+  styles [
+    "k-card",
+  ]
+
   tooltip-text: bind template.video as <$TFVideo>.title;
 
   EventControllerMotion {
@@ -30,40 +32,46 @@ template $TFVideoItem: Box {
     Adw.Layout {
       name: "wide";
 
-      content: Adw.Clamp {
+      content: Adw.Clamp clamp_wide {
         maximum-size: 288;
 
         child: Gtk.Box {
           orientation: vertical;
-          spacing: 6;
+          spacing: 10;
 
-          Adw.LayoutSlot {
+          Adw.LayoutSlot slot_image_wide {
             id: "image";
             width-request: 288;
             height-request: 162;
           }
 
           Box {
-            orientation: vertical;
-            spacing: 5;
+            spacing: 10;
 
             Adw.LayoutSlot {
-              id: "title";
+              id: "avatar";
+              valign: start;
             }
 
             Box {
-              spacing: 6;
+              orientation: vertical;
+              spacing: 2;
+              hexpand: true;
 
               Adw.LayoutSlot {
-                id: "avatar";
+                id: "title";
               }
 
-              Adw.LayoutSlot {
-                id: "author";
-              }
+              Box {
+                spacing: 5;
 
-              Adw.LayoutSlot {
-                id: "date";
+                Adw.LayoutSlot {
+                  id: "author";
+                }
+
+                Adw.LayoutSlot {
+                  id: "date";
+                }
               }
             }
           }
@@ -76,22 +84,20 @@ template $TFVideoItem: Box {
 
       content: Gtk.Box {
         orientation: horizontal;
+        spacing: 12;
 
-        Adw.Clamp {
-          maximum-size: 128;
-
-          Adw.LayoutSlot {
-            id: "image";
-            width-request: 128;
-            height-request: 72;
-            valign: start;
-          }
+        Adw.LayoutSlot {
+          id: "image";
+          width-request: 160;
+          height-request: 90;
+          valign: start;
         }
 
         Gtk.Box {
           orientation: vertical;
-          spacing: 6;
-          margin-start: 6;
+          spacing: 4;
+          valign: center;
+          hexpand: true;
 
           Adw.LayoutSlot {
             id: "title";
@@ -119,23 +125,29 @@ template $TFVideoItem: Box {
 
     [image]
     Overlay overlay {
+      styles [
+        "k-thumb-frame",
+      ]
+
+      overflow: hidden;
+
       [overlay]
       Box {
         styles [
-          "osd",
-          "duration-osd",
+          "k-badge",
           "numeric",
         ]
 
         valign: end;
         halign: start;
-        margin-bottom: 5;
-        margin-start: 5;
+        margin-bottom: 6;
+        margin-start: 6;
         spacing: 3;
         visible: bind $or(template.video as <$TFVideo>.downloading, template.video as <$TFVideo>.downloaded) as <bool>;
 
         Image {
           icon-name: "folder-download-symbolic";
+          pixel-size: 12;
         }
 
         Adw.Spinner {
@@ -150,16 +162,15 @@ template $TFVideoItem: Box {
       [overlay]
       Box {
         styles [
-          "osd",
-          "duration-osd",
+          "k-badge",
           "numeric",
         ]
 
         valign: end;
         halign: end;
-        margin-bottom: 5;
-        margin-end: 5;
-        spacing: 3;
+        margin-bottom: 6;
+        margin-end: 6;
+        spacing: 4;
 
         Label {
           label: bind template.video as <$TFVideo>.duration-label;
@@ -167,15 +178,21 @@ template $TFVideoItem: Box {
 
         Image {
           icon-name: bind $icon_name_for_platform(template.video as <$TFVideo>.platform) as <string>;
+          pixel-size: 12;
         }
       }
 
+      // Shown with the pointer over the card (faded in by CSS).
       [overlay]
       Box {
+        styles [
+          "k-card-actions",
+        ]
+
         margin-top: 6;
         margin-start: 6;
         margin-end: 6;
-        visible: bind $and(template.hovering, $not(template.compact) as <bool>) as <bool>;
+        visible: bind template.compact inverted;
         valign: start;
 
         Button {
@@ -192,7 +209,6 @@ template $TFVideoItem: Box {
         Gtk.Button btn_more_actions {
           halign: end;
           hexpand: true;
-          visible: bind template.hovering;
 
           styles [
             "circular",
@@ -207,56 +223,57 @@ template $TFVideoItem: Box {
 
       Picture thumbnail {
         styles [
-          "card",
+          "k-thumb",
         ]
 
+        content-fit: cover;
+        can-shrink: true;
         paintable: bind $pixbuf_to_paintable(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
       }
     }
 
     [avatar]
-    Adw.Avatar {
+    Adw.Avatar avatar {
       styles [
-        "card",
-        "avatar-card",
+        "k-avatar",
       ]
 
       custom-image: bind $pixbuf_to_paintable(
         template.video as <$TFVideo>.uploader as <$TFChannel>.avatar
         ) as <Gdk.Paintable>;
       text: bind template.video as <$TFVideo>.uploader as <$TFChannel>.name;
-      size: 24;
+      size: 32;
     }
 
     [author]
     Label {
       styles [
-        "dimmed",
+        "k-card-meta",
       ]
 
       label: bind template.video as <$TFVideo>.uploader as <$TFChannel>.name;
       ellipsize: end;
       lines: 1;
       halign: start;
-      hexpand: true;
-      margin-end: 6;
+      xalign: 0;
     }
 
     [date]
     Label {
       styles [
-        "dimmed",
+        "k-card-meta",
       ]
 
-      label: bind template.video as <$TFVideo>.uploaded-label;
+      label: bind $meta_date(template.video as <$TFVideo>.uploaded-label, template.compact) as <string>;
       ellipsize: end;
       lines: 1;
+      xalign: 0;
     }
 
     [title]
     Label label_title {
       styles [
-        "title-4",
+        "k-card-title",
       ]
 
       label: bind template.video as <$TFVideo>.title;

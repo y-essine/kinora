@@ -384,6 +384,17 @@ pub mod imp {
         billboard: TemplateChild<clapper_gtk::Billboard>,
         #[template_child]
         page_scroller: TemplateChild<gtk::ScrolledWindow>,
+        // Kinora: the stage (player over its ambient glow) and the page body.
+        #[template_child]
+        stage: TemplateChild<gtk::Overlay>,
+        #[template_child]
+        stage_clamp: TemplateChild<adw::Clamp>,
+        #[template_child]
+        body_clamp: TemplateChild<adw::Clamp>,
+        #[template_child]
+        body: TemplateChild<gtk::Box>,
+        #[template_child]
+        up_next_clamp: TemplateChild<adw::Clamp>,
 
         // Kinora: "Up next"
         #[template_child]
@@ -434,6 +445,11 @@ pub mod imp {
                 video: Default::default(),
                 billboard: Default::default(),
                 page_scroller: Default::default(),
+                stage: Default::default(),
+                stage_clamp: Default::default(),
+                body_clamp: Default::default(),
+                body: Default::default(),
+                up_next_clamp: Default::default(),
                 up_next_box: Default::default(),
                 up_next_list: Default::default(),
                 autoplay_switch: Default::default(),
@@ -1009,25 +1025,60 @@ pub mod imp {
                 }
             ));
 
-            // Kinora: the player lives in the page's scrolling column, where
-            // it gets no height of its own; size it 16:9 to the page width (at most
-            // 70% of the page height). Fullscreen lifts this and lets it fill.
+            // Kinora: the player lives in the page's scrolling column, where it
+            // gets no height of its own; size it 16:9, as large as the page allows
+            // (at most 72% of its height), centred on the stage with the glow
+            // around it. Narrow windows use every pixel: the player runs edge to
+            // edge. Fullscreen lifts all of this and lets it fill.
+            // Wide windows also put Up next in a column beside the details.
+            self.stage.set_measure_overlay(&*self.stage_clamp, true);
+            let last = Cell::new((0, 0, false));
             self.clapper.add_tick_callback(clone!(
                 #[weak]
                 obj,
                 #[upgrade_or]
                 glib::ControlFlow::Break,
                 move |clapper, _| {
-                    let want = if obj.fullscreened() {
-                        -1
-                    } else {
-                        let by_width = obj.width() as f64 * 9.0 / 16.0;
-                        let cap = obj.height() as f64 * 0.7;
-                        by_width.min(cap).max(120.0).round() as i32
-                    };
-                    if clapper.height_request() != want {
-                        clapper.set_height_request(want);
+                    let state = (obj.width(), obj.height(), obj.fullscreened());
+                    // Nothing to do unless the page changed size.
+                    if last.replace(state) == state {
+                        return glib::ControlFlow::Continue;
                     }
+                    let imp = obj.imp();
+                    let (width, height, fullscreened) = state;
+                    if fullscreened {
+                        clapper.set_height_request(-1);
+                        imp.stage_clamp.set_maximum_size(i32::MAX);
+                        imp.stage.add_css_class("fullscreen");
+                        return glib::ControlFlow::Continue;
+                    }
+                    imp.stage.remove_css_class("fullscreen");
+                    let narrow = width < 640;
+                    if narrow {
+                        imp.stage.add_css_class("edge");
+                    } else {
+                        imp.stage.remove_css_class("edge");
+                    }
+                    let gutter = if narrow { 0.0 } else { 24.0 };
+                    let by_width = (width as f64 - 2.0 * gutter) * 9.0 / 16.0;
+                    let cap = height as f64 * 0.72;
+                    let player_height = by_width.min(cap).max(120.0).round();
+                    clapper.set_height_request(player_height as i32);
+                    imp.stage_clamp
+                        .set_maximum_size((player_height * 16.0 / 9.0).round() as i32);
+
+                    let two_columns = width >= 1080;
+                    imp.body.set_orientation(if two_columns {
+                        gtk::Orientation::Horizontal
+                    } else {
+                        gtk::Orientation::Vertical
+                    });
+                    imp.body_clamp
+                        .set_maximum_size(if two_columns { 1360 } else { 850 });
+                    let column = if two_columns { 400 } else { 10000 };
+                    imp.up_next_clamp.set_maximum_size(column);
+                    imp.up_next_clamp.set_tightening_threshold(column);
+                    imp.up_next_clamp.set_hexpand(!two_columns);
                     glib::ControlFlow::Continue
                 }
             ));
