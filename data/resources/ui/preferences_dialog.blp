@@ -35,6 +35,20 @@ template $TFPreferencesDialog: Adw.PreferencesDialog {
     Adw.PreferencesGroup {
       title: _("General");
 
+      // Kinora: the presets of the first launch (see gui/first_run.rs).
+      Adw.ActionRow {
+        title: _("Ways to Watch");
+        subtitle: _("Private, Lite, Connected or Fun: set Kinora up in one step");
+        activatable: true;
+        action-name: "win.ways-to-watch";
+
+        [suffix]
+        Gtk.Image {
+          icon-name: "go-next-symbolic";
+          accessible-role: presentation;
+        }
+      }
+
       Adw.SwitchRow switch_reload_on_startup {
         title: _("Reload on Startup");
       }

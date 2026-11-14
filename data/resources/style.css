@@ -763,6 +763,56 @@ button.k-glass:hover {
   background-color: color-mix(in srgb, var(--k-accent) 14%, transparent);
 }
 
+/* --- First run: "How do you want to watch?" (see docs/design.md) -------------- */
+.k-first-run-body {
+  padding: var(--k-space-6) var(--k-space-5) var(--k-space-5);
+}
+
+.k-first-run-title {
+  font-size: 26px;
+}
+
+.k-first-run flowbox {
+  margin: var(--k-space-5) 0 var(--k-space-4);
+}
+
+.k-first-run flowboxchild {
+  padding: 0;
+  background: none;
+  outline: none;
+}
+
+.k-mode-card {
+  padding: var(--k-space-4);
+  border-radius: var(--k-radius-l);
+  font-weight: inherit;
+  background-color: var(--k-surface-1);
+  box-shadow: inset 0 0 0 1px var(--k-line);
+  transition: background-color var(--k-dur-fast) var(--k-ease), box-shadow var(--k-dur-fast) var(--k-ease);
+}
+
+.k-mode-card:hover {
+  background-color: var(--k-surface-3);
+}
+
+.k-mode-card:checked {
+  background-color: color-mix(in srgb, var(--k-accent) 10%, var(--k-surface-2));
+  box-shadow: inset 0 0 0 2px var(--k-accent);
+}
+
+.k-first-run-icon {
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: var(--k-radius-pill);
+  color: var(--k-text-dim);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.k-mode-card:checked .k-first-run-icon {
+  color: var(--k-accent);
+  background-color: color-mix(in srgb, var(--k-accent) 16%, transparent);
+}
+
 /* --- Lite: effects off (the reduce-effects setting) ------------------------- */
 window.reduce-effects * {
   transition: none;

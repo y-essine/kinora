@@ -9,6 +9,7 @@ mod featured_banner;
 mod filter_dialog;
 mod filter_similar_dialog;
 mod finite_video_list;
+mod first_run;
 mod home_view;
 mod import_dialog;
 mod player_sheet;

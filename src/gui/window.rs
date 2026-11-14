@@ -1783,7 +1783,11 @@ pub mod imp {
             obj.insert_action_group("win", Some(&actions));
 
             // Kinora: the player sheet (see docs/design.md, "Player").
-            let player_actions: [(&str, fn(&Self)); 10] = [
+            let player_actions: [(&str, fn(&Self)); 11] = [
+                // "How do you want to watch?" (see `gui/first_run.rs`).
+                ("ways-to-watch", |s| {
+                    crate::gui::first_run::present(&s.obj(), &s.settings)
+                }),
                 // The DJ (see `gui/dj.rs`).
                 ("dj-start", |s| s.dj().start(false)),
                 ("dj-start-mix", |s| s.dj().start(true)),
@@ -1879,10 +1883,23 @@ pub mod imp {
                     }
                     // Kinora: load the account's home feed.
                     s.obj().client().refresh_home().await;
+                    s.first_run();
                     #[cfg(feature = "dev-hooks")]
                     s.dev_hooks();
                 }
             ));
+        }
+
+        /// Kinora: "How do you want to watch?", once (see `gui/first_run.rs`).
+        /// A test session (any `KH_` hook set) is not interrupted by it;
+        /// `KH_FIRST_RUN=1` shows it there.
+        fn first_run(&self) {
+            let forced = cfg!(feature = "dev-hooks") && std::env::var("KH_FIRST_RUN").is_ok();
+            let testing =
+                cfg!(feature = "dev-hooks") && std::env::vars().any(|(k, _)| k.starts_with("KH_"));
+            if forced || (!testing && crate::gui::first_run::is_due(&self.settings)) {
+                crate::gui::first_run::present(&self.obj(), &self.settings);
+            }
         }
 
         fn show_privacy_notice(&self) {
