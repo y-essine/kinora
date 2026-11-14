@@ -33,7 +33,8 @@ face, like a Tauri app for Windows or an mpv-based player, can reuse the brain a
 |---|---|
 | `lib.rs` | `Core`, the entry point a frontend keeps in an `Arc` |
 | `config.rs` | `Paths` (the cache folder), `AccountConfig` (the cookies command), `PlaybackConfig` (fast start) |
-| `home.rs` | The account's YouTube Home over InnerTube: first page, chips, continuations, yt-dlp fallback, parsing |
+| `home.rs` | The account's YouTube Home over InnerTube: first page, chips, continuations, yt-dlp fallback, parsing (videos, and playlist/mix cards apart) |
+| `playlist.rs` | `PlaylistCard` / `PlaylistKind` (Mix, Playlist, Album), playlist id clean-up, the lockup parser (see *Playlists and mixes*) |
 | `account.rs` | Cookies, browser profiles (`kinora-account`), Up next and subscriptions (RustyPipe), mark watched (yt-dlp) |
 | `streams.rs` | Prepared playback (`kinora-prepare`) and the experimental RustyPipe fast start (DASH/HLS) |
 | `player.rs` | The `Player` trait and playback helpers |
@@ -48,7 +49,8 @@ Rules:
 - **Paths are passed in** (`Paths::new(cache_dir)`): `account/` holds RustyPipe's cache,
   `streams/` the prepared manifests.
 - **Shared types** are pipeline-core's `pcore::Video` and `pcore::Channel` (same revision for the
-  app and the core through `[workspace.dependencies]`), and the core's `HomePage`/`HomeChip`.
+  app and the core through `[workspace.dependencies]`), and the core's `HomePage`/`HomeChip`/
+  `PlaylistCard`.
 - **Async on Tokio.** `Core`'s futures are `Send` and need a Tokio runtime (child processes,
   HTTP). The GTK app runs them with `tspawn!` and brings results back to the GTK thread.
 - **Errors** are `Box<dyn Error + Send + Sync>` messages for the user or the log.
@@ -147,7 +149,7 @@ list to store. Labels in manifests are English; translate them in the frontend.
 | id | Contributes | Settings | Off means |
 |---|---|---|---|
 | `account` (Network, Account) | `youtube-home` main feed source; `on_watched` marks the video watched on YouTube; menu item `import-subscriptions` (Home) | `personal-up-next`, `mark-watched` (both on) | Fully anonymous: no Home, anonymous Up next, nothing sent to the account. `Core::account_active` and the Client's `has-account` are false |
-| `home-chips` | a feed filter that hides the playlist-only Mixes/Playlists chips | `hide-playlist-chips` (on) | Home is one feed without a chip bar |
+| `home-chips` | a feed filter that, when asked, hides the playlist-only Mixes/Playlists chips and the playlist cards | `hide-playlist-chips` ("Hide Mixes and Playlists", off: they are kept so the DJ can play them) | Home is one feed without a chip bar |
 | `dj` (Network, Account, PlayerControl) | nothing to the fixed points: frontends call `Core::dj_*` (see *The DJ*) | `crossfade-seconds` (choice `"0"`..`"12"`, `"6"`), `avoid-repeats` (on), `start-from` (`current-video` \| `my-mix`) | `Core::dj_*` fail; nothing is fetched |
 
 What stays in the core on purpose: anonymous Up next (it works without an account; the account
@@ -163,10 +165,10 @@ Extensions that should start *off* need an `enabled-extensions` list too (not ad
 
 ## The DJ
 
-A continuous music session from a seed: a video (its YouTube Music radio) or "my mix" (`RDMM`,
-personal when the account is active, YouTube's popular mix otherwise). The engine is in
-`kinora_core::dj`, with no I/O except `dj::radio::fetch`; the frontend draws the session and
-plays the audio.
+A continuous music session from a seed: a video (its YouTube Music radio), "my mix" (`RDMM`,
+personal when the account is active, YouTube's popular mix otherwise), or a playlist, album or
+mix (`DjSeed::Playlist`, see *Playlists and mixes*). The engine is in `kinora_core::dj`, with no
+I/O except `dj::radio::fetch`; the frontend draws the session and plays the audio.
 
 - **Radio** (`dj::radio`): InnerTube `next` on music.youtube.com (`WEB_REMIX`, playlist
   `RDAMVM<videoId>`), signed in with the same cookies.txt → `Cookie` + `SAPISIDHASH` auth as Home
@@ -196,13 +198,44 @@ plays the audio.
 page to `session.extend(&request, page)`, or `session.fetch_failed(&request)`),
 `dj_refill(account, &mut session)`, `dj_transition(duration, position, &next) -> TransitionPlan`.
 All fail while the extension is off. `cargo run -p kinora-core --example dj_radio -- [VIDEO_ID |
-mymix]` tries it against the live API; the parser tests use recorded anonymous responses in
-`crates/kinora-core/src/dj/fixtures/`.
+mymix]` and `--example dj_playlist -- [--shuffle] [PLAYLIST_ID_OR_URL ...]` try it against the
+live API; the parser tests use recorded anonymous responses in
+`crates/kinora-core/src/dj/fixtures/` (and `src/fixtures/` for Home's lockups), cut down to what
+the parsers read, without tracking data, visitor data or playback URLs.
 
 What a frontend does: keep the `DjSession`; when a track starts, prepare `peek_next()` and plan
 the transition with the player's real duration; at `start_at` start the next track at volume 0
 and set both volumes from `gains(elapsed)` every ~50 ms for `fade`, then stop the old one (a cut:
 on end of stream); call `advance()` (or `skip()`), then refill in the background.
+
+### Playlists and mixes
+
+Home and the account list playlists as `PlaylistCard { id, title, kind: Mix | Playlist | Album,
+thumbnail, owner, owner_id, video_count, first_video_id }` (`kinora_core::playlist`). The kind
+comes from the id (`RD…` mix except `RDCLAK…`, `OLAK5uy_…` album, anything else a playlist;
+`LL`/`LM`/`WL` are liked videos, liked music, watch later) and the "Mix" badge. `normalize_id`
+takes an id, a `VL…` browse id or a URL with `list=`.
+
+- **Home**: `HomePage::playlists` holds the page's playlist and mix lockups, apart from
+  `videos` (which are unchanged). `Core::home`/`home_more` still skip pages without videos (the
+  GTK list); `Core::home_with_playlists`/`home_more_with_playlists` count a page of playlists as a
+  page, so the "Mixes" and "Playlists" chips' feeds come back after one request
+  (`FeedRequest::playlists` tells the feed source). The yt-dlp fallback lists playlists too.
+- **Account**: `Core::account_playlists(account)` (active account only): YouTube's Playlists page
+  through RustyPipe's `saved_playlists` (`FEplaylist_aggregation`, up to 500), with Liked videos
+  and Watch later added when missing. Not yet tried against a live account.
+- **DJ**: `DjSeed::Playlist { id, title, shuffle }`, made with `DjSeed::playlist(id, title)` (cleans
+  the id; `.shuffled(true)`) or `card.dj_seed(shuffle)`. `dj_start` asks YouTube Music's `next`
+  for the playlist id: 50 tracks a page in the playlist's order, continued with a token
+  (`shuffle` sends YouTube Music's shuffle parameter, which shuffles the whole playlist). The
+  fallback is regular YouTube's playlist panel (200 a page, then a token; signed in first, so
+  private playlists can play; shuffled page by page). Nothing is current at the start:
+  `advance()` for the first track. When the playlist has no more pages, `refill_request()` starts
+  the radio of its last queued track, and the session goes on as a radio. A mix (`RD…`) is
+  endless like a radio and never shuffled. `session.in_playlist()` (no radio started yet) and
+  `session.is_from_playlist(&track)` let a frontend mark where the playlist ends in the queue.
+  Measured anonymously: a 248-track playlist starts in ~0.4 s once connected (the very first
+  request of a process takes 3-4 s), each further page ~0.5 s.
 
 ## A new frontend
 
@@ -212,9 +245,10 @@ A Tauri (Windows) or mpv-based frontend would:
    Tokio runtime (Tauri already runs one).
 2. Store its settings however it likes and pass them in per call: `AccountConfig`,
    `PlaybackConfig`, `extensions().set_disabled(..)`, `extensions().set_values(..)`.
-3. Expose `Core` calls as commands (`home`, `home_more`, `up_next`, `prepare`,
-   `prepared_uri`, `fast_playback_uri`, `watched`, `activate`) and serialise `pcore::Video` for
-   the web UI.
+3. Expose `Core` calls as commands (`home`, `home_more` or their `_with_playlists` versions,
+   `account_playlists`, `up_next`, `prepare`, `prepared_uri`, `fast_playback_uri`, `watched`,
+   `activate`, the `dj_*` calls) and serialise `pcore::Video` (and the serde types
+   `PlaylistCard`, `DjSeed`, `DjSession`) for the web UI.
 4. Implement `Player` for its player (libmpv, or a bridge to an HTML `<video>`), and call
    `Core::watched`/`ended` from its events.
 5. Render `settings_panels()` and `menu_items(location)` with its own widgets.
@@ -229,6 +263,9 @@ would ship them next to the app).
 - Move the SQLite store, the `papi` provider setup (Piped/RustyPipe/PeerTube) and import/export
   into the core. The store uses the GObject `Filter`, so it needs a plain filter type first.
 - A `ClapperPlayer` implementing `Player`, and autoplay through `choose_next`/`play_next`.
+- Playlist and mix cards in the GTK app (`HomePage::playlists`, `Core::account_playlists`). Until
+  then the GTK Home still calls `Core::home`, so the "Mixes"/"Playlists" chips (now kept by
+  default) show "no videos for this filter" there.
 - The DJ's UI and its crossfading playback (two players, volumes from `TransitionPlan`). A number
   setting kind would suit `crossfade-seconds` better than a choice. The DJ is on by default but
   idle until started; for the Fun experience it could move to the opt-in list.

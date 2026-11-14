@@ -44,6 +44,28 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! # From a playlist or a mix
+//!
+//! ```no_run
+//! # async fn example(core: &kinora_core::Core, account: &kinora_core::AccountConfig,
+//! #     card: &kinora_core::PlaylistCard) -> Result<(), kinora_core::Error> {
+//! use kinora_core::dj::DjSeed;
+//!
+//! // A card from `HomePage::playlists` or `core.account_playlists(account)`...
+//! let mut session = core.dj_start(account, card.dj_seed(false)).await?;
+//! // ...or an id or URL the user pasted.
+//! let seed = DjSeed::playlist("https://www.youtube.com/playlist?list=PL…", None);
+//! # let _ = seed;
+//!
+//! // Nothing plays yet: start the first track.
+//! let first = session.advance().cloned();
+//! // Then the same loop as above. When the playlist is over, the session
+//! // goes on with the radio of its last track by itself.
+//! # let _ = first;
+//! # Ok(())
+//! # }
+//! ```
 
 mod dedupe;
 pub mod radio;
