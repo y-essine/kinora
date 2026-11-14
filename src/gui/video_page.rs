@@ -155,6 +155,20 @@ impl VideoPage {
         player.pause();
     }
 
+    /// Kinora: stop for good (another video replaces this page): pause and
+    /// unload the video, so it no longer plays or streams.
+    pub fn stop(&self) {
+        let player = self
+            .imp()
+            .clapper
+            .player()
+            .expect("Clapper does not have a player");
+        player.pause();
+        if let Some(queue) = player.queue() {
+            queue.clear();
+        }
+    }
+
     pub fn finished(&self) -> bool {
         if self.external() {
             return true;

@@ -498,8 +498,28 @@ pub mod imp {
 
             let video_page = VideoPage::new(&video, &obj.client());
             let page = NavigationPage::new(&video_page, &video.title());
-            self.main_navigation_pre_push();
-            self.main_navigation.push(&page);
+
+            // Kinora: a video opened from a video page (Up next, autoplay) replaces
+            // it, like on YouTube: one player, and Back returns to where you came
+            // from instead of through every video. The old one counts as watched.
+            if let Some(old) = self.visible_video_page() {
+                if let Some(old_video) = old.video() {
+                    obj.client().watched(old_video, Utc::now());
+                }
+                old.stop();
+                let mut stack: Vec<NavigationPage> = self
+                    .main_navigation
+                    .navigation_stack()
+                    .iter::<NavigationPage>()
+                    .flatten()
+                    .collect();
+                stack.pop();
+                stack.push(page.clone());
+                self.main_navigation.replace(&stack);
+            } else {
+                self.main_navigation_pre_push();
+                self.main_navigation.push(&page);
+            }
 
             obj.announce(
                 &gettextrs::gettext("Switched to video page {}").replace("{}", &video.title()),
