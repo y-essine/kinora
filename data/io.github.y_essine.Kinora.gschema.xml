@@ -63,6 +63,16 @@
       <default>"https://sepiasearch.org/"</default>
       <summary>The peertube api used for searches</summary>
     </key>
+    <!-- Kinora: which source the Search page shows; only used while both sources are enabled. -->
+    <key name="search-source" type="s">
+      <choices>
+        <choice value="all"/>
+        <choice value="youtube"/>
+        <choice value="peertube"/>
+      </choices>
+      <default>"youtube"</default>
+      <summary>Which source the Search page shows results from: "all", "youtube" or "peertube".</summary>
+    </key>
     <key name="only-videos-yesterday" type="b">
       <default>false</default>
       <summary>Only show videos of yesterday.</summary>

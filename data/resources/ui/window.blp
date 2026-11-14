@@ -417,6 +417,28 @@ Adw.ViewStack main_stack {
         }
       }
 
+      // Kinora: filter search results by source; hidden unless both sources are enabled.
+      Adw.ToggleGroup search_source {
+        halign: center;
+        margin-bottom: 6;
+        notify::active-name => $search_source_changed() swapped;
+
+        Adw.Toggle {
+          name: "all";
+          label: _("All");
+        }
+
+        Adw.Toggle {
+          name: "youtube";
+          label: _("YouTube");
+        }
+
+        Adw.Toggle {
+          name: "peertube";
+          label: _("PeerTube");
+        }
+      }
+
       $TFSearchList search_list {
         client: bind template.client;
         compact: bind template.breakpoint_collapsed;

@@ -262,6 +262,9 @@ pub mod imp {
 
         #[template_child]
         search_entry: TemplateChild<SearchEntry>,
+        // Kinora: source filter of the Search page.
+        #[template_child]
+        search_source: TemplateChild<adw::ToggleGroup>,
         #[template_child]
         search_list: TemplateChild<SearchList>,
         #[template_child]
@@ -325,6 +328,7 @@ pub mod imp {
                 video_list: Default::default(),
                 search_page: Default::default(),
                 search_entry: Default::default(),
+                search_source: Default::default(),
                 search_list: Default::default(),
                 btn_filter_menu: Default::default(),
                 label_splash: Default::default(),
@@ -839,9 +843,62 @@ pub mod imp {
                 async move {
                     let s = obj.imp();
                     let text = s.search_entry.text();
-                    s.search_list.set_model(obj.client().search(&text).await);
+                    let platform = s.search_platform();
+                    s.search_list
+                        .set_model(obj.client().search(&text, platform).await);
                 }
             ));
+        }
+
+        /// Kinora: the platform to restrict searches to, if any.
+        /// The filter only exists while both sources are enabled; with one source enabled, only that one is searched anyway.
+        fn search_platform(&self) -> Option<&'static str> {
+            if !(self.settings.boolean("enable-source-youtube")
+                && self.settings.boolean("enable-source-peertube"))
+            {
+                return None;
+            }
+            match self.settings.string("search-source").as_str() {
+                "youtube" => Some("youtube"),
+                "peertube" => Some("peertube"),
+                _ => None,
+            }
+        }
+
+        /// Kinora: re-run the current search when the source filter changes.
+        #[template_callback]
+        fn search_source_changed(&self) {
+            if self.search_list.model().is_some() && !self.search_entry.text().is_empty() {
+                self.search();
+            }
+        }
+
+        fn setup_search_source(&self) {
+            self.settings
+                .bind("search-source", &*self.search_source, "active-name")
+                .build();
+
+            let update_visibility = clone!(
+                #[weak(rename_to = toggle_group)]
+                self.search_source,
+                move |settings: &gtk::gio::Settings| {
+                    toggle_group.set_visible(
+                        settings.boolean("enable-source-youtube")
+                            && settings.boolean("enable-source-peertube"),
+                    );
+                }
+            );
+            update_visibility(&self.settings);
+            for key in ["enable-source-youtube", "enable-source-peertube"] {
+                self.settings.connect_changed(
+                    Some(key),
+                    clone!(
+                        #[strong]
+                        update_visibility,
+                        move |settings, _| update_visibility(settings)
+                    ),
+                );
+            }
         }
 
         #[template_callback]
@@ -1693,6 +1750,7 @@ pub mod imp {
             self.setup_main_navigation();
             self.setup_compute_properties();
             self.setup_filter_icon();
+            self.setup_search_source();
             self.setup_fullscreen();
             self.allow_all_clapper_enhancers();
 
