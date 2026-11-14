@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<schemalist>
+  <schema path="/de/schmidhuberj/tubefeeder/" id="de.schmidhuberj.tubefeeder" gettext-domain="tubefeeder">
+    <key name="window-width" type="i">
+      <default>1230</default>
+      <summary>Window width</summary>
+    </key>
+    <key name="window-height" type="i">
+      <default>650</default>
+      <summary>Window height</summary>
+    </key>
+    <key name="is-maximized" type="b">
+      <default>false</default>
+      <summary>Window maximized state</summary>
+    </key>
+    <key name="sidebar-pinned" type="b">
+      <default>true</default>
+      <summary>Whether the sidebar is pinned</summary>
+    </key>
+    <key name="player" type="s">
+      <default>""</default>
+      <summary>The player to use</summary>
+    </key>
+    <key name="downloader" type="s">
+      <default>"youtube-dl"</default>
+      <summary>The downloader to use</summary>
+    </key>
+    <key name="download-format" type="s">
+      <default>"bv*+ba/b"</default>
+      <summary>The default format for downloading videos.</summary>
+    </key>
+    <key name="download-yt-dlp-arguments" type="s">
+      <default>""</default>
+      <summary>Additional yt-dlp arguments.</summary>
+    </key>
+    <key name="enable-source-youtube" type="b">
+      <default>true</default>
+      <summary>Let Pipeline fetch videos from YouTube</summary>
+    </key>
+    <key name="piped-url" type="s">
+      <default>"https://pipedapi.kavin.rocks"</default>
+      <summary>The piped api url</summary>
+    </key>
+    <key name="piped-automatically-manage-instances" type="b">
+      <default>true</default>
+      <summary>Automatically manage Piped instances.</summary>
+    </key>
+    <key name="piped-api-urls" type="as">
+      <default>["https://pipedapi.kavin.rocks", "https://pipedapi-libre.kavin.rocks", "https://pipedapi.leptons.xyz", "https://pipedapi.nosebs.ru", "https://pipedapi.adminforge.de", "https://api.piped.yt/", "https://piapi.ggtyler.dev/", "https://pipedapi.ducks.party/", "https://pipedapi.reallyaweso.me/", "https://api.piped.private.coffee/", "https://pipedapi.orangenet.cc/"]</default>
+      <summary>The piped api urls</summary>
+    </key>
+    <!-- TODO: Can one make youtube-mode typesave? -->
+    <key name="youtube-mode" type="s">
+      <default>"rustypipe-then-piped"</default>
+      <summary>How to query data from YouTube; can be either "rustyipe", "piped", "rustypipe-then-piped", or "piped-then-rustypipe" (with potential future values reserved for in the future).</summary>
+    </key>
+
+    <key name="enable-source-peertube" type="b">
+      <default>true</default>
+      <summary>Let Pipeline fetch videos from PeerTube</summary>
+    </key>
+    <key name="peertube-search-api" type="s">
+      <default>"https://sepiasearch.org/"</default>
+      <summary>The peertube api used for searches</summary>
+    </key>
+    <key name="only-videos-yesterday" type="b">
+      <default>false</default>
+      <summary>Only show videos of yesterday.</summary>
+    </key>
+    <key name="remove-short-videos" type="b">
+      <default>false</default>
+      <summary>Remove short videos.</summary>
+    </key>
+    <key name="remove-requires-payment" type="b">
+      <default>true</default>
+      <summary>Remove videos which require payment.</summary>
+    </key>
+    <key name="remove-watched" type="b">
+      <default>false</default>
+      <summary>Remove videos which have already been watched.</summary>
+    </key>
+    <key name="filter-enabled" type="b">
+      <default>true</default>
+      <summary>Whether the filter is enabled.</summary>
+    </key>
+    <key name="watch-history-enabled" type="b">
+      <default>true</default>
+      <summary>Whether the application keeps the history of watched videos.</summary>
+    </key>
+    <key name="last-added-platform" type="s">
+      <default>"youtube"</default>
+      <summary>The type of platform for which the last subscription was added.</summary>
+    </key>
+    <key name="reload-on-startup" type="b">
+      <default>true</default>
+      <summary>Whether to reload when starting the application.</summary>
+    </key>
+    <key name="play-external-default" type="b">
+      <default>false</default>
+      <summary>Whether to play with the external player by default.</summary>
+    </key>
+    <key name="show-splash" type="b">
+      <default>true</default>
+        <!-- Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash. -->
+      <summary>Whether to show the splash text when reloading the feed.</summary>
+    </key>
+    <key name="seasonal-style" type="b">
+      <default>true</default>
+      <summary>Whether to apply seasonal styling to the application, based on annual celebrations (e.g. pride month).</summary>
+    </key>
+    <key name="setup-window-shown" type="b">
+      <default>false</default>
+      <summary>Whether the setup window was already shown.</summary>
+    </key>
+    <key name="cairo-software-renderer" type="b">
+      <default>false</default>
+      <summary>Whether cairo should be used for rendering.</summary>
+    </key>
+
+    <!-- Copied from https://github.com/Rafostar/clapper/blob/master/src/bin/clapper-app/data/glib-2.0/schemas/com.github.rafostar.Clapper.gschema.xml -->
+    <key name="player-volume" type="d">
+      <default>1.0</default>
+      <summary>Stores last volume value to apply on startup</summary>
+    </key>
+    <key name="player-speed" type="d">
+      <default>1.0</default>
+      <summary>Stores last speed value to apply on startup</summary>
+    </key>
+    <key name="player-subtitles-enabled" type="b">
+      <default>true</default>
+      <summary>Stores whether subtitles are enabled value to apply on startup</summary>
+    </key>
+    <!-- Changed type to "u" as the type of the property is unsigned -->
+    <key name="player-adaptive-start-bitrate" type="u">
+      <default>1600000</default>
+      <summary>Stores initial adaptive streaming bitrate to apply on startup</summary>
+    </key>
+  </schema>
+</schemalist>

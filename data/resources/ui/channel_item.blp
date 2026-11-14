@@ -1,0 +1,151 @@
+using Gtk 4.0;
+using Adw 1;
+using Gdk 4.0;
+
+template $TFChannelItem: Box {
+  margin-end: 6;
+  margin-start: 6;
+  margin-top: 18;
+  margin-bottom: 18;
+  tooltip-text: bind template.channel as <$TFChannel>.name;
+  halign: center;
+  hexpand: true;
+  valign: center;
+
+  GestureClick {
+    button: 3;
+    exclusive: true;
+    pressed => $handle_right_clicked() swapped;
+  }
+
+  GestureLongPress {
+    touch-only: true;
+    exclusive: true;
+    pressed => $handle_right_clicked() swapped;
+  }
+
+  Adw.MultiLayoutView multi_layout_view {
+    Adw.Layout {
+      name: "wide";
+
+      content: Adw.Clamp {
+        maximum-size: 288;
+        width-request: 288;
+
+        child: Box {
+          orientation: vertical;
+          spacing: 3;
+
+          Adw.LayoutSlot {
+            id: "avatar";
+          }
+
+          Adw.LayoutSlot {
+            id: "author";
+          }
+
+          Adw.LayoutSlot {
+            id: "subscribers";
+          }
+
+          Adw.LayoutSlot {
+            id: "platform";
+          }
+        };
+      };
+    }
+
+    Adw.Layout {
+      name: "compact";
+
+      content: Gtk.Box {
+        orientation: horizontal;
+        spacing: 12;
+
+        Adw.LayoutSlot {
+          id: "avatar";
+        }
+
+        Gtk.Box {
+          orientation: vertical;
+          spacing: 3;
+
+          Adw.LayoutSlot {
+            id: "author";
+            halign: start;
+          }
+
+          Adw.LayoutSlot {
+            id: "subscribers";
+            halign: start;
+          }
+
+          Adw.LayoutSlot {
+            id: "platform";
+            halign: start;
+          }
+        }
+      };
+    }
+
+    [avatar]
+    Adw.Avatar avatar {
+      styles [
+        "card",
+        "avatar-card",
+      ]
+
+      halign: center;
+      custom-image: bind $pixbuf_to_paintable(template.channel as <$TFChannel>.avatar) as <Gdk.Paintable>;
+      text: bind template.channel as <$TFChannel>.name;
+      size: 96;
+      margin-bottom: 12;
+    }
+
+    [author]
+    Label label_author {
+      styles [
+        "title-4",
+      ]
+
+      label: bind template.channel as <$TFChannel>.name;
+      ellipsize: end;
+      lines: 1;
+    }
+
+    [subscribers]
+    Label {
+      styles [
+        "dimmed",
+      ]
+
+      label: bind $format_subscribers(template.channel as <$TFChannel>.subscribers) as <string>;
+      visible: bind template.channel as <$TFChannel>.has-subscribers;
+      ellipsize: end;
+    }
+
+    [platform]
+    Box {
+      halign: center;
+      spacing: 6;
+
+      Image {
+        styles [
+          "dimmed",
+        ]
+
+        icon-name: bind $icon_name_for_platform(template.channel as <$TFChannel>.platform) as <string>;
+      }
+
+      Label {
+        styles [
+          "dimmed",
+        ]
+
+        label: bind $format_platform(template.channel as <$TFChannel>.platform) as <string>;
+      }
+    }
+  }
+
+  PopoverMenu popover_menu {}
+}

@@ -1,0 +1,1926 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the tubefeeder package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: tubefeeder\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-18 11:19+0200\n"
+"PO-Revision-Date: 2025-08-13 07:02+0000\n"
+"Last-Translator: maboroshin <maboroshin@users.noreply.hosted.weblate.org>\n"
+"Language-Team: Japanese <https://hosted.weblate.org/projects/schmiddi-on-"
+"mobile/pipeline/ja/>\n"
+"Language: ja\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: Weblate 5.13-dev\n"
+
+#: data/de.schmidhuberj.tubefeeder.desktop.in.in:4
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:6
+#: data/resources/ui/window.blp:8 data/resources/ui/window.blp:479
+#: src/gui/video_page.rs:606 src/main.rs:163
+msgid "Pipeline"
+msgstr "Pipeline"
+
+#: data/de.schmidhuberj.tubefeeder.desktop.in.in:5
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:7
+msgid "Follow video creators"
+msgstr "動画クリエイターをフォローしよう"
+
+#: data/de.schmidhuberj.tubefeeder.desktop.in.in:11
+msgid "youtube;peertube;video;"
+msgstr "youtube;peertube;video;動画;"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:460
+msgid ""
+"Pipeline lets you watch and download videos from YouTube and PeerTube, all "
+"without needing to navigate through different websites. Its adaptive design "
+"allows you to enjoy content on any screen size."
+msgstr ""
+"Pipeline を使って、各サイトを行き来せず YouTube と PeerTube の動画を視聴した"
+"りダウンロード。アダプティブデザインで、画面サイズに合わせてコンテンツが楽し"
+"めます。"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:465
+msgid "Pipeline allows you to:"
+msgstr "Pipelineの機能:"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:471
+msgid "Search for you favorite channels and subscribe to them."
+msgstr "好きなチャンネルを探し、チャンネル登録。"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:473
+msgid "Aggregate the videos of all subscriptions into a single feed."
+msgstr "すべてのチャンネルの動画をひとつの新着動画フィードに集約。"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:475
+msgid ""
+"Filter out unwanted items from the feed, like short videos or videos from a "
+"series."
+msgstr "ショート動画やシリーズの動画など、新着動画に不要な項目を条件で除外。"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:477
+msgid ""
+"Play those videos either in the built-in video player or with any other "
+"video player of your choice."
+msgstr ""
+"動画は、内蔵の動画プレーヤーや好きな外部の動画プレーヤーで再生できます。"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:479
+msgid "Download videos for offline viewing."
+msgstr "オフラインで視聴するために動画をダウンロード。"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:481
+msgid "Manage videos you want to watch later."
+msgstr "「後で見る」で動画を管理。"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:483
+msgid "Import your subscriptions from NewPipe or YouTube."
+msgstr "NewPipeや YouTube から登録チャンネルをインポート。"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:485
+msgid ""
+"Supports YouTube, PeerTube with the possibility to extend to other platforms "
+"on request."
+msgstr ""
+"YouTube、PeerTube に対応し、要望により他のプラットフォームにも拡張できます。"
+
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:491
+msgid "Playing a Video"
+msgstr "動画を再生中"
+
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:495
+msgid "Viewing Videos of a Channel"
+msgstr "チャンネルの動画を表示中"
+
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:499
+msgid "Managing your Subscriptions"
+msgstr "登録チャンネルの管理"
+
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:503
+msgid "Listing Videos to Watch Later"
+msgstr "後で見るに動画を追加"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:6
+msgid "Window width"
+msgstr "ウィンドウの幅"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:10
+msgid "Window height"
+msgstr "ウィンドウの高さ"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:14
+msgid "Window maximized state"
+msgstr "ウィンドウの最大化"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:18
+#, fuzzy
+#| msgid "Whether the filter is enabled."
+msgid "Whether the sidebar is pinned"
+msgstr "検索除外が有効かどうか。"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:22
+msgid "The player to use"
+msgstr "使用するプレイヤー"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:26
+msgid "The downloader to use"
+msgstr "使用するダウンローダー"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:30
+msgid "The default format for downloading videos."
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:34
+msgid "Additional yt-dlp arguments."
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:38
+msgid "Let Pipeline fetch videos from YouTube"
+msgstr "PipelineでYouTubeから動画を取得"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:42
+msgid "The piped api url"
+msgstr "Piped API の URL"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:46
+msgid "Automatically manage Piped instances."
+msgstr "Pipedのインスタンスを自動管理。"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:50
+msgid "The piped api urls"
+msgstr "Piped API の URL"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:55
+msgid ""
+"How to query data from YouTube; can be either \"rustyipe\", \"piped\", "
+"\"rustypipe-then-piped\", or \"piped-then-rustypipe\" (with potential future "
+"values reserved for in the future)."
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:60
+msgid "Let Pipeline fetch videos from PeerTube"
+msgstr "PipelineでPeerTubeから動画を取得"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:64
+msgid "The peertube api used for searches"
+msgstr "検索に使う PeerTube API"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:68
+msgid "Only show videos of yesterday."
+msgstr "昨日の動画のみ表示します。"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:72
+msgid "Remove short videos."
+msgstr "ショート動画を非表示にします。"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:76
+msgid "Remove videos which require payment."
+msgstr "支払いが必要な動画を除去する。"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:80
+msgid "Remove videos which have already been watched."
+msgstr "視聴済みの動画を除去する。"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:84
+msgid "Whether the filter is enabled."
+msgstr "検索除外が有効かどうか。"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:88
+msgid "Whether the application keeps the history of watched videos."
+msgstr "動画の視聴履歴を残すかどうか。"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:92
+msgid "The type of platform for which the last subscription was added."
+msgstr "最後にチャンネル登録をしたときのチャンネルのプラットフォーム。"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:96
+msgid "Whether to reload when starting the application."
+msgstr "アプリの起動時に再読込するかどうか。"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:100
+msgid "Whether to play with the external player by default."
+msgstr "最初からで外部プレーヤーで再生するか。"
+
+#. Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:105
+msgid "Whether to show the splash text when reloading the feed."
+msgstr "動画一覧の再読み込み時にヒントを表示するかどうか。"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:109
+msgid ""
+"Whether to apply seasonal styling to the application, based on annual "
+"celebrations (e.g. pride month)."
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:113
+msgid "Whether the setup window was already shown."
+msgstr "セットアップウィンドウが表示されているかどうか。"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:117
+msgid "Whether cairo should be used for rendering."
+msgstr "Cairoを描画に使うかどうか。"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:123
+msgid "Stores last volume value to apply on startup"
+msgstr "起動時に適用するため、最後の音量を保存"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:127
+msgid "Stores last speed value to apply on startup"
+msgstr "起動時に適用するため、最後の速度の値を保存"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:131
+#, fuzzy
+#| msgid "Stores last speed value to apply on startup"
+msgid "Stores whether subtitles are enabled value to apply on startup"
+msgstr "起動時に適用するため、最後の速度の値を保存"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:136
+msgid "Stores initial adaptive streaming bitrate to apply on startup"
+msgstr "起動時に適用するため、動画の適応的なビットレートの初期値を保存"
+
+#: data/resources/ui/bottom_bar.blp:123
+msgid "Dismiss bottom bar"
+msgstr "下部のバーを非表示"
+
+#: data/resources/ui/channel_page.blp:15 data/resources/ui/video_page.blp:121
+#: data/resources/ui/window.blp:97
+msgid "Show Sidebar"
+msgstr "サイドバーを表示"
+
+#: data/resources/ui/channel_page.blp:33 data/resources/ui/window.blp:116
+msgid "Reload"
+msgstr "再読み込み"
+
+#: data/resources/ui/channel_page.blp:50 data/resources/ui/video_page.blp:129
+#: data/resources/ui/window.blp:139
+msgctxt "accessibility"
+msgid "Primary menu"
+msgstr "メインメニュー"
+
+#: data/resources/ui/channel_page.blp:55 data/resources/ui/video_page.blp:134
+#: data/resources/ui/window.blp:143
+msgctxt "tooltip"
+msgid "Primary menu"
+msgstr "メインメニュー"
+
+#: data/resources/ui/channel_page.blp:194
+msgid "Description"
+msgstr "説明"
+
+#: data/resources/ui/channel_page.blp:222 data/resources/ui/window.blp:224
+msgid "Loading Videos"
+msgstr "動画の一覧を読込中"
+
+#: data/resources/ui/channel_page.blp:245 data/resources/ui/import_dialog.blp:5
+#: data/resources/ui/import_dialog.blp:127 data/resources/ui/video_page.blp:511
+#: data/resources/ui/window.blp:504 src/gui/import_dialog.rs:69
+#: src/gui/import_dialog.rs:107 src/gui/import_dialog.rs:145
+#: src/gui/import_dialog.rs:183
+msgid "Import"
+msgstr "インポート"
+
+#: data/resources/ui/channel_page.blp:250 data/resources/ui/export_dialog.blp:7
+#: data/resources/ui/export_dialog.blp:105 data/resources/ui/video_page.blp:516
+#: data/resources/ui/window.blp:509 src/gui/export_dialog.rs:60
+#: src/gui/export_dialog.rs:99 src/gui/export_dialog.rs:140
+msgid "Export"
+msgstr "エクスポート"
+
+#: data/resources/ui/channel_page.blp:257 data/resources/ui/video_page.blp:523
+#: data/resources/ui/window.blp:516
+msgid "Preferences"
+msgstr "設定"
+
+#: data/resources/ui/channel_page.blp:262
+#: data/resources/ui/privacy_notice.blp:13 data/resources/ui/video_page.blp:528
+#: data/resources/ui/window.blp:521 src/gui/window.rs:1491
+#, fuzzy
+msgid "Privacy Notice"
+msgstr "個人情報保護方針"
+
+#: data/resources/ui/channel_page.blp:267 data/resources/ui/video_page.blp:533
+#: data/resources/ui/window.blp:526
+msgid "Keyboard Shortcuts"
+msgstr "キーボードショートカット"
+
+#: data/resources/ui/channel_page.blp:272 data/resources/ui/video_page.blp:538
+#: data/resources/ui/window.blp:531
+msgid "About Pipeline"
+msgstr "Pipeline について"
+
+#: data/resources/ui/error_dialog.blp:12
+msgid "Errors"
+msgstr "エラー"
+
+#: data/resources/ui/error_dialog.blp:20
+msgid "Clear Errors"
+msgstr "エラー一覧を消去"
+
+#. Translators: The format a video will be downloaded in.
+#: data/resources/ui/export_dialog.blp:32
+#: data/resources/ui/import_dialog.blp:32
+#: data/resources/ui/preferences_dialog.blp:36
+msgid "Format"
+msgstr ""
+
+#: data/resources/ui/export_dialog.blp:60
+#, fuzzy
+#| msgid ""
+#| "Export all the data Pipeline stores, in order to backup the data or "
+#| "import into another Pipeline instance."
+msgid ""
+"Export all the data Pipeline stores, in order to backup the data or import "
+"into another Pipeline instance"
+msgstr ""
+"Pipelineが保存するすべてのデータをエクスポートする。バックアップしたり、別の"
+"Pipelineインスタンスにインポートできます。"
+
+#: data/resources/ui/export_dialog.blp:76
+#, fuzzy
+#| msgid ""
+#| "Export as a YouTube CSV format. While YouTube itself cannot import it, it "
+#| "can be used in other applications. This only exports YouTube "
+#| "subscriptions and not subscriptions from any other platform."
+msgid ""
+"Export as a YouTube CSV format. While YouTube itself cannot import it, it "
+"can be used in other applications. This only exports YouTube subscriptions"
+msgstr ""
+"YouTube をCSV形式でエクスポートする。YouTube自体はこの形式をインポートできま"
+"せん。他のアプリに対応するものがあります。このエクスポートはYouTubeの登録チャ"
+"ンネルのみが対象で、他のプラットフォームの登録チャンネルは含まれません。"
+
+#: data/resources/ui/export_dialog.blp:92
+msgid ""
+"Produces a JSON file with your subscriptions which can be imported into "
+"NewPipe"
+msgstr ""
+
+#: data/resources/ui/filter_dialog.blp:5 data/resources/ui/filter_dialog.blp:8
+msgid "Manage Filters"
+msgstr "除外条件の管理"
+
+#: data/resources/ui/filter_dialog.blp:19
+msgid "Use Filters"
+msgstr "絞り込み機能を使用"
+
+#: data/resources/ui/filter_dialog.blp:20
+msgid "Hide videos from the feed"
+msgstr "新着動画から動画を非表示"
+
+#: data/resources/ui/filter_dialog.blp:26
+msgid "General Filters"
+msgstr "除外設定一般"
+
+#: data/resources/ui/filter_dialog.blp:30
+msgid "Hide Watched Videos"
+msgstr "視聴済みの動画を非表示"
+
+#: data/resources/ui/filter_dialog.blp:31
+msgid "Hide videos you have already watched from the feed"
+msgstr "新着動画から、視聴済みの動画を非表示"
+
+#: data/resources/ui/filter_dialog.blp:35
+msgid "Hide Short Videos"
+msgstr "ショート動画を非表示"
+
+#: data/resources/ui/filter_dialog.blp:36
+msgid "Hide videos shorter than one minute from the feed"
+msgstr "新着動画から、1分以下の動画を非表示"
+
+#: data/resources/ui/filter_dialog.blp:40
+msgid "Hide Payed Videos"
+msgstr "再生済みの動画を非表示"
+
+#: data/resources/ui/filter_dialog.blp:41
+msgid "Hide videos that require a payment from the feed"
+msgstr "新着動画から、支払いが必要な動画を非表示"
+
+#: data/resources/ui/filter_dialog.blp:45
+msgid "Hide Videos from Today"
+msgstr "今日の動画を非表示"
+
+#: data/resources/ui/filter_dialog.blp:46
+msgid "Hide videos that came out today from the feed"
+msgstr "新着動画から、今日公開された動画を非表示"
+
+#: data/resources/ui/filter_dialog.blp:52
+#: data/resources/ui/filter_dialog.blp:57
+msgid "Custom Filters"
+msgstr "除外条件の指定"
+
+#: data/resources/ui/filter_dialog.blp:59
+msgid ""
+"Hide a channel's videos whose titles contain a certain word or phrase\n"
+"\n"
+"You can create custom filters either here or prepopulate the information "
+"from a video's context menu"
+msgstr ""
+"チャンネルの動画で、題名に指定の言葉を含むものを非表示にします\n"
+"\n"
+"独自の検索除外は、ここか動画のコンテキストメニューから情報を入力して作成しま"
+"す"
+
+#: data/resources/ui/filter_dialog.blp:71
+#: data/resources/ui/filter_similar_dialog.blp:5
+#: data/resources/ui/filter_similar_dialog.blp:28
+msgid "Add Filter"
+msgstr "除外条件を追加"
+
+#: data/resources/ui/filter_similar_dialog.blp:7
+msgid ""
+"Hide videos from the feed if they contain a specific phrase in their titles "
+"and were uploaded by a specific channel"
+msgstr ""
+"題名に指定した言葉を含む、指定したチャンネル名からアップロードされた動画を除"
+"外"
+
+#: data/resources/ui/filter_similar_dialog.blp:17
+msgid "Phrase to Filter"
+msgstr "除外したい言葉"
+
+#: data/resources/ui/filter_similar_dialog.blp:21
+msgid "Channel"
+msgstr "チャンネル"
+
+#: data/resources/ui/filter_similar_dialog.blp:29
+#: src/gui/preferences_dialog.rs:545
+msgid "Cancel"
+msgstr "キャンセル"
+
+#: data/resources/ui/import_dialog.blp:62
+#, fuzzy
+#| msgid ""
+#| "Import data from a previous Pipeline data export. <b>This will overwrite "
+#| "all data Pipeline currently stores.</b> A restart after importing the "
+#| "data is recommended."
+msgid ""
+"Importing data from a previous Pipeline export will overwrite all current "
+"data. Restarting is recommended after importing"
+msgstr ""
+"以前にエクスポートしたPipelineデータをインポートします。<b>これにより、"
+"Pipelineが現在保存しているすべてのデータは上書きされます。</b> インポート後、"
+"再起動してください。"
+
+#: data/resources/ui/import_dialog.blp:78
+#, fuzzy
+#| msgid ""
+#| "To import subscriptions from YouTube, you need to export your "
+#| "subscriptions as a CSV from <a href=\"https://takeout.google.com/settings/"
+#| "takeout/downloads\">Google Takeout</a>. Afterwards, select the downloaded "
+#| "file to import it into Pipeline."
+msgid ""
+"To import subscriptions from YouTube, you need to export your subscriptions "
+"as a CSV from <a href=\"https://takeout.google.com/settings/takeout/"
+"downloads\">Google Takeout</a>. Afterwards, select the downloaded file to "
+"import it into Pipeline"
+msgstr ""
+"YouTubeから登録チャンネルをインポートするには、<a href=\"https://"
+"takeout.google.com/settings/takeout/downloads\">Google Takeout</a>から登録"
+"チャンネルをCSVとしてエクスポートしてください。ダウンロードしたファイルを選択"
+"しPipelineにインポートします。"
+
+#: data/resources/ui/import_dialog.blp:95
+#, fuzzy
+#| msgid ""
+#| "To import subscriptions from NewPipe, you need to export your "
+#| "subscriptions to a JSON file. Afterwards, select the downloaded file to "
+#| "import it into Pipeline."
+msgid ""
+"To import subscriptions from NewPipe, you need to export your subscriptions "
+"to a JSON file. Afterwards, select the downloaded file to import it into "
+"Pipeline"
+msgstr ""
+"NewPipeから登録チャンネルをインポートするには、登録チャンネルをJSONファイルに"
+"エクスポートしてください。ダウンロードしたファイルを選択しPipelineにインポー"
+"トします。"
+
+#: data/resources/ui/import_dialog.blp:111
+#, fuzzy
+#| msgid ""
+#| "To import subscriptions from NewPipe, you need to export your "
+#| "subscriptions to a JSON file. Afterwards, select the downloaded file to "
+#| "import it into Pipeline."
+msgid ""
+"To import subscriptions from Invidious, you need to export your "
+"subscriptions to a JSON file. Afterwards, select the downloaded file to "
+"import it into Pipeline"
+msgstr ""
+"NewPipeから登録チャンネルをインポートするには、登録チャンネルをJSONファイルに"
+"エクスポートしてください。ダウンロードしたファイルを選択しPipelineにインポー"
+"トします。"
+
+#: data/resources/ui/preferences_dialog.blp:6
+#: data/resources/ui/preferences_dialog.blp:10
+#: data/resources/ui/shortcuts.blp:6
+msgid "General"
+msgstr "一般"
+
+#: data/resources/ui/preferences_dialog.blp:13
+msgid "Reload on Startup"
+msgstr "起動時に再読込"
+
+#: data/resources/ui/preferences_dialog.blp:17
+msgid "Keep Watch History"
+msgstr "視聴履歴を保存"
+
+#: data/resources/ui/preferences_dialog.blp:32
+#, fuzzy
+#| msgid "External Video Downloader"
+msgid "Video Downloads"
+msgstr "外部の動画ダウンローダー"
+
+#: data/resources/ui/preferences_dialog.blp:40
+msgid "Custom Download Format"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:46
+msgid "Custom yt-dlp Arguments"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:53
+msgid "External Programs"
+msgstr "外部のプログラム"
+
+#: data/resources/ui/preferences_dialog.blp:56
+msgid "Play with External Player by Default"
+msgstr "標準的に外部プレイヤーで再生"
+
+#: data/resources/ui/preferences_dialog.blp:60
+msgid "External Video Player"
+msgstr "外部の動画プレイヤー"
+
+#: data/resources/ui/preferences_dialog.blp:68
+msgid "YouTube Preferences"
+msgstr "YouTube の設定"
+
+#: data/resources/ui/preferences_dialog.blp:78
+#, fuzzy
+msgid "Enable YouTube"
+msgstr "YouTubeを使用"
+
+#: data/resources/ui/preferences_dialog.blp:79
+#, fuzzy
+msgid "Allow Pipeline to fetch YouTube videos"
+msgstr "PipelineでYouTubeから動画を取得"
+
+#: data/resources/ui/preferences_dialog.blp:94
+#, fuzzy
+#| msgid "Import from YouTube"
+msgid "Prefer Fetching Information Directly from YouTube"
+msgstr "YouTubeからインポート"
+
+#: data/resources/ui/preferences_dialog.blp:95
+msgid "On errors, try to fetch information using Piped. Recommended."
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:103
+msgid "Prefer Fetching Information Using Piped"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:104
+#, fuzzy
+#| msgid "Import from YouTube"
+msgid "On errors, try to fetch information from YouTube"
+msgstr "YouTubeからインポート"
+
+#: data/resources/ui/preferences_dialog.blp:112
+#, fuzzy
+#| msgid "Import from YouTube"
+msgid "Always Fetch Information Directly from YouTube"
+msgstr "YouTubeからインポート"
+
+#: data/resources/ui/preferences_dialog.blp:120
+msgid "Always Fetch Information Using Piped"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:136
+msgid "YouTube Cookies File"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:137
+msgid "No cookies file used"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:142
+msgid "Choose a cookies file"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:148
+#, fuzzy
+#| msgid "Remove Filter"
+msgid "Remove cookies file"
+msgstr "除外条件を削除"
+
+#: data/resources/ui/preferences_dialog.blp:153
+msgid "Extractor Arguments for yt-dlp"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:166
+#, fuzzy
+msgid ""
+"Specify the list of instances to use. Pipeline can maintain this list "
+"automatically, which will refresh it on every startup. You can freely modify "
+"this list if you have your own Piped instances you want to use. The requests "
+"will be balanced across all listed instances. For a complete list of public "
+"APIs, see the <a href=\"https://github.com/TeamPiped/documentation/blob/main/"
+"content/docs/public-instances/index.md\">Instances page</a>."
+msgstr ""
+"Pipeline が YouTube の動画を取得するのに使う Piped インスタンスです。Pipeline"
+"はこの一覧を自動管理でき、起動時に更新されます。使いたいPipedインスタンスがあ"
+"れば、自由に変更できます。リクエストは一覧の全インスタンスでバランスよく配置"
+"されます（仮訳: バランスの意味が不明）。公開APIの完全な一覧は、<a "
+"href=\"https://github.com/TeamPiped/documentation/blob/main/content/docs/"
+"public-instances/index.md\">インスタンスのページ</a>をご覧ください。"
+
+#: data/resources/ui/preferences_dialog.blp:186
+msgid "Peertube Preferences"
+msgstr "PeerTube の設定"
+
+#: data/resources/ui/preferences_dialog.blp:190
+#, fuzzy
+msgid "Enable Peertube"
+msgstr "PeerTubeを使用"
+
+#: data/resources/ui/preferences_dialog.blp:191
+#, fuzzy
+msgid "Allow Pipeline to fetch Peertube videos"
+msgstr "PipelineでPeerTubeから動画を取得"
+
+#: data/resources/ui/preferences_dialog.blp:195
+msgid "Search Instance"
+msgstr "インスタンスを検索"
+
+#. Translators: Preferences section containing some fun features of the application, like showing a random splash text or seasonal styling.
+#: data/resources/ui/preferences_dialog.blp:206
+msgid "Fun"
+msgstr ""
+
+#. Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+#: data/resources/ui/preferences_dialog.blp:210
+msgid "Show Splash Text"
+msgstr "ヒントを表示"
+
+#. Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+#: data/resources/ui/preferences_dialog.blp:212
+msgid "A random splash text is shown when reloading the feed."
+msgstr "動画一覧の再読み込み時に、ヒントがランダムに表示されます。"
+
+#: data/resources/ui/preferences_dialog.blp:216
+msgid "Seasonal Styling"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:217
+msgid ""
+"The progress bar will be styled based on annual celebrations, for example "
+"pride month."
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:222
+msgid "Performance"
+msgstr "動作性能"
+
+#: data/resources/ui/preferences_dialog.blp:224
+msgid ""
+"If Pipeline performs badly on your device, you may want to change some of "
+"those settings. In general, keeping the default settings is recommended. For "
+"older devices which do not support GLES 3.0 like the PinePhone, you may want "
+"to switch to software rendering. Changing these settings require a restart "
+"of Pipeline."
+msgstr ""
+"この端末でのPipelineの動作がスムーズでないなら、設定の一部を変更してくださ"
+"い。一般的には、標準設定を推奨します。GLES 3.0に未対応の古い端末（例 "
+"PinePhone）では、ソフトウェアでの描画に切り替えてみてください。これらの設定を"
+"変更には、Pipelineの再起動が必要です。"
+
+#: data/resources/ui/preferences_dialog.blp:228
+msgid "Software Rendering"
+msgstr "ソフトウェアによる描画"
+
+#: data/resources/ui/preferences_dialog.blp:229
+msgid "Using the Cairo renderer"
+msgstr "Cairo 描画機能を使用"
+
+#: data/resources/ui/privacy_notice.blp:30
+msgid "Dismiss"
+msgstr ""
+
+#: data/resources/ui/privacy_notice.blp:47
+msgid ""
+"Pipeline connects directly to YouTube and PeerTube for getting data and when "
+"playing videos. Pipeline can be configured to use Piped for retrieving "
+"Youtube data, but videos are still played over YouTube"
+msgstr ""
+
+#: data/resources/ui/shortcuts.blp:10
+msgid "Go Back"
+msgstr "戻る"
+
+#: data/resources/ui/shortcuts.blp:15
+msgid "Quit"
+msgstr "終了"
+
+#: data/resources/ui/shortcuts.blp:20
+msgid "Show Shortcuts"
+msgstr "ショートカットを表示"
+
+#: data/resources/ui/shortcuts.blp:25
+msgid "Show Preferences"
+msgstr "設定を表示"
+
+#: data/resources/ui/shortcuts.blp:30
+msgid "Open Menu"
+msgstr "メニューを開く"
+
+#: data/resources/ui/shortcuts.blp:35
+#, fuzzy
+#| msgid "Hide Sidebar"
+msgid "Toggle Sidebar"
+msgstr "サイドバーを非表示"
+
+#: data/resources/ui/shortcuts.blp:40
+msgid "Pages"
+msgstr "ページ"
+
+#: data/resources/ui/shortcuts.blp:44
+msgid "Switch to Feed Page"
+msgstr "新着ページに切替"
+
+#: data/resources/ui/shortcuts.blp:49 data/resources/ui/window.blp:259
+#: data/resources/ui/window.blp:314
+msgid "Search"
+msgstr "検索"
+
+#: data/resources/ui/shortcuts.blp:54
+msgid "Switch to Watch-Later Page"
+msgstr "後で見るページに切替"
+
+#: data/resources/ui/shortcuts.blp:59
+msgid "Switch to Subscriptions Page"
+msgstr "登録チャンネルのページに切替"
+
+#: data/resources/ui/shortcuts.blp:64
+msgid "Playback"
+msgstr "再生"
+
+#: data/resources/ui/shortcuts.blp:68
+msgid "Play or Pause the Video"
+msgstr "動画を再生・停止"
+
+#: data/resources/ui/shortcuts.blp:69
+msgid "Only when the video page is in focus"
+msgstr "映像ページに焦点時にがある時のみ"
+
+#: data/resources/ui/shortcuts.blp:74
+msgid "Increase Speed"
+msgstr "速度を上昇"
+
+#: data/resources/ui/shortcuts.blp:79
+msgid "Decrease Speed"
+msgstr "速度を低下"
+
+#: data/resources/ui/shortcuts.blp:84
+msgid "Increase Volume"
+msgstr "音量を上げる"
+
+#: data/resources/ui/shortcuts.blp:89
+msgid "Decrease Volume"
+msgstr "音量を下げる"
+
+#: data/resources/ui/shortcuts.blp:94
+msgid "Seek Backward"
+msgstr "後ろへシーク"
+
+#: data/resources/ui/shortcuts.blp:95
+msgid "Or double tap (left side)"
+msgstr "またはダブルタップ (左側)"
+
+#: data/resources/ui/shortcuts.blp:100
+msgid "Seek Forward"
+msgstr "前へシーク"
+
+#: data/resources/ui/shortcuts.blp:101
+msgid "Or double tap (right side)"
+msgstr "またはダブルタップ (右側)"
+
+#: data/resources/ui/shortcuts.blp:106
+msgid "Seek to Percentage"
+msgstr "比率へシーク"
+
+#: data/resources/ui/shortcuts.blp:111
+msgid "Toggle Mute"
+msgstr "ミュートの切替"
+
+#: data/resources/ui/shortcuts.blp:116
+msgid "Toggle Fullscreen"
+msgstr "全画面を切替"
+
+#: data/resources/ui/shortcuts.blp:121
+msgid "Application"
+msgstr "アプリ"
+
+#: data/resources/ui/shortcuts.blp:125
+msgid "Bookmark Video or Subscribe to Channel"
+msgstr "動画をブックマーク・チャンネル登録"
+
+#: data/resources/ui/shortcuts.blp:130
+msgid "Reload Video Feed or Channel Page"
+msgstr "動画新着やチャンネルページを再読込"
+
+#: data/resources/ui/subscription_item.blp:82
+#: data/resources/ui/subscription_item.blp:94 src/gui/channel_item.rs:127
+#: src/gui/channel_page.rs:194
+msgid "Unsubscribe"
+msgstr "解除"
+
+#: data/resources/ui/video_item.blp:143
+#, fuzzy
+#| msgid "Video is Buffering"
+msgid "Video is downloading"
+msgstr "動画をバッファ中"
+
+#: data/resources/ui/video_item.blp:202
+msgid "More Actions"
+msgstr "ほかの操作"
+
+#: data/resources/ui/video_page.blp:183
+msgid "Video is Playing Externally"
+msgstr "動画は外部で再生中"
+
+#: data/resources/ui/video_page.blp:328 src/gui/video_item.rs:288
+#: src/gui/video_item.rs:329
+msgid "Download"
+msgstr "ダウンロード"
+
+#: data/resources/ui/video_page.blp:362 src/gui/video_item.rs:283
+#: src/gui/video_item.rs:324
+msgid "Remove Local Copy"
+msgstr ""
+
+#: data/resources/ui/video_page.blp:383
+msgid "Copy Video Link"
+msgstr "動画のリンクをコピー"
+
+#: data/resources/ui/window.blp:152
+msgid "Filters"
+msgstr "除外"
+
+#: data/resources/ui/window.blp:168
+msgid "Feed"
+msgstr "新着"
+
+#: data/resources/ui/window.blp:201 data/resources/ui/window.blp:423
+msgid "No Subscriptions Yet"
+msgstr "まだ登録チャンネルなし"
+
+#: data/resources/ui/window.blp:202 data/resources/ui/window.blp:424
+#, fuzzy
+msgid "Subscribe to channels or import your subscriptions"
+msgstr "最初にチャンネル登録しよう"
+
+#: data/resources/ui/window.blp:211 data/resources/ui/window.blp:433
+msgid "Import Subscriptions"
+msgstr "登録チャンネルをインポート"
+
+#: data/resources/ui/window.blp:249 data/resources/ui/window.blp:342
+#: data/resources/ui/window.blp:369
+msgid "No Videos"
+msgstr "新着動画なし"
+
+#: data/resources/ui/window.blp:250
+msgid "Try Reloading"
+msgstr "再読み込みもお試しください"
+
+#: data/resources/ui/window.blp:273
+msgid "Explore videos and creators"
+msgstr "動画と作成者を探索"
+
+#: data/resources/ui/window.blp:300
+msgid "Searching"
+msgstr "検索中"
+
+#: data/resources/ui/window.blp:322 src/gui/video_item.rs:259
+msgid "Watch Later"
+msgstr "後で見る"
+
+#: data/resources/ui/window.blp:343
+msgid "Add videos to your watch later list to display them here"
+msgstr "ここに表示するには、動画を後で見るに追加します"
+
+#: data/resources/ui/window.blp:351
+#, fuzzy
+#| msgid "Download"
+msgid "Downloads"
+msgstr "ダウンロード"
+
+#: data/resources/ui/window.blp:370
+#, fuzzy
+#| msgid "Add videos to your watch later list to display them here"
+msgid "Download videos to display them here"
+msgstr "ここに表示するには、動画を後で見るに追加します"
+
+#: data/resources/ui/window.blp:378
+msgid "History"
+msgstr ""
+
+#: data/resources/ui/window.blp:399 data/resources/ui/window.blp:407
+msgid "No History"
+msgstr ""
+
+#: data/resources/ui/window.blp:400
+msgid "Watched videos will be displayed here"
+msgstr ""
+
+#: data/resources/ui/window.blp:408
+#, fuzzy
+#| msgid "Please check your player in the preferences."
+msgid "You turned off your watch history in the preferences"
+msgstr "設定でプレイヤーを確認してください。"
+
+#: data/resources/ui/window.blp:416
+msgid "Subscriptions"
+msgstr "登録チャンネル"
+
+#. I don't think this will ever be shown.
+#: data/resources/ui/window.blp:454
+msgid "Sidebar"
+msgstr "サイドバー"
+
+#: data/resources/ui/window.blp:463
+msgid "Hide Sidebar"
+msgstr "サイドバーを非表示"
+
+#: data/resources/ui/window.blp:496
+msgid "Show"
+msgstr "表示"
+
+#: src/backend/channel.rs:87
+msgid "Unknown Channel"
+msgstr "不明のチャンネル"
+
+#: src/backend/search_stream.rs:100
+msgid "Error searching one platform"
+msgstr "プラットフォームの検索エラー"
+
+#: src/backend/video_fetcher_stream.rs:150
+msgid "Error loading one channel"
+msgid_plural "Error loading {} channels"
+msgstr[0] "{} 個の登録チャンネルで読み込みエラー"
+
+#: src/gui/bottom_bar.rs:94
+msgid "Pause Video"
+msgstr "動画を停止"
+
+#: src/gui/bottom_bar.rs:95
+msgid "Resume Video"
+msgstr "動画を再開"
+
+#: src/gui/bottom_bar.rs:96
+msgid "Video is Buffering"
+msgstr "動画をバッファ中"
+
+#. Should never happen
+#: src/gui/bottom_bar.rs:98 src/gui/bottom_bar.rs:99
+msgid "Video is Stopped"
+msgstr "動画を停止しました"
+
+#: src/gui/bottom_bar.rs:114
+msgid "Expand Video \"{title}\""
+msgstr "動画を展開 {title}"
+
+#: src/gui/channel_item.rs:132 src/gui/channel_page.rs:197
+msgid "Subscribe"
+msgstr "チャンネル登録"
+
+#: src/gui/channel_page.rs:45
+msgid "Failed to load channel data"
+msgstr "チャンネル情報の読み込みに失敗"
+
+#: src/gui/export_dialog.rs:61
+msgid "Export Pipeline"
+msgstr "Pipeline をエクスポート"
+
+#: src/gui/export_dialog.rs:76
+msgid "Error exporting pipeline subscriptions"
+msgstr "Pipelineの登録チャンネルのインポートに失敗"
+
+#: src/gui/export_dialog.rs:81
+msgid "Successfully exported data"
+msgstr "データのエクスポートに成功"
+
+#: src/gui/export_dialog.rs:101
+msgid "Export YouTube Subscriptions"
+msgstr "YouTube の登録チャンネルをエクスポート"
+
+#: src/gui/export_dialog.rs:116
+msgid "Error exporting YouTube subscriptions"
+msgstr "YouTubeの登録チャンネルのエクスポートに失敗"
+
+#: src/gui/export_dialog.rs:121 src/gui/export_dialog.rs:162
+msgid "Successfully exported subscriptions"
+msgstr "登録チャンネルをエクスポートしました"
+
+#: src/gui/export_dialog.rs:142
+msgid "Export NewPipe Subscriptions"
+msgstr "NewPipe の登録チャンネルをエクスポート"
+
+#: src/gui/export_dialog.rs:157
+msgid "Error exporting NewPipe subscriptions"
+msgstr "NewPipe の登録チャンネルのエクスポートに失敗"
+
+#: src/gui/filter_dialog.rs:89
+msgid ""
+"This filter is disabled due to your preference to not save your watch "
+"history. Enable the preference to allow for enabling this filter."
+msgstr ""
+"視聴履歴を保存しない設定のため、この検索除外は無効になっています。有効にする"
+"には、設定からこの検索除外を有効にしてください。"
+
+#: src/gui/filter_dialog.rs:154 src/gui/filter_similar_dialog.rs:34
+msgid "Edit Filter"
+msgstr "除外条件を編集"
+
+#: src/gui/filter_dialog.rs:181
+msgid "Remove Filter"
+msgstr "除外条件を削除"
+
+#: src/gui/filter_similar_dialog.rs:35
+msgid "Save Filter"
+msgstr "除外条件を保存"
+
+#: src/gui/import_dialog.rs:70
+msgid "Import Pipeline Data"
+msgstr "Pipeline のデータをインポート"
+
+#: src/gui/import_dialog.rs:84
+msgid "Error importing Pipeline Data"
+msgstr "Pipeline のデータのインポートに失敗"
+
+#: src/gui/import_dialog.rs:89
+msgid ""
+"Successfully imported data. A restart of the application is recommended."
+msgstr "データをインポートしました。アプリを再起動してください。"
+
+#: src/gui/import_dialog.rs:109
+msgid "Import YouTube Subscriptions"
+msgstr "YouTube の登録チャンネルをインポート"
+
+#: src/gui/import_dialog.rs:123
+msgid "Error importing YouTube subscriptions"
+msgstr "YouTubeの登録チャンネルのインポートに失敗"
+
+#: src/gui/import_dialog.rs:128 src/gui/import_dialog.rs:166
+#: src/gui/import_dialog.rs:204
+msgid "Successfully imported subscriptions"
+msgstr "登録チャンネルをインポートしました"
+
+#: src/gui/import_dialog.rs:147
+msgid "Import NewPipe Subscriptions"
+msgstr "NewPipe の登録チャンネルをインポート"
+
+#: src/gui/import_dialog.rs:161
+msgid "Error importing NewPipe subscriptions"
+msgstr "NewPipe の登録チャンネルのインポートに失敗"
+
+#: src/gui/import_dialog.rs:185
+#, fuzzy
+#| msgid "Import Subscriptions"
+msgid "Import Invidious Subscriptions"
+msgstr "登録チャンネルをインポート"
+
+#: src/gui/import_dialog.rs:199
+#, fuzzy
+#| msgid "Error importing YouTube subscriptions"
+msgid "Error importing Invidious subscriptions"
+msgstr "YouTubeの登録チャンネルのインポートに失敗"
+
+#. Translators: For selecting the best video format when downloading.
+#: src/gui/preferences_dialog.rs:31
+msgid "Best"
+msgstr ""
+
+#. Translators: For selecting a custom video format when downloading.
+#: src/gui/preferences_dialog.rs:33
+#, fuzzy
+#| msgid "Custom Filters"
+msgid "Custom"
+msgstr "除外条件の指定"
+
+#: src/gui/preferences_dialog.rs:463
+#, fuzzy
+msgid "Automatically Manage Piped Instances"
+msgstr "Pipedのインスタンスを自動管理。"
+
+#: src/gui/preferences_dialog.rs:464
+msgid "Recommended"
+msgstr ""
+
+#: src/gui/preferences_dialog.rs:485
+msgid "New Piped API"
+msgstr "新しい Piped の API"
+
+#: src/gui/preferences_dialog.rs:535
+msgid ""
+"If watching too many YouTube videos, YouTube can require confirmation that "
+"you are a real person. This is done by logging into your account using "
+"cookies stored in your browser. Refer to the <a href=\"https://github.com/yt-"
+"dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp\">yt-dlp documentation</"
+"a> on how to obtain such a file. Note that this associates the videos you "
+"watch with your account. Furthermore, this may get your account deactivated "
+"due to not using offical YouTube applications. The developers of Pipeline "
+"are not responsible for your account being deactivated."
+msgstr ""
+
+#: src/gui/preferences_dialog.rs:541
+msgid "Accept the Risk and Continue"
+msgstr ""
+
+#: src/gui/preferences_dialog.rs:562
+#, fuzzy
+#| msgid "Save Filter"
+msgid "Select File"
+msgstr "除外条件を保存"
+
+#: src/gui/preferences_dialog.rs:563
+msgid "Select Cookies File"
+msgstr ""
+
+#: src/gui/preferences_dialog.rs:812
+msgid ""
+"To use external players with Pipeline, you will need to grant Pipeline "
+"additional permissions. See <a href=\"https://gitlab.com/schmiddi-on-mobile/"
+"pipeline/-/wikis/External-Player-for-Flatpak\">this page</a> for details."
+msgstr ""
+
+#: src/gui/utility.rs:62
+msgid "One Subscriber"
+msgid_plural "{} Subscribers"
+msgstr[0] "{} 人の登録者"
+
+#: src/gui/utility.rs:68
+msgid "No Subscribers"
+msgstr "登録者なし"
+
+#: src/gui/utility.rs:84
+msgid "Remove video from Watch Later"
+msgstr "後で見るから動画を削除"
+
+#: src/gui/utility.rs:86
+msgid "Add video to Watch Later"
+msgstr "後で見るに動画を追加"
+
+#. Note to translators: Format numbers compactly. For numbers at least one billion.
+#: src/gui/utility.rs:102
+msgctxt "number-formatting"
+msgid "{}B"
+msgstr "{}B"
+
+#. Note to translators: Format numbers compactly. For numbers at least one million.
+#: src/gui/utility.rs:106
+msgctxt "number-formatting"
+msgid "{}M"
+msgstr "{}M"
+
+#. Note to translators: Format numbers compactly. For numbers at least one thousand.
+#: src/gui/utility.rs:110
+msgctxt "number-formatting"
+msgid "{}K"
+msgstr "{}K"
+
+#: src/gui/utility.rs:128
+msgid "{title} uploaded by {channel} on {date}"
+msgstr "{title} /作成者: {channel} /投稿日: {date}"
+
+#. Translators: For accessibility about a channel, e.g. "Channel Name with 100 subscribers".
+#: src/gui/utility.rs:136
+msgid "{name} with {subscribers} subscribers"
+msgstr "{name}・{subscribers} 人の登録者"
+
+#. Translators: formatting of time of day in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+#: src/gui/utility.rs:158
+msgid "%H:%M"
+msgstr "%H:%M"
+
+#: src/gui/utility.rs:160
+msgid "Tomorrow"
+msgstr "明日"
+
+#: src/gui/utility.rs:162
+msgid "Yesterday"
+msgstr "昨日"
+
+#. Translators: formatting of dates without year in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+#: src/gui/utility.rs:165
+msgid "%a, %d. %B"
+msgstr "%m-%d %a"
+
+#. Translators: formatting of dates with year in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+#: src/gui/utility.rs:168
+msgid "%Y-%m-%d"
+msgstr "%Y-%m-%d"
+
+#. Translators: Formatting for percentage labels (e.g. "50%").
+#: src/gui/utility.rs:219
+#, fuzzy
+#| msgctxt "number-formatting"
+#| msgid "{}B"
+msgid "{}%"
+msgstr "{}B"
+
+#: src/gui/video_item.rs:254
+msgid "Remove from Watch Later"
+msgstr "後で見るから削除"
+
+#: src/gui/video_item.rs:266 src/gui/video_item.rs:307
+msgid "Play with Internal Player"
+msgstr "内蔵プレイヤーで再生"
+
+#: src/gui/video_item.rs:271 src/gui/video_item.rs:312
+msgid "Play with External Player"
+msgstr "外部プレイヤーで再生"
+
+#: src/gui/video_item.rs:277 src/gui/video_item.rs:318
+msgid "Copy Video URL"
+msgstr "動画のURLをコピー"
+
+#: src/gui/video_item.rs:295 src/gui/video_item.rs:336
+msgid "Filter out Similar Videos"
+msgstr "類似の動画を非表示"
+
+#: src/gui/video_page.rs:111
+#, fuzzy
+#| msgid "Please check your player in the preferences."
+msgid "Configure your external player in the preferences first"
+msgstr "設定でプレイヤーを確認してください。"
+
+#: src/gui/video_page.rs:137
+msgid "Failed to spawn video player"
+msgstr "動画プレイヤーの起動に失敗"
+
+#: src/gui/video_page.rs:190 src/gui/window.rs:918
+msgid "Downloaded video not available locally anymore"
+msgstr ""
+
+#: src/gui/video_page.rs:347
+msgid "Failed to populate video information"
+msgstr "動画情報の投入に失敗"
+
+#: src/gui/video_page.rs:361
+msgid "Failed to fetch channel information"
+msgstr "チャンネル情報の取得に失敗"
+
+#: src/gui/video_page.rs:402
+msgid "Uploaded {}"
+msgstr "公開日 {}"
+
+#: src/gui/video_page.rs:469 src/gui/video_page.rs:482
+#: src/gui/video_page.rs:506 src/gui/video_page.rs:511
+msgid "10 Seconds"
+msgstr "10秒"
+
+#: src/gui/window.rs:174
+msgid "One Error"
+msgid_plural "{} Errors"
+msgstr[0] "{} 個のエラー"
+
+#: src/gui/window.rs:389
+#, fuzzy
+#| msgid "Hide Sidebar"
+msgid "Unpin Sidebar"
+msgstr "サイドバーを非表示"
+
+#: src/gui/window.rs:391
+#, fuzzy
+#| msgid "Hide Sidebar"
+msgid "Pin Sidebar"
+msgstr "サイドバーを非表示"
+
+#: src/gui/window.rs:495
+msgid "Switched to video page {}"
+msgstr "動画ページに切替 {}"
+
+#: src/gui/window.rs:626
+msgid "Switched to channel page {}"
+msgstr "チャンネルのページに切替 {}"
+
+#: src/gui/window.rs:735
+msgid "Unsubscribed from {channel}"
+msgstr "登録解除 {channel}"
+
+#: src/gui/window.rs:740
+msgid "Undo"
+msgstr "元に戻す"
+
+#: src/gui/window.rs:835 src/gui/window.rs:875
+msgid "Switched to page {}"
+msgstr "ページに切替 {}"
+
+#: src/gui/window.rs:887
+msgid "Copied URL"
+msgstr "URLをコピーしました"
+
+#: src/gui/window.rs:905
+#, fuzzy
+#| msgid "Failed to spawn video downloader"
+msgid "Failed to remove downloaded file"
+msgstr "ダウンローダーの起動に失敗"
+
+#: src/gui/window.rs:910
+msgid "Removed downloaded copy of the video"
+msgstr ""
+
+#: src/gui/window.rs:947
+msgid "Started Download"
+msgstr "ダウンロードを開始しました"
+
+#: src/gui/window.rs:956
+msgid "Error creating the directory where the video will be downloaded"
+msgstr ""
+
+#: src/gui/window.rs:997 src/gui/window.rs:1022
+#, fuzzy
+#| msgid "Error loading one channel"
+#| msgid_plural "Error loading {} channels"
+msgid "Error downloading a video"
+msgstr "{} 個の登録チャンネルで読み込みエラー"
+
+#: src/gui/window.rs:1016
+msgid "Finished Download"
+msgstr "ダウンロード完了"
+
+#. translators: One per line: How you want to be credited as a translator, e.g. by the name you use, and optionally an email address ("Edgar Allan Poe <edgar@poe.com>")
+#: src/gui/window.rs:1276
+msgid "translator-credits"
+msgstr "Niek Nooijens, maboroshin, gnuey56"
+
+#: src/gui/window.rs:1467
+msgid "Failed to set up application"
+msgstr "アプリのセットアップに失敗"
+
+#: src/gui/window.rs:1492
+#, fuzzy
+msgid "More Information"
+msgstr "動画の情報"
+
+#: src/splashes.rs:11
+msgctxt "Displayed as a splash text"
+msgid "Pipeline was once called Tubefeeder."
+msgstr "Pipelineの前の名前はTubefeederでした。"
+
+#: src/splashes.rs:17
+msgctxt "Displayed as a splash text"
+msgid ""
+"Pipeline was built for mobile linux devices like the PinePhone. That it "
+"works on desktops is just a happy side effect."
+msgstr ""
+"PipelineはPinePhoneのようなモバイルLinux端末用に作られた。デスクトップで動く"
+"のは嬉しい副作用です。"
+
+#: src/splashes.rs:23
+msgctxt "Displayed as a splash text"
+msgid "The first commit of Pipeline was {} days ago."
+msgstr "Pipelineの最初のコミットは{}日前でした。"
+
+#: src/splashes.rs:35
+msgctxt "Displayed as a splash text"
+msgid "You are running commit number {} of Pipeline."
+msgstr "Pipelineのコミット番号{}を実行中です。"
+
+#: src/splashes.rs:42
+msgctxt "Displayed as a splash text"
+msgid "You are running release number {} of Pipeline."
+msgstr "Pipelineのリリース番号{}を実行中です。"
+
+#: src/splashes.rs:49
+msgctxt "Displayed as a splash text"
+msgid "Pipeline is built from {} lines of Rust code."
+msgstr "Pipelineは{}行のRustコードから構築されてます。"
+
+#: src/splashes.rs:56
+msgctxt "Displayed as a splash text"
+msgid "Pipeline is built from {} lines of Blueprint UI markup."
+msgstr "Pipelineは {} 行のブループリント UI マークアップから構築されてます。"
+
+#: src/splashes.rs:64
+msgctxt "Displayed as a splash text"
+msgid "There are {} different splash texts which can be displayed here."
+msgstr "ここに表示されるヒントは{}種類です。"
+
+#. Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+#: src/splashes.rs:74
+msgctxt "Displayed as a splash text"
+msgid ""
+"In expectation, you will need to reload {} times to have seen all splash "
+"texts at least once."
+msgstr ""
+"すべてのヒントを最低でも一回は見るには、少なくとも{}回再読み込みしないといけ"
+"ない。"
+
+#: src/splashes.rs:80
+msgctxt "Displayed as a splash text"
+msgid ""
+"Pipeline is translated in {languages} different languages by {translators} "
+"translators"
+msgstr ""
+"Pipeline は {languages} の様々な言語に {translators} 人の翻訳者により翻訳され"
+"てる"
+
+#: src/splashes.rs:94
+msgctxt "Displayed as a splash text"
+msgid ""
+"You can help translate Pipeline using <a href=\"https://hosted.weblate.org/"
+"engage/schmiddi-on-mobile/\">Weblate</a>."
+msgstr ""
+"Pipeline の翻訳には <a href=\"https://hosted.weblate.org/engage/schmiddi-on-"
+"mobile/\">Weblate</a>を使ってるよ。"
+
+#: src/splashes.rs:100
+msgctxt "Displayed as a splash text"
+msgid ""
+"The source code of Pipeline is hosted on <a href=\"https://gitlab.com/"
+"schmiddi-on-mobile/pipeline\">GitLab</a>."
+msgstr ""
+"Pipeline のソースコードは、<a href=\"https://gitlab.com/schmiddi-on-mobile/"
+"pipeline\">GitLab</a>でホストされてるよ。"
+
+#: src/splashes.rs:106
+#, c-format
+msgctxt "Displayed as a splash text"
+msgid ""
+"We have a <a href=\"https://matrix.to/#/%23pipelineapp:matrix.org\">Matrix "
+"room</a> where you can come and talk with us."
+msgstr ""
+"Pipelineの<a href=\"https://matrix.to/#/%23pipelineapp:matrix.org\">Matrixの"
+"ルーム</a>でみんなとお話できます。"
+
+#: src/splashes.rs:112
+msgctxt "Displayed as a splash text"
+msgid ""
+"Pipeline has a <a href=\"https://mobile.schmidhuberj.de/pipeline\">website</"
+"a>."
+msgstr ""
+"Pipelineの<a href=\"https://mobile.schmidhuberj.de/pipeline\">サイト</a>があ"
+"るよ。"
+
+#: src/splashes.rs:118
+msgctxt "Displayed as a splash text"
+msgid ""
+"You can get Pipeline on <a href=\"https://flathub.org/apps/"
+"de.schmidhuberj.tubefeeder\">Flathub</a>."
+msgstr ""
+"<a href=\"https://flathub.org/apps/de.schmidhuberj.tubefeeder\">Flathub</a>か"
+"らPipelineを入手できるよ。"
+
+#: src/splashes.rs:124
+msgctxt "Displayed as a splash text"
+msgid ""
+"We use <a href=\"https://github.com/Rafostar/clapper\">Clapper</a> as the "
+"video player."
+msgstr ""
+"動画プレーヤーに<a href=\"https://github.com/Rafostar/clapper\">Clapper</a> "
+"を使ってます。"
+
+#: src/splashes.rs:130
+#, fuzzy
+msgctxt "Displayed as a splash text"
+msgid ""
+"We use <a href=\"https://codeberg.org/ThetaDev/rustypipe/\">rustypipe</a> "
+"and <a href=\"https://piped.video/\">Piped</a> to get data from YouTube."
+msgstr ""
+"YouTubeからのデータ取得に <a href=\"https://piped.video/\">Piped</a>を使って"
+"ます。"
+
+#: src/splashes.rs:136
+msgctxt "Displayed as a splash text"
+msgid ""
+"The creator of Pipeline has also built other applications, like <a "
+"href=\"https://flathub.org/apps/de.schmidhuberj.DieBahn\">Railway</a> and <a "
+"href=\"https://flathub.org/apps/de.schmidhuberj.Flare\">Flare</a>."
+msgstr ""
+"Pipelineの開発者は、<a href=\"https://flathub.org/apps/"
+"de.schmidhuberj.DieBahn\">Railway</a>や<a href=\"https://flathub.org/apps/"
+"de.schmidhuberj.Flare\">Flare</a>のような他のアプリも開発してる。"
+
+#: src/splashes.rs:142
+#, fuzzy
+msgctxt "Displayed as a splash text"
+msgid ""
+"When using Piped to fetch data, Pipeline will be able to fetch your "
+"subscriptions faster with more public Piped instances. So consider <a "
+"href=\"https://docs.piped.video/docs/self-hosting/\">hosting Piped</a> and "
+"making it available for everyone."
+msgstr ""
+"Piped の公開インスタンスが多いほど、Pipeline はより速くチャンネルから一覧を取"
+"得できます。そのため、<a href=\"https://docs.piped.video/docs/self-hosting/"
+"\">Pipedをホスティングし</a>、みんなが利用できるよう検討してください。"
+
+#: src/splashes.rs:148
+msgctxt "Displayed as a splash text"
+msgid ""
+"No animals were harmed while making this application. But two cats were "
+"petted."
+msgstr ""
+"アプリの開発中に苦痛を与えられた動物はいません。でも2匹の猫が可愛がられたよ。"
+
+#: src/splashes.rs:155
+msgctxt "Displayed as a splash text"
+msgid ""
+"Add videos to your watch-later list by bringing up their context menu, or "
+"directly when watching videos."
+msgstr ""
+"動画のコンテキストメニューを表示するか、動画を視聴中に直接、動画を「後で見"
+"る」リストに追加できます。"
+
+#: src/splashes.rs:161
+msgctxt "Displayed as a splash text"
+msgid ""
+"Seeing something you don't like? You can hide videos from your feed based on "
+"the title and uploader of the video."
+msgstr ""
+"お気に召さない動画があった？動画の題名やアップロード者を、動画一覧から非表示"
+"にできます。"
+
+#: src/splashes.rs:167
+#, fuzzy
+msgctxt "Displayed as a splash text"
+msgid ""
+"You can hide videos you already watched. Enable this by managing your "
+"filters."
+msgstr ""
+"視聴済みの動画を非表示にできます。メインメニューで絞込みを管理することで有効"
+"になります。"
+
+#: src/splashes.rs:173
+#, fuzzy
+msgctxt "Displayed as a splash text"
+msgid ""
+"You can quickly toggle on and off filters in the feed from the filter dialog."
+msgstr ""
+"メインメニューから、動画一覧の絞り込みのオンフを素早く切り替えできます。"
+
+#: src/splashes.rs:179
+msgctxt "Displayed as a splash text"
+msgid ""
+"Want to keep your subscriptions from YouTube or NewPipe? You can import "
+"those into Pipeline."
+msgstr ""
+"YouTubeやNewPipeの登録チャンネルを維持したいですか？Pipelineにインポートでき"
+"ます。"
+
+#: src/splashes.rs:185
+msgctxt "Displayed as a splash text"
+msgid ""
+"Want to bring your own video player instead of the one built-in? You can "
+"manage an external video player in the settings and tell Pipeline to use it "
+"by default."
+msgstr ""
+"内蔵の動画プレーヤーではなく、好きなプレーヤーを使いたいですか？外部のプレー"
+"ヤーをPipelineから使用する設定ができます。"
+
+#: src/splashes.rs:191
+msgctxt "Displayed as a splash text"
+msgid ""
+"You want to keep a video you watched? You can directly download it from the "
+"video page."
+msgstr "視聴した動画を保存したい？動画のページから直接ダウンロードできます。"
+
+#: src/splashes.rs:197
+msgctxt "Displayed as a splash text"
+msgid ""
+"Want to share a video? You can copy its URL to the clipboard directly from "
+"the video page."
+msgstr ""
+"動画を共有したい？動画のページから直接クリップボードにURLをコピーできます。"
+
+#: src/splashes.rs:203
+msgctxt "Displayed as a splash text"
+msgid ""
+"Are you hosting your own Piped instance? You can tell Pipeline to use it in "
+"the settings."
+msgstr ""
+"独自のPipedインスタンスをホストしていれば、Pipelineで使うように設定できます。"
+
+#: src/splashes.rs:210
+msgctxt "Displayed as a splash text"
+msgid ""
+"Not interested in those splash texts? You can disable them in the settings."
+msgstr "このヒントに興味がない？設定で無効にできます。"
+
+#: src/splashes.rs:216
+msgctxt "Displayed as a splash text"
+msgid ""
+"Don't like YouTube anymore? Pipeline also works with <a href=\"https://"
+"joinpeertube.org\">PeerTube</a>."
+msgstr ""
+"YouTubeはもうイヤだ？Pipelineは<a href=\"https://"
+"joinpeertube.org\">PeerTube</a>も探せるよ。"
+
+#: src/splashes.rs:222
+msgctxt "Displayed as a splash text"
+msgid ""
+"Searching for something? Pipeline can help you with that and search for "
+"channels and videos on YouTube and Peertube."
+msgstr ""
+"何か探してる？Pipelineで、YouTubeやPeertubeの動画やチャンネルを探せるよ。"
+
+#: src/splashes.rs:228
+msgctxt "Displayed as a splash text"
+msgid ""
+"Pipeline has four different ways to fetch videos from YouTube. Just to be "
+"sure you don't miss any of your precious cat videos."
+msgstr ""
+
+#: src/splashes.rs:243
+#, c-format
+msgctxt "Displayed as a splash text"
+msgid ""
+"Have ideas for further splash text? Tell us on <a href=\"https://matrix.to/#/"
+"%23pipelineapp:matrix.org\">Matrix</a>."
+msgstr ""
+"表示されるヒントのアイデアがありますか？<a href=\"https://matrix.to/#/"
+"%23pipelineapp:matrix.org\">Matrix</a>から教えてください。"
+
+#: src/splashes.rs:249
+msgctxt "Displayed as a splash text"
+msgid "Pretty sure {year} will be the year of the Linux desktop."
+msgstr "{year}年がLinuxデスクトップの年になるのは間違いない。"
+
+#. Translators: A reference to the "I use Arch btw" meme.
+#: src/splashes.rs:255
+msgctxt "Displayed as a splash text"
+msgid "I can be used on Arch btw."
+msgstr "ちなみにArchでも使えるよ。"
+
+#: src/splashes.rs:260
+msgctxt "Displayed as a splash text"
+msgid "Do you want to advertise here? You can't."
+msgstr ""
+
+#: src/splashes.rs:277
+msgctxt "Displayed as a splash text"
+msgid "🎉 Pipeline turned {} years old today. Happy Birthday! 🎉"
+msgstr ""
+
+#: src/splashes.rs:331
+msgctxt "Displayed as a splash text"
+msgid "Also try {}!"
+msgstr "{} もお試しください！"
+
+#~ msgid "Export to Pipeline"
+#~ msgstr "Pipeline にエクスポート"
+
+#~ msgid "Export to YouTube"
+#~ msgstr "YouTubeにエクスポート"
+
+#~ msgid ""
+#~ "This will produce a JSON file which you can import into NewPipe in the "
+#~ "subscriptions tab. This will only export your subscriptions."
+#~ msgstr ""
+#~ "NewPipeの登録チャンネルのタブへとインポートできるJSONファイルを生成しま"
+#~ "す。登録チャンネルのみをエクスポートします。"
+
+#~ msgid "Export to NewPipe"
+#~ msgstr "NewPipeへエクスポート"
+
+#~ msgid "Import from Pipeline"
+#~ msgstr "Pipelineからインポート"
+
+#~ msgid "Import from YouTube"
+#~ msgstr "YouTubeからインポート"
+
+#~ msgid "Import from NewPipe"
+#~ msgstr "NewPipeからインポート"
+
+#, fuzzy
+#~| msgid "Import from YouTube"
+#~ msgid "Import from Invidious"
+#~ msgstr "YouTubeからインポート"
+
+#~ msgid "Welcome to Pipeline"
+#~ msgstr "Pipeline へようこそ"
+
+#~ msgid "Start using Pipeline"
+#~ msgstr "Pipeline の使用を開始"
+
+#~ msgid ""
+#~ "Note that Pipeline at the moment directly connects to YouTube and "
+#~ "PeerTube when playing videos. Please use a VPN or similar technology, or "
+#~ "another application, if you are not comfortable with that."
+#~ msgstr ""
+#~ "注: Pipelineは、動画の再生時に直接YouTubeとPeerTubeに接続します。これが心"
+#~ "配であれば、VPNや類似の技術、または別のアプリをご利用ください。"
+
+#~ msgid ""
+#~ "Already have a list of subscriptions from either NewPipe or YouTube? You "
+#~ "can import your subscriptions from those platforms to get started."
+#~ msgstr ""
+#~ "NewPipeまたはYouTubeの登録チャンネルが既にありますか？それらのプラット"
+#~ "フォームから登録チャンネルをインポートすることができます。"
+
+#~ msgid ""
+#~ "Do you have a very weak device like the PinePhone and Pipeline is running "
+#~ "very slowly? You can find some settings to potentially improve "
+#~ "performance on weak devices in the preferences."
+#~ msgstr ""
+#~ "PinePhoneなどかなり低性能な端末を使用し、Pipelineの動作が重いですか？低性"
+#~ "能な端末での性能を改善する設定もあります。"
+
+#~ msgid "Automatically Manage Instances"
+#~ msgstr "インスタンスを自動管理"
+
+#~ msgid "Piped Preferences"
+#~ msgstr "Piped の設定"
+
+#~ msgid "Did you know?"
+#~ msgstr "知ってる？"
+
+#~ msgid "Feature Spotlight:"
+#~ msgstr "機能の紹介:"
+
+#~ msgid ""
+#~ "Filters are currently disabled. Those settings will not have an effect "
+#~ "until you enable filters again."
+#~ msgstr ""
+#~ "検索除外は無効になっています。有効にするまで、これらの設定は効果がありませ"
+#~ "ん。"
+
+#~ msgid "Main Page"
+#~ msgstr "メインページ"
+
+#~ msgid "Video"
+#~ msgstr "動画"
+
+#~ msgid "Search for Videos and Channels"
+#~ msgstr "動画とチャンネルを検索"
+
+#~ msgid "Channel Name"
+#~ msgstr "チャンネル名"
+
+#~ msgid "Piped APIs"
+#~ msgstr "Piped の API"
+
+#~ msgid "Copy URL to Clipboard"
+#~ msgstr "URLをクリップボードにコピー"
+
+#~ msgid "Download Video"
+#~ msgstr "動画をダウンロード"
+
+#~ msgid "Remove this video from the watch-later list"
+#~ msgstr "この動画を後で見る一覧から削除"
+
+#~ msgid "Add this video to the watch-later list"
+#~ msgstr "この動画を後で見る一覧に追加"
+
+#~ msgid "Pipeline comes with several features:"
+#~ msgstr "Pipeline にはこんな機能があります:"
+
+#~ msgid "Play videos with any video player"
+#~ msgstr "好きなプレイヤーで動画を再生"
+
+#~ msgid "Filter out unwanted videos in the feed"
+#~ msgstr "新着一覧から不要な動画を除外"
+
+#~ msgid "Multiple platforms"
+#~ msgstr "複数のプラットフォームに対応"
+
+#~ msgid "Feed List"
+#~ msgstr "新着一覧"
+
+#~ msgid "Filter List"
+#~ msgstr "一覧から除外"
+
+#~ msgid "Open in Browser"
+#~ msgstr "ブラウザで開く"
+
+#~ msgid "Please check your downloader in the preferences."
+#~ msgstr "設定でダウンローダーを確認してください。"
+
+#~ msgid "Close"
+#~ msgstr "閉じる"
+
+#~ msgctxt "tooltip"
+#~ msgid "Reload"
+#~ msgstr "再読み込み"
+
+#~ msgid "Your feed will appear once you've added subscriptions"
+#~ msgstr "チャンネル登録すると新着動画を表示します"
+
+#~ msgid "Remove"
+#~ msgstr "除去"
+
+#~ msgctxt "accessibility"
+#~ msgid "Add Filter…"
+#~ msgstr "除外条件を追加…"
+
+#~ msgctxt "tooltip"
+#~ msgid "Add Filter…"
+#~ msgstr "除外条件を追加…"
+
+#~ msgid "Add Filter…"
+#~ msgstr "除外条件を追加…"
+
+#~ msgid "Add"
+#~ msgstr "追加"
+
+#~ msgid ""
+#~ "This will import your subscriptions from exported data from NewPipe or "
+#~ "YouTube."
+#~ msgstr ""
+#~ "NewPipeや YouTube からエクスポートしたデータから登録チャンネルをインポート"
+#~ "します。"
+
+#~ msgid "NewPipe"
+#~ msgstr "NewPipe"
+
+#~ msgid "Player"
+#~ msgstr "プレイヤー"
+
+#~ msgid "APIs"
+#~ msgstr "API"
+
+#~ msgid ""
+#~ "For a complete list of public APIs, see the <a href=\"https://github.com/"
+#~ "TeamPiped/Piped/wiki/Instances\">Instances page</a>."
+#~ msgstr ""
+#~ "公開 API の完全な一覧は、<a href=\"https://github.com/TeamPiped/Piped/"
+#~ "wiki/Instances\">インスタンスのページ</a>をご覧ください。"
+
+#~ msgid "Custom Piped API"
+#~ msgstr "独自の Piped API"
+
+#~ msgid "Other"
+#~ msgstr "ほか"
+
+#~ msgid "Subscribe to a Channel…"
+#~ msgstr "チャンネルを登録…"
+
+#~ msgid "Add Subscription"
+#~ msgstr "登録チャンネルを追加"
+
+#~ msgid "Base URL"
+#~ msgstr "ベースURL"
+
+#~ msgid "Channel ID or Name"
+#~ msgstr "チャンネル ID か名前"
+
+#~ msgctxt "accessibility"
+#~ msgid "Add Subscription…"
+#~ msgstr "登録チャンネルを追加…"
+
+#~ msgctxt "tooltip"
+#~ msgid "Add Subscription…"
+#~ msgstr "登録チャンネルを追加…"
+
+#~ msgctxt "accessibility"
+#~ msgid "Go back to subscription list"
+#~ msgstr "登録チャンネル一覧に戻る"
+
+#~ msgctxt "tooltip"
+#~ msgid "Go back"
+#~ msgstr "戻る"
+
+#~ msgid "Please check your input, internet connection and API URL."
+#~ msgstr "入力、インターネット接続、API の URL をご確認ください。"
+
+#~ msgid "Everything Watched"
+#~ msgstr "すべて視聴済み"
+
+#~ msgid "How about going outside?"
+#~ msgstr "出かけるのはどうですか？"
+
+#~ msgid "Error connecting to the network"
+#~ msgstr "ネットワーク接続のエラー"
+
+#~ msgid "Some error occured"
+#~ msgstr "エラーが発生しました"
+
+#~ msgid "%F %T"
+#~ msgstr "%F %T"
+
+#~ msgid "Select YouTube subscription file"
+#~ msgstr "YouTubeの登録チャンネル用ファイルを選択"
+
+#~ msgid ""
+#~ "Note that on Flatpak, there are some more steps required when using a "
+#~ "player external to the Flatpak. For more information, please consult the "
+#~ "wiki."
+#~ msgstr ""
+#~ "注・Flatpak では、Flatpak の外部のプレーヤーを使用する際に、追加の手順が必"
+#~ "要です。 詳細は Wiki をご覧ください。"
+
+#~ msgid "Donate"
+#~ msgstr "寄付する"

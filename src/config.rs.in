@@ -1,0 +1,20 @@
+pub const APP_ID: &str = @APP_ID@;
+pub const BASE_ID: &str = @BASE_ID@;
+pub const GETTEXT_PACKAGE: &str = @GETTEXT_PACKAGE@;
+pub const RESOURCES_PATH: &str = @RESOURCES_PATH@;
+pub const LOCALEDIR: &str = @LOCALEDIR@;
+pub const PROFILE: &str = @PROFILE@;
+// pub const VERSION: &str = @VERSION@;
+pub const FLATPAK: bool = @FLATPAK@;
+pub const RESOURCES_BYTES: &[u8] = include_bytes!(concat!(
+    @BUILD_DIR@,
+    "/data/resources/resources.gresource"
+));
+
+// For splash texts.
+pub const NUMBER_OF_COMMITS: i64 = @NUMBER_OF_COMMITS@;
+pub const NUMBER_OF_TAGS: i64 = @NUMBER_OF_TAGS@;
+pub const LINES_OF_RUST: i64 = @LINES_OF_RUST@;
+pub const LINES_OF_BLUEPRINT: i64 = @LINES_OF_BLUEPRINT@;
+pub const NUMBER_OF_TRANSLATED_LANGUAGES: i64 = @NUMBER_OF_TRANSLATED_LANGUAGES@;
+pub const NUMBER_OF_TRANSLATORS: i64 = @NUMBER_OF_TRANSLATORS@;

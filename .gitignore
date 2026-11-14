@@ -1,0 +1,14 @@
+/target
+*~*
+src/config.rs
+data/resources/ui/about.ui
+data/resources/ui/about.blp
+.flatpak-builder
+.direnv
+*.syscap
+screenshot-aux
+.nixos-test-history
+result
+.vscode
+
+/subprojects/blueprint-compiler

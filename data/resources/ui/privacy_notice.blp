@@ -1,0 +1,55 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $TFPrivacyNotice: Adw.Dialog {
+  can-focus: true;
+  content-height: 200;
+  content-width: 300;
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      title-widget: Adw.WindowTitle {
+        title: _("Privacy Notice");
+      };
+    }
+
+    [bottom]
+    Gtk.Box {
+      styles [
+        "toolbar",
+      ]
+
+      hexpand: true;
+
+      Gtk.Button {
+        styles [
+          "suggested-action",
+        ]
+
+        label: _("Dismiss");
+        halign: end;
+        hexpand: true;
+        clicked => $handle_dismiss() swapped;
+      }
+    }
+
+    Gtk.Box {
+      margin-top: 0;
+      margin-bottom: 12;
+      margin-start: 12;
+      margin-end: 12;
+      spacing: 12;
+      orientation: vertical;
+
+      Gtk.Label {
+        label: _(
+          "Pipeline connects directly to YouTube and PeerTube for getting data and when playing videos. Pipeline can be configured to use Piped for retrieving Youtube data, but videos are still played over YouTube"
+        );
+        wrap: true;
+        xalign: 0;
+        use-markup: false;
+      }
+    }
+  };
+}

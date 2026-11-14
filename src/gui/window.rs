@@ -1,0 +1,1662 @@
+use adw::Toast;
+use adw::prelude::GtkApplicationExt;
+use gdk::gio::prelude::SettingsExtManual;
+use gdk::subclass::prelude::ObjectSubclassIsExt;
+use gtk::glib::Object;
+use gtk::prelude::GtkWindowExt;
+use gtk::prelude::SettingsExt;
+
+gtk::glib::wrapper! {
+    pub struct Window(ObjectSubclass<imp::Window>)
+        @extends adw::ApplicationWindow, gtk::ApplicationWindow, adw::Window, gtk::Window, gtk::Widget,
+        @implements gtk::gio::ActionGroup, gtk::gio::ActionMap, gtk::Accessible, gtk::Buildable,
+            gtk::ConstraintTarget, gtk::Native, gtk::Root, gtk::ShortcutManager;
+}
+
+impl Window {
+    pub fn new(app: &gtk::Application) -> Self {
+        app.set_accels_for_action("win.settings", &["<Control>comma"]);
+        app.set_accels_for_action("win.about", &["F1"]);
+        app.set_accels_for_action("win.show-help-overlay", &["<Control>question"]);
+        app.set_accels_for_action("win.search", &["<Ctrl>f", "F3", "<Alt>2"]);
+        app.set_accels_for_action("win.subscribe-or-watch-later", &["<Ctrl>d"]);
+        app.set_accels_for_action("window.close", &["<Control>q", "<Control>w"]);
+        app.set_accels_for_action("win.reload", &["<Control>r", "F5"]);
+        app.set_accels_for_action("win.toggle-sidebar", &["F9"]);
+
+        app.set_accels_for_action("win.tab-feed", &["<Alt>1"]);
+        app.set_accels_for_action("win.tab-watch-later", &["<Alt>3"]);
+        app.set_accels_for_action("win.tab-subscriptions", &["<Alt>4"]);
+
+        Object::builder::<Self>()
+            .property("application", app)
+            .build()
+    }
+
+    fn save_window_size(&self) -> Result<(), gtk::glib::BoolError> {
+        let imp = self.imp();
+
+        let (width, height) = self.default_size();
+
+        imp.settings.set_int("window-width", width)?;
+        imp.settings.set_int("window-height", height)?;
+
+        imp.settings
+            .set_boolean("is-maximized", self.is_maximized())?;
+
+        Ok(())
+    }
+
+    fn load_window_size(&self) {
+        let imp = self.imp();
+
+        let width = imp.settings.int("window-width");
+        let height = imp.settings.int("window-height");
+        let is_maximized = imp.settings.boolean("is-maximized");
+
+        self.set_default_size(width, height);
+
+        if is_maximized {
+            self.maximize();
+        }
+    }
+
+    fn debug_info(&self) -> String {
+        let settings = &self.imp().settings;
+        let mut lines = vec![];
+        lines.push("- Versions:".to_string());
+        lines.push(format!(
+            "    - Version: {} ({}; {})",
+            env!("CARGO_PKG_VERSION"),
+            if crate::config::FLATPAK {
+                "Flatpak"
+            } else {
+                "Not Flatpak"
+            },
+            if crate::config::PROFILE == "Devel" {
+                "Development Version"
+            } else {
+                "Release Version"
+            }
+        ));
+        lines.push(format!(
+            "    - GTK version: {}.{}.{}",
+            gtk::major_version(),
+            gtk::minor_version(),
+            gtk::micro_version()
+        ));
+        lines.push(format!(
+            "    - Libadwaita version: {}.{}.{}",
+            adw::major_version(),
+            adw::minor_version(),
+            adw::micro_version()
+        ));
+
+        lines.push("- Preferences:".to_string());
+        lines.push(format!(
+            "    - YouTube Enabled: {}",
+            settings.boolean("enable-source-youtube")
+        ));
+        lines.push(format!(
+            "    - PeerTube Enabled: {}",
+            settings.boolean("enable-source-peertube")
+        ));
+
+        let youtube_mode = settings.string("youtube-mode");
+        lines.push(format!("    - YouTube Method: {}", youtube_mode));
+        if youtube_mode.contains("piped") {
+            lines.push(format!(
+                "    - Piped instances managed automatically: {}",
+                settings.boolean("piped-automatically-manage-instances")
+            ));
+            lines.push("    - Piped instances:".to_string());
+            for instance in settings.get::<Vec<String>>("piped-api-urls") {
+                lines.push(format!("        - {instance}"));
+            }
+        }
+        lines.push(format!(
+            "    - YouTube Cookies Set: {}",
+            clapper::global_enhancer_proxies()
+                .and_then(|p| p.proxy_by_module("clapper_yt_dlp"))
+                .and_then(|p| p.settings())
+                .map(|s| s.string("cookies-file"))
+                .map(|c| if c.is_empty() { "None" } else { "Set" })
+                .unwrap_or("Cannot access Clapper settings")
+        ));
+        lines.push(format!(
+            "    - Peertube search API: {}",
+            settings.string("peertube-search-api")
+        ));
+        lines.push(format!(
+            "    - External player by default: {}",
+            settings.boolean("play-external-default")
+        ));
+        lines.push(format!(
+            "    - External player: {}",
+            settings.string("player")
+        ));
+        lines.push(format!(
+            "    - Cairo rendering: {}",
+            settings.boolean("cairo-software-renderer")
+        ));
+
+        lines.join("\n")
+    }
+
+    pub fn display_error(&self, text: String, error: Box<dyn std::error::Error>) {
+        // Ignore an error which happens whenever a YouTube video is opened and which therefore is very annoying.
+        // See the upstream error: https://github.com/TeamPiped/Piped/issues/3658.
+        if format!("{error:?}").contains("Sign in to confirm that you're not a bot") {
+            return;
+        }
+
+        // Ignore Piped internal server errors; nothing we can do about those.
+        if format!("{error:?}").contains("status code 500 Internal Server Error") {
+            return;
+        }
+
+        // Ignore errors where the provider was not found.
+        // This most likely means the user disabled a provider but still interacted with a video or channel of such a provider.
+        // TODO: Maybe consider making it impossible in the first place to interact with such videos or channels, but that is likely pretty hard to do.
+        if format!("{error:?}").starts_with("ProviderSpecific(ProviderNotFound") {
+            return;
+        }
+
+        let imp = self.imp();
+        let mut errors = imp.errors.borrow_mut();
+        errors.push((text.clone(), error));
+
+        let num_errors = errors.len();
+
+        let toast_title = if num_errors == 1 {
+            text
+        } else {
+            gettextrs::ngettext("One Error", "{} Errors", num_errors as u32)
+                .replace("{}", &num_errors.to_string())
+        };
+
+        imp.toast_error.set_title(&toast_title);
+
+        self.show_toast(imp.toast_error.get());
+    }
+
+    pub fn show_toast(&self, toast: Toast) {
+        self.imp().toast_overlay.add_toast(toast);
+    }
+}
+
+pub mod imp {
+    use std::cell::{Cell, RefCell};
+    use std::path::{Path, PathBuf};
+
+    use crate::backend::{
+        Channel, Client, PlayType, SearchStream, SubscriptionsStore, Video, VideoFetcherStream,
+    };
+    use crate::config::{self, BASE_ID, PROFILE};
+    use crate::gui::bottom_bar::BottomBar;
+    use crate::gui::channel_item::ChannelItem;
+    use crate::gui::channel_page::ChannelPage;
+    use crate::gui::error_dialog::ErrorDialog;
+    use crate::gui::export_dialog::ExportDialog;
+    use crate::gui::filter_dialog::FilterDialog;
+    use crate::gui::finite_video_list::FiniteVideoList;
+    use crate::gui::import_dialog::ImportDialog;
+    use crate::gui::preferences_dialog::PreferencesDialog;
+    use crate::gui::privacy_notice::PrivacyNotice;
+    use crate::gui::search_list::SearchList;
+    use crate::gui::subscriptions_list::SubscriptionsList;
+    use crate::gui::utility::Utility;
+    use crate::gui::video_item::VideoItem;
+    use crate::gui::video_list::VideoList;
+    use crate::gui::video_page::VideoPage;
+    use crate::{gspawn, tspawn};
+
+    use adw::prelude::{AdwApplicationWindowExt, AdwDialogExt, NavigationPageExt};
+    use adw::{
+        NavigationPage, NavigationView, OverlaySplitView, Toast, ToastOverlay, ViewStack,
+        ViewStackPage, ViewSwitcherBar, WindowTitle,
+    };
+    use chrono::Utc;
+    use futures::StreamExt;
+    use gdk::gio::{MenuModel, SettingsBindFlags, SimpleAction, SimpleActionGroup};
+    use glib::subclass::InitializingObject;
+    use glib::{Properties, Variant, clone};
+    use gtk::accessible::Relation;
+    use gtk::glib::Propagation;
+    use gtk::subclass::prelude::*;
+    use gtk::{
+        AccessibleAnnouncementPriority, Builder, Button, Label, ListBox, ListBoxRow, Overlay,
+        ProgressBar, SearchEntry, glib,
+    };
+    use gtk::{Image, Orientation, prelude::*};
+
+    use adw::ShortcutsDialog;
+    use adw::subclass::prelude::AdwApplicationWindowImpl;
+    use adw::subclass::prelude::AdwWindowImpl;
+    use gtk::CompositeTemplate;
+
+    const MOBILE_BOTTOM_BAR_ITEMS: u32 = 3;
+
+    #[derive(CompositeTemplate, Properties)]
+    #[properties(wrapper_type = super::Window)]
+    #[template(resource = "/ui/window.ui")]
+    pub struct Window {
+        #[template_child]
+        main_stack: TemplateChild<ViewStack>,
+        #[template_child]
+        sidebar_list: TemplateChild<ListBox>,
+
+        #[template_child]
+        main_title: TemplateChild<WindowTitle>,
+        #[template_child]
+        main_navigation: TemplateChild<NavigationView>,
+        #[template_child]
+        main_page: TemplateChild<NavigationPage>,
+        #[template_child]
+        view_switcher: TemplateChild<ViewSwitcherBar>,
+
+        #[template_child]
+        split_view: TemplateChild<OverlaySplitView>,
+        #[template_child]
+        video_list: TemplateChild<VideoList>,
+
+        #[template_child]
+        search_entry: TemplateChild<SearchEntry>,
+        #[template_child]
+        search_list: TemplateChild<SearchList>,
+        #[template_child]
+        search_page: TemplateChild<ViewStackPage>,
+
+        #[template_child]
+        btn_filter_menu: TemplateChild<Button>,
+
+        #[template_child]
+        label_splash: TemplateChild<Label>,
+        #[template_child]
+        overlay_videos: TemplateChild<Overlay>,
+        #[template_child]
+        bottom_bar: TemplateChild<BottomBar>,
+
+        #[template_child]
+        menubar: TemplateChild<MenuModel>,
+
+        #[template_child]
+        pub(super) toast_overlay: TemplateChild<ToastOverlay>,
+        #[template_child]
+        pub(super) toast_error: TemplateChild<Toast>,
+
+        #[template_child]
+        progress_feed: TemplateChild<ProgressBar>,
+
+        pub(super) errors: RefCell<Vec<(String, Box<dyn std::error::Error>)>>,
+
+        #[property(get)]
+        client: RefCell<Client>,
+
+        #[property(get, set = Self::set_video_page_for_bottom_bar, nullable)]
+        video_page_for_bottom_bar: RefCell<Option<NavigationPage>>,
+
+        #[property(get, set)]
+        split_view_collapsed_before_fullscreen: Cell<bool>,
+        #[property(get, set = Self::set_breakpoint_collapsed)]
+        breakpoint_collapsed: Cell<bool>,
+        #[property(get, set, default = true)]
+        sidebar_pinned: Cell<bool>,
+
+        #[property(get, set)]
+        main_show_sidebar_visible: Cell<bool>,
+
+        #[property(get, set)]
+        watch_history_enabled: Cell<bool>,
+
+        pub settings: gtk::gio::Settings,
+    }
+
+    impl Default for Window {
+        fn default() -> Self {
+            Self {
+                main_stack: Default::default(),
+                sidebar_list: Default::default(),
+                main_title: Default::default(),
+                main_navigation: Default::default(),
+                main_page: Default::default(),
+                split_view: Default::default(),
+                view_switcher: Default::default(),
+                video_list: Default::default(),
+                search_page: Default::default(),
+                search_entry: Default::default(),
+                search_list: Default::default(),
+                btn_filter_menu: Default::default(),
+                label_splash: Default::default(),
+                overlay_videos: Default::default(),
+                toast_overlay: Default::default(),
+                toast_error: Default::default(),
+                bottom_bar: Default::default(),
+                menubar: Default::default(),
+                progress_feed: Default::default(),
+
+                errors: Default::default(),
+
+                settings: gtk::gio::Settings::new(BASE_ID),
+
+                split_view_collapsed_before_fullscreen: Default::default(),
+                breakpoint_collapsed: Default::default(),
+                sidebar_pinned: Default::default(),
+                main_show_sidebar_visible: Default::default(),
+                watch_history_enabled: Default::default(),
+
+                video_page_for_bottom_bar: Default::default(),
+
+                client: Default::default(),
+            }
+        }
+    }
+
+    #[gtk::template_callbacks]
+    impl Window {
+        #[template_callback(function)]
+        fn feed_visible(page: Option<&str>) -> bool {
+            page == Some("feed")
+        }
+
+        #[template_callback(function)]
+        fn is_video_visible(page: Option<&str>) -> bool {
+            page == Some("video-page")
+        }
+
+        #[template_callback(function)]
+        fn is_channel_visible(page: Option<&str>) -> bool {
+            page == Some("channel-page")
+        }
+
+        #[template_callback(function)]
+        fn refresh_button_visible_child_name(loading: bool) -> &'static str {
+            if loading { "spinner" } else { "button" }
+        }
+
+        #[template_callback(function)]
+        fn bottom_bar_style_for_video_bar_visible(visible: bool) -> adw::ToolbarStyle {
+            if visible {
+                adw::ToolbarStyle::Raised
+            } else {
+                adw::ToolbarStyle::Flat
+            }
+        }
+
+        #[template_callback(function)]
+        fn pin_label(pinned: bool) -> String {
+            if pinned {
+                gettextrs::gettext("Unpin Sidebar")
+            } else {
+                gettextrs::gettext("Pin Sidebar")
+            }
+        }
+
+        #[template_callback]
+        fn bottom_bar_clicked(&self) {
+            let obj = self.obj();
+            let page = obj
+                .video_page_for_bottom_bar()
+                .expect("There is a video page in the bottom bar if it was clicked");
+
+            // If it already was in the navigation view, remove it as it cannot be added multiple times.
+            // Ideally, we would also keep the old one to allow going back, but that would require one Clapper instance with the same player, which is currently not possible (but will maybe be implemented in the future).
+            let current_pages = self
+                .main_navigation
+                .navigation_stack()
+                .iter::<NavigationPage>()
+                .map(|p| p.expect("NavigationView pages to only be NavigationPage"))
+                .filter(|p| *p != page)
+                .collect::<Vec<_>>();
+            self.main_navigation.replace(&current_pages);
+
+            self.main_navigation_pre_push();
+            self.main_navigation.push(&page);
+
+            obj.set_video_page_for_bottom_bar(None::<NavigationPage>);
+
+            // For some reason, immediately grabbing focus does not work.
+            // Waiting a bit before grabbing focus seems to work.
+            gspawn!(clone!(
+                #[weak]
+                page,
+                async move {
+                    glib::timeout_future(std::time::Duration::from_millis(50)).await;
+                    page.child()
+                        .expect("NavigationPage to have a child")
+                        .grab_focus();
+                }
+            ));
+        }
+
+        #[template_callback]
+        fn bottom_bar_dismissed(&self) {
+            let obj = self.obj();
+            if let Some(page) = obj
+                .video_page_for_bottom_bar()
+                .and_then(|p| p.child())
+                .and_dynamic_cast_ref::<VideoPage>()
+            {
+                page.pause();
+                obj.set_video_page_for_bottom_bar(None::<NavigationPage>);
+            }
+        }
+
+        #[template_callback]
+        fn bottom_bar_play_pause(&self) {
+            let obj = self.obj();
+            if let Some(page) = obj
+                .video_page_for_bottom_bar()
+                .and_then(|p| p.child())
+                .and_dynamic_cast_ref::<VideoPage>()
+            {
+                page.play_pause();
+            }
+        }
+
+        #[template_callback]
+        fn play_video(&self, video: Video, play_type: PlayType) {
+            let obj = self.obj();
+
+            let play_is_default = play_type == PlayType::Default;
+            let play_external_default = self.settings.boolean("play-external-default");
+            let play_internal = play_is_default ^ play_external_default;
+
+            // If the same video is already playing from the bottom bar, expand it instead of starting the video again.
+            if obj
+                .video_page_for_bottom_bar()
+                .and_then(|p| p.child().and_dynamic_cast::<VideoPage>().ok())
+                .and_then(|p| p.video())
+                .is_some_and(|v| v == video)
+            {
+                if play_internal {
+                    self.bottom_bar_clicked();
+                    return;
+                } else {
+                    self.bottom_bar_dismissed();
+                }
+            }
+
+            if let Some(page) = obj
+                .video_page_for_bottom_bar()
+                .and_then(|p| p.child())
+                .and_dynamic_cast_ref::<VideoPage>()
+            {
+                page.pause();
+                obj.set_video_page_for_bottom_bar(None::<NavigationPage>);
+            }
+
+            let video_page = VideoPage::new(&video, &obj.client());
+            let page = NavigationPage::new(&video_page, &video.title());
+            self.main_navigation_pre_push();
+            self.main_navigation.push(&page);
+
+            obj.announce(
+                &gettextrs::gettext("Switched to video page {}").replace("{}", &video.title()),
+                AccessibleAnnouncementPriority::Medium,
+            );
+
+            obj.bind_property(
+                "main-show-sidebar-visible",
+                &video_page,
+                "show-sidebar-visible",
+            )
+            .sync_create()
+            .build();
+
+            self.split_view
+                .bind_property("show-sidebar", &video_page, "primary-menu-visible")
+                .sync_create()
+                .invert_boolean()
+                .build();
+
+            video_page.connect_local(
+                "display-channel",
+                false,
+                clone!(
+                    #[weak]
+                    obj,
+                    #[upgrade_or_default]
+                    move |args| {
+                        let channel: Channel = args[1]
+                            .get()
+                            .expect("display-channel argument to be of type Channel");
+                        obj.imp().display_channel(channel);
+                        None
+                    }
+                ),
+            );
+
+            video_page.connect_local(
+                "download-video",
+                false,
+                clone!(
+                    #[weak]
+                    obj,
+                    #[upgrade_or_default]
+                    move |args| {
+                        let video: Video = args[1]
+                            .get()
+                            .expect("download-video argument to be of type Video");
+                        obj.imp().download(video);
+                        None
+                    }
+                ),
+            );
+
+            video_page.connect_local(
+                "remove-downloaded",
+                false,
+                clone!(
+                    #[weak]
+                    obj,
+                    #[upgrade_or_default]
+                    move |args| {
+                        let video: Video = args[1]
+                            .get()
+                            .expect("remove-downloaded argument to be of type Video");
+                        obj.imp().remove_downloaded(video);
+                        None
+                    }
+                ),
+            );
+
+            video_page.connect_local(
+                "copy-video-url-to-clipboard",
+                false,
+                clone!(
+                    #[weak]
+                    obj,
+                    #[upgrade_or_default]
+                    move |args| {
+                        let video: Video = args[1]
+                            .get()
+                            .expect("copy-video-url-to-clipboard argument to be of type Video");
+                        obj.imp().copy_video_url(video);
+                        None
+                    }
+                ),
+            );
+
+            video_page.connect_fullscreened_notify(clone!(
+                #[weak]
+                obj,
+                #[upgrade_or_default]
+                move |page| {
+                    let fullscreen = page.fullscreened();
+                    obj.set_fullscreened(fullscreen);
+                    if fullscreen {
+                        obj.set_split_view_collapsed_before_fullscreen(
+                            obj.imp().split_view.is_collapsed(),
+                        );
+                        obj.imp().split_view.set_show_sidebar(false);
+                        obj.imp().view_switcher.set_reveal(false);
+                    } else if obj.current_breakpoint().is_some() {
+                        obj.imp().split_view.set_show_sidebar(false);
+                        obj.imp().view_switcher.set_reveal(true);
+                    } else {
+                        obj.imp()
+                            .split_view
+                            .set_show_sidebar(obj.split_view_collapsed_before_fullscreen());
+                        obj.imp().view_switcher.set_reveal(false);
+                    }
+                }
+            ));
+
+            video_page.grab_focus();
+
+            if play_internal {
+                video_page.play();
+            } else {
+                video_page.play_external();
+            }
+        }
+
+        #[template_callback]
+        fn display_channel(&self, channel: Channel) {
+            let obj = self.obj();
+
+            let channel_page = ChannelPage::new(&channel, &obj.client());
+            channel_page.reload();
+            let page = NavigationPage::new(&channel_page, &channel.name());
+            self.main_navigation_pre_push();
+            self.main_navigation.push(&page);
+
+            obj.announce(
+                &gettextrs::gettext("Switched to channel page {}").replace("{}", &channel.name()),
+                AccessibleAnnouncementPriority::Medium,
+            );
+
+            obj.bind_property(
+                "main-show-sidebar-visible",
+                &channel_page,
+                "show-sidebar-visible",
+            )
+            .sync_create()
+            .build();
+
+            obj.bind_property("breakpoint_collapsed", &channel_page, "compact")
+                .sync_create()
+                .build();
+
+            self.split_view
+                .bind_property("show-sidebar", &channel_page, "primary-menu-visible")
+                .sync_create()
+                .invert_boolean()
+                .build();
+
+            channel_page.connect_local(
+                "play-video",
+                false,
+                clone!(
+                    #[weak]
+                    obj,
+                    #[upgrade_or_default]
+                    move |args| {
+                        let video: Video = args[1]
+                            .get()
+                            .expect("play-video argument to be of type Video");
+                        let play_type: PlayType = args[2]
+                            .get()
+                            .expect("play-video 2nd argument to be of type PlayType");
+                        obj.imp().play_video(video, play_type);
+                        None
+                    }
+                ),
+            );
+
+            channel_page.connect_local(
+                "download",
+                false,
+                clone!(
+                    #[weak]
+                    obj,
+                    #[upgrade_or_default]
+                    move |args| {
+                        let video: Video = args[1]
+                            .get()
+                            .expect("download-video argument to be of type Video");
+                        obj.imp().download(video);
+                        None
+                    }
+                ),
+            );
+
+            channel_page.connect_local(
+                "remove-downloaded",
+                false,
+                clone!(
+                    #[weak]
+                    obj,
+                    #[upgrade_or_default]
+                    move |args| {
+                        let video: Video = args[1]
+                            .get()
+                            .expect("remove-downloaded argument to be of type Video");
+                        obj.imp().remove_downloaded(video);
+                        None
+                    }
+                ),
+            );
+
+            channel_page.connect_local(
+                "copy-video-url",
+                false,
+                clone!(
+                    #[weak]
+                    obj,
+                    #[upgrade_or_default]
+                    move |args| {
+                        let video: Video = args[1]
+                            .get()
+                            .expect("copy-video-url-to-clipboard argument to be of type Video");
+                        obj.imp().copy_video_url(video);
+                        None
+                    }
+                ),
+            );
+
+            // For some reason, immediately grabbing focus does not work.
+            // Waiting a bit before grabbing focus seems to work.
+            gspawn!(clone!(
+                #[weak]
+                channel_page,
+                async move {
+                    glib::timeout_future(std::time::Duration::from_millis(50)).await;
+                    channel_page.grab_focus();
+                }
+            ));
+        }
+
+        #[template_callback]
+        fn show_unsubscribe_toast(&self, channel: Channel) {
+            let obj = self.obj();
+
+            let toast_title = gettextrs::gettext("Unsubscribed from {channel}")
+                .replace("{channel}", &channel.name());
+
+            let toast = Toast::builder()
+                .title(toast_title)
+                .button_label(gettextrs::gettext("Undo"))
+                .build();
+
+            toast.connect_button_clicked(clone!(
+                #[weak]
+                channel,
+                #[weak]
+                obj,
+                move |_| {
+                    obj.client().toggle_subscription(channel);
+                }
+            ));
+
+            obj.show_toast(toast);
+        }
+
+        fn visible_video_page(&self) -> Option<VideoPage> {
+            let page = self.main_navigation.visible_page();
+            let child = page.and_then(|p| p.child());
+            child.and_dynamic_cast::<VideoPage>().ok()
+        }
+
+        fn visible_channel_page(&self) -> Option<ChannelPage> {
+            let page = self.main_navigation.visible_page();
+            let child = page.and_then(|p| p.child());
+            child.and_dynamic_cast::<ChannelPage>().ok()
+        }
+
+        fn main_navigation_pre_push(&self) {
+            let obj = self.obj();
+
+            if let Some(video_page) = self.visible_video_page() {
+                if let Some(video) = video_page.video() {
+                    self.obj().client().watched(video, Utc::now());
+                }
+
+                if !video_page.finished() {
+                    obj.set_video_page_for_bottom_bar(self.main_navigation.visible_page());
+                }
+            }
+        }
+
+        #[template_callback]
+        fn search(&self) {
+            gspawn!(clone!(
+                #[weak(rename_to = obj)]
+                self.obj(),
+                async move {
+                    let s = obj.imp();
+                    let text = s.search_entry.text();
+                    s.search_list.set_model(obj.client().search(&text).await);
+                }
+            ));
+        }
+
+        #[template_callback]
+        fn sidebar_child_changed(&self) {
+            let is_search_page = self.main_stack.visible_child_name() == Some("search".into());
+            let is_feed_page = self.main_stack.visible_child_name() == Some("feed".into());
+
+            if is_search_page {
+                // Cannot focus search bar right now, as sometimes focus is set to other widgets in the code, e.g. to the widget that was actually clicked in the sidebar on bottom bar.
+                // I'm not sure whether we can fix that in some other way, but waiting a bit before moving focus works.
+                gspawn!(clone!(
+                    #[weak(rename_to=search_entry)]
+                    self.search_entry,
+                    async move {
+                        glib::timeout_future(std::time::Duration::from_millis(50)).await;
+                        search_entry.grab_focus();
+                        search_entry.select_region(0, -1);
+                    }
+                ));
+            }
+
+            self.main_title.set_title(
+                &self
+                    .main_stack
+                    .page(&self.main_stack.visible_child().unwrap())
+                    .title()
+                    .unwrap(),
+            );
+
+            self.main_navigation.pop_to_tag("root");
+
+            let obj = self.obj();
+            obj.action_set_enabled("win.filter-enabled", is_feed_page);
+            obj.action_set_enabled("win.filter-dialog", is_feed_page);
+
+            if let Some(title) = self
+                .main_stack
+                .visible_child()
+                .map(|c| self.main_stack.page(&c))
+                .and_then(|p| p.title())
+            {
+                obj.announce(
+                    &gettextrs::gettext("Switched to page {}").replace("{}", &title),
+                    AccessibleAnnouncementPriority::Medium,
+                );
+            }
+
+            if obj.breakpoint_collapsed() || !obj.sidebar_pinned() {
+                self.split_view.set_show_sidebar(false);
+            }
+        }
+
+        #[template_callback]
+        fn navigation_popped(&self, page: NavigationPage) {
+            let obj = self.obj();
+
+            if let Some(video_page) = page.child().and_dynamic_cast_ref::<VideoPage>() {
+                if let Some(video) = video_page.video() {
+                    self.obj().client().watched(video, Utc::now());
+                }
+
+                if video_page.fullscreened() {
+                    video_page.set_fullscreened(false);
+                }
+
+                if !video_page.finished() {
+                    obj.set_video_page_for_bottom_bar(Some(page));
+                }
+            }
+
+            if self.main_navigation.visible_page() == obj.video_page_for_bottom_bar() {
+                obj.set_video_page_for_bottom_bar(None::<NavigationPage>);
+            }
+
+            if self.main_navigation.visible_page_tag().as_deref() == Some("root") {
+                let is_feed_page = self.main_stack.visible_child_name() == Some("feed".into());
+                obj.action_set_enabled("win.filter-enabled", is_feed_page);
+                obj.action_set_enabled("win.filter-dialog", is_feed_page);
+            }
+
+            if let Some(title) = self.main_navigation.visible_page().map(|p| p.title()) {
+                obj.announce(
+                    &gettextrs::gettext("Switched to page {}").replace("{}", &title),
+                    AccessibleAnnouncementPriority::Medium,
+                );
+            }
+        }
+
+        #[template_callback]
+        fn copy_video_url(&self, video: Video) {
+            let clipboard = WidgetExt::display(&*self.obj()).clipboard();
+            clipboard.set_text(video.playable_url().as_ref());
+
+            let toast = Toast::builder()
+                .title(gettextrs::gettext("Copied URL"))
+                .build();
+            self.toast_overlay.add_toast(toast);
+        }
+
+        #[template_callback]
+        fn remove_downloaded(&self, video: Video) {
+            let obj = self.obj();
+            let client = obj.client();
+
+            if let Some(path) = video.downloaded_path() {
+                client.remove_downloaded(&video);
+
+                let path = Path::new(&path);
+
+                if path.exists() {
+                    if let Err(e) = std::fs::remove_file(path) {
+                        obj.display_error(
+                            gettextrs::gettext("Failed to remove downloaded file"),
+                            Box::new(e),
+                        );
+                    } else {
+                        let toast = Toast::builder()
+                            .title(gettextrs::gettext("Removed downloaded copy of the video"))
+                            .build();
+                        self.toast_overlay.add_toast(toast);
+                    }
+                } else {
+                    obj.show_toast(
+                        Toast::builder()
+                            .title(gettextrs::gettext(
+                                "Downloaded video not available locally anymore",
+                            ))
+                            .build(),
+                    );
+                }
+            }
+        }
+
+        // TODO: Potentially add a gsetting for that. Would not play too nicely with the Flatpak though.
+        fn download_dir() -> Result<PathBuf, std::io::Error> {
+            let mut videos = glib::user_special_dir(glib::enums::UserDirectory::Videos)
+                .unwrap_or_else(|| {
+                    let mut dir = glib::home_dir();
+                    dir.push("Videos");
+                    dir
+                });
+            videos.push("Pipeline");
+            std::fs::create_dir_all(&videos)?;
+            Ok(videos)
+        }
+
+        #[template_callback]
+        fn download(&self, video: Video) {
+            let obj = self.obj();
+            gspawn!(clone!(
+                #[weak]
+                obj,
+                async move {
+                    let toast = Toast::builder()
+                        .title(gettextrs::gettext("Started Download"))
+                        .build();
+                    obj.show_toast(toast);
+
+                    let download_dir = Self::download_dir();
+
+                    if let Err(e) = download_dir {
+                        obj.display_error(
+                            gettextrs::gettext(
+                                "Error creating the directory where the video will be downloaded",
+                            ),
+                            Box::new(e) as Box<dyn std::error::Error + 'static>,
+                        );
+                        return;
+                    }
+
+                    let download_dir = download_dir.unwrap().into_os_string();
+                    let download_format = obj.imp().settings.string("download-format");
+                    let download_arguments = obj.imp().settings.string("download-yt-dlp-arguments");
+
+                    let all_arguments = {
+                        let mut v = vec![];
+                        if config::FLATPAK {
+                            v.push("--js-runtimes".into());
+                            v.push("deno:/app/extensions/clapper/enhancers/bin/deno".into());
+                        }
+                        v.push("-P".into());
+                        v.push(download_dir);
+                        v.push("-f".into());
+                        v.push(download_format.into());
+                        v.extend(download_arguments.split(' ').map(|s| {
+                            s.strip_prefix('"')
+                                .unwrap_or(s)
+                                .strip_suffix('"')
+                                .unwrap_or(s)
+                                .into()
+                        }));
+                        v
+                    };
+
+                    video.set_downloading(true);
+
+                    let url = video.playable_url();
+                    log::debug!("Downloading video {url} with arguments {all_arguments:?}");
+                    let stream = tspawn!(async move { pytdlp::download(&url, all_arguments,) })
+                        .await
+                        .expect("Failed to spawn tokio");
+
+                    if let Err(e) = stream {
+                        obj.display_error(
+                            gettextrs::gettext("Error downloading a video"),
+                            Box::new(e) as Box<dyn std::error::Error + 'static>,
+                        );
+                        return;
+                    }
+
+                    let mut stream = stream.unwrap();
+
+                    while let Some(result) = stream.next().await {
+                        match result {
+                            pytdlp::DownloadOutput::Log(l) => log::trace!("Download log: {}", l),
+                            pytdlp::DownloadOutput::Progress(p) => {
+                                log::trace!("Download progressed to {} percent", p.percent);
+                                video.set_download_progress(p.percent / 100.0);
+                            }
+                            pytdlp::DownloadOutput::Finished(c) => {
+                                obj.client().downloaded(video.clone(), c.filename);
+
+                                let toast = Toast::builder()
+                                    .title(gettextrs::gettext("Finished Download"))
+                                    .build();
+                                obj.show_toast(toast);
+                            }
+                            pytdlp::DownloadOutput::Error(e) => {
+                                obj.display_error(
+                                    gettextrs::gettext("Error downloading a video"),
+                                    Box::new(e) as Box<dyn std::error::Error + 'static>,
+                                );
+                            }
+                        }
+                    }
+
+                    video.set_downloading(false);
+                }
+            ));
+        }
+
+        fn set_video_page_for_bottom_bar(&self, page: Option<NavigationPage>) {
+            if page.is_none() {
+                self.bottom_bar.set_video_page(None::<VideoPage>);
+            }
+            self.video_page_for_bottom_bar.replace(page);
+        }
+
+        fn set_breakpoint_collapsed(&self, value: bool) {
+            let obj = self.obj();
+            if !obj.is_fullscreen() {
+                self.split_view.set_show_sidebar(!value);
+                self.view_switcher.set_reveal(value);
+            }
+            self.breakpoint_collapsed.set(value);
+        }
+
+        fn compute_main_show_sidebar_visible(&self) {
+            let obj = self.obj();
+            obj.set_main_show_sidebar_visible(
+                !self.split_view.shows_sidebar() && !self.view_switcher.reveals(),
+            );
+        }
+
+        fn setup_compute_properties(&self) {
+            let obj = self.obj();
+            self.split_view.connect_show_sidebar_notify(clone!(
+                #[weak]
+                obj,
+                move |_| {
+                    obj.imp().compute_main_show_sidebar_visible();
+                }
+            ));
+            self.view_switcher.connect_reveal_notify(clone!(
+                #[weak]
+                obj,
+                move |_| {
+                    obj.imp().compute_main_show_sidebar_visible();
+                }
+            ));
+        }
+
+        #[template_callback]
+        fn handle_spinner_pressed(&self) {
+            crate::pride::remove_seasonal_style(&self.progress_feed.get());
+            self.progress_feed.add_css_class("rgb");
+        }
+
+        fn set_splash(&self) {
+            use crate::splashes::*;
+            let splash = Splash::random();
+            self.label_splash.set_label(&splash.label());
+        }
+
+        fn setup_splashes(&self) {
+            let obj = self.obj();
+
+            self.settings
+                .bind("show-splash", &self.label_splash.get(), "visible")
+                .flags(SettingsBindFlags::DEFAULT)
+                .build();
+
+            self.overlay_videos.connect_visible_notify(clone!(
+                #[weak]
+                obj,
+                move |_| {
+                    obj.imp().set_splash();
+                }
+            ));
+        }
+
+        fn setup_sidebar(&self) {
+            let stack = self.main_stack.clone();
+            let list = self.sidebar_list.clone();
+
+            let pages = stack.pages();
+            let n_pages = pages.n_items();
+
+            let mut page_names = Vec::with_capacity(n_pages.try_into().unwrap());
+
+            let mut toggle_group: Option<gtk::ToggleButton> = None;
+
+            for i in 0..n_pages {
+                let page: ViewStackPage = pages.item(i).unwrap().downcast().unwrap();
+                let page_name = page.name().expect("Page to have a name");
+                page_names.push(page_name.clone());
+
+                // TODO: Maybe put this in a blueprint file and in its own widget; code is pretty ugly.
+                let icon = Image::builder()
+                    .icon_name(
+                        page.icon_name()
+                            .expect("ViewStackPage to have an icon-name"),
+                    )
+                    .build();
+                let label = Label::builder()
+                    .label(page.title().expect("ViewStackPage to have a title"))
+                    .build();
+                let bx = gtk::Box::builder()
+                    .spacing(12)
+                    .orientation(Orientation::Horizontal)
+                    .build();
+
+                let toggle = gtk::ToggleButton::new();
+                toggle.set_child(Some(&bx));
+                toggle.add_css_class("flat");
+                toggle.set_focusable(false);
+                toggle.update_relation(&[Relation::LabelledBy(&[&label.clone().upcast()])]);
+
+                if let Some(toggle_group) = toggle_group.as_ref() {
+                    toggle.set_group(Some(toggle_group));
+                } else {
+                    toggle_group = Some(toggle.clone());
+                }
+
+                let row = ListBoxRow::builder().activatable(true).build();
+
+                row.add_css_class("sidebar-item");
+
+                bx.append(&icon);
+                bx.append(&label);
+                row.set_child(Some(&toggle));
+                list.append(&row);
+
+                toggle.connect_toggled(clone!(
+                    #[weak]
+                    stack,
+                    #[strong]
+                    page_name,
+                    move |toggle| {
+                        if toggle.is_active() {
+                            stack.set_visible_child_name(&page_name);
+                        }
+                    }
+                ));
+
+                if i < MOBILE_BOTTOM_BAR_ITEMS {
+                    self.obj()
+                        .bind_property("breakpoint_collapsed", &row, "visible")
+                        .sync_create()
+                        .invert_boolean()
+                        .build();
+                }
+            }
+
+            list.connect_row_activated(move |_, row| {
+                let toggle = row
+                    .child()
+                    .expect("ListBoxRow of sidebar to have a child")
+                    .dynamic_cast::<gtk::ToggleButton>()
+                    .expect("Child of sidebar to be a toggle");
+                toggle.set_active(true);
+            });
+
+            stack.connect_visible_child_name_notify(clone!(
+                #[strong]
+                page_names,
+                #[weak]
+                list,
+                move |stack| {
+                    let name = stack
+                        .visible_child_name()
+                        .expect("Stack to have a visible child");
+                    let index = page_names
+                        .iter()
+                        .position(|p| p == &name)
+                        .expect("Visible child name of stack in page names");
+                    let row = list
+                        .row_at_index(index.try_into().unwrap())
+                        .expect("Sidebar to have a row at bottom bar selected index");
+                    row.activate();
+                }
+            ));
+
+            // Select the first row on startup.
+            toggle_group
+                .expect("There is at least one elemnt in the sidebar")
+                .set_active(true);
+        }
+
+        fn setup_bottom_bar(&self) {
+            // Hide the view switcher entries of the bottom bar that are displayed in the sidebar.
+            // Very ugly code.
+            let view_switcher = self
+                .view_switcher
+                .first_child() // Action bar
+                .and_then(|c| c.first_child()) // Revealer
+                .and_then(|c| c.first_child()) // Center box
+                .and_then(|c| c.first_child()) // Box
+                .and_then(|c| c.next_sibling()); // View Switcher
+
+            let mut child = view_switcher.and_then(|c| c.first_child());
+
+            let mut i = 0;
+            while let Some(widget) = child {
+                if i >= MOBILE_BOTTOM_BAR_ITEMS {
+                    widget.set_visible(false);
+                }
+
+                i += 1;
+                child = widget.next_sibling();
+            }
+        }
+
+        fn setup_main_navigation(&self) {
+            self.main_navigation.push(&self.main_page.get());
+        }
+
+        fn setup_actions(&self, obj: &super::Window) {
+            let action_settings = SimpleAction::new("settings", None);
+            action_settings.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    let settings = PreferencesDialog::new(obj.client());
+                    settings.present(Some(&obj));
+                }
+            ));
+
+            let action_toggle_filter = self.settings.create_action("filter-enabled");
+
+            let action_filter_dialog = SimpleAction::new("filter-dialog", None);
+            action_filter_dialog.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    let filter_dialog = FilterDialog::new(obj.client());
+                    filter_dialog.present(Some(&obj));
+                }
+            ));
+
+            let action_about = SimpleAction::new("about", None);
+            action_about.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    let about_dialog = adw::AboutDialog::from_appdata(
+                        &(config::RESOURCES_PATH.to_owned() + config::APP_ID + ".metainfo.xml"),
+                        Some(env!("CARGO_PKG_VERSION")),
+                    );
+
+                    about_dialog.set_comments(env!("CARGO_PKG_DESCRIPTION"));
+
+                    // translators: One per line: How you want to be credited as a translator, e.g. by the name you use, and optionally an email address ("Edgar Allan Poe <edgar@poe.com>")
+                    about_dialog.set_translator_credits(&gettextrs::gettext("translator-credits"));
+                    about_dialog.set_developers(
+                        &(env!("CARGO_PKG_AUTHORS").split(':').collect::<Vec<&str>>()),
+                    );
+                    about_dialog.set_artists(&["David Lapshin <ddaudix@gmail.com>"]);
+                    about_dialog.set_designers(&["Lo"]);
+                    about_dialog.set_debug_info(&obj.debug_info());
+                    about_dialog.present(Some(&obj));
+                }
+            ));
+
+            let action_show_errors = SimpleAction::new("show-errors", None);
+            action_show_errors.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    let dialog = ErrorDialog::new(&obj.imp().errors.borrow());
+                    dialog.present(Some(&obj));
+                }
+            ));
+            let action_clear_errors = SimpleAction::new("clear-errors", None);
+            action_clear_errors.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    obj.imp().errors.borrow_mut().clear();
+                }
+            ));
+
+            let action_show_help_overlay = SimpleAction::new("show-help-overlay", None);
+            action_show_help_overlay.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    let builder = Builder::from_resource("/ui/shortcuts.ui");
+                    let shortcuts_window: ShortcutsDialog = builder
+                        .object("help_overlay")
+                        .expect("shortcuts.ui to have at least one object help_overlay");
+                    shortcuts_window.present(Some(&obj));
+                }
+            ));
+
+            let action_watch_later = SimpleAction::new("watch-later", None);
+            action_watch_later.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    if let Some(video) = obj.imp().visible_video_page().and_then(|p| p.video()) {
+                        obj.client().toggle_watch_later(video);
+                    }
+                }
+            ));
+            let action_subscribe = SimpleAction::new("subscribe", None);
+            action_subscribe.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    if let Some(channel) =
+                        obj.imp().visible_channel_page().and_then(|p| p.channel())
+                    {
+                        obj.client().toggle_subscription(channel);
+                    }
+                }
+            ));
+            let action_subscribe_or_watch_later =
+                SimpleAction::new("subscribe-or-watch-later", None);
+            action_subscribe_or_watch_later.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    // Just try both. In case e.g. the topmost stack element is not a channel, subscribing will do nothing.
+                    let _ = WidgetExt::activate_action(&obj, "win.subscribe", None::<&Variant>);
+                    let _ = WidgetExt::activate_action(&obj, "win.watch-later", None::<&Variant>);
+                }
+            ));
+
+            let action_search = SimpleAction::new("search", None);
+            action_search.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    obj.imp().main_stack.set_visible_child_name("search");
+                    // Explicitly notify that the sidebar child changed, otherwise the shortcut will not work in the search page.
+                    obj.imp().sidebar_child_changed();
+                }
+            ));
+            let action_reload = SimpleAction::new("reload", None);
+            action_reload.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    if let Some(channel_page) = obj.imp().visible_channel_page() {
+                        channel_page.reload();
+                    } else {
+                        obj.imp().video_list.reload();
+                    }
+                }
+            ));
+
+            let action_tab_feed = SimpleAction::new("tab-feed", None);
+            action_tab_feed.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    obj.imp().main_stack.set_visible_child_name("feed");
+                }
+            ));
+            let action_tab_watch_later = SimpleAction::new("tab-watch-later", None);
+            action_tab_watch_later.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    obj.imp().main_stack.set_visible_child_name("watch-later");
+                }
+            ));
+            let action_tab_subscriptions = SimpleAction::new("tab-subscriptions", None);
+            action_tab_subscriptions.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    obj.imp().main_stack.set_visible_child_name("subscriptions");
+                }
+            ));
+
+            let action_import = SimpleAction::new("import", None);
+            action_import.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    let dialog = ImportDialog::new(obj.client());
+                    dialog.present(Some(&obj));
+                }
+            ));
+            let action_export = SimpleAction::new("export", None);
+            action_export.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    let dialog = ExportDialog::new(obj.client());
+                    dialog.present(Some(&obj));
+                }
+            ));
+            let action_toggle_sidebar = SimpleAction::new("toggle-sidebar", None);
+            action_toggle_sidebar.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    let imp = obj.imp();
+                    imp.split_view
+                        .set_show_sidebar(!imp.split_view.shows_sidebar());
+                }
+            ));
+            let action_privacy_notice = SimpleAction::new("privacy-notice", None);
+            action_privacy_notice.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| {
+                    obj.imp().show_privacy_notice();
+                }
+            ));
+
+            let actions = SimpleActionGroup::new();
+            obj.insert_action_group("win", Some(&actions));
+            actions.add_action(&action_settings);
+            actions.add_action(&action_toggle_filter);
+            actions.add_action(&action_filter_dialog);
+            actions.add_action(&action_show_help_overlay);
+            actions.add_action(&action_about);
+            actions.add_action(&action_show_errors);
+            actions.add_action(&action_clear_errors);
+            actions.add_action(&action_watch_later);
+            actions.add_action(&action_subscribe);
+            actions.add_action(&action_subscribe_or_watch_later);
+            actions.add_action(&action_search);
+            actions.add_action(&action_reload);
+            actions.add_action(&action_tab_feed);
+            actions.add_action(&action_tab_watch_later);
+            actions.add_action(&action_tab_subscriptions);
+            actions.add_action(&action_import);
+            actions.add_action(&action_export);
+            actions.add_action(&action_toggle_sidebar);
+            actions.add_action(&action_privacy_notice);
+        }
+
+        fn setup_client(&self) {
+            let obj = self.obj();
+            let client = obj.client();
+            let res = client.setup();
+
+            if let Err(e) = res {
+                log::error!("Error setting up the client: {e}");
+                obj.display_error(gettextrs::gettext("Failed to set up application"), e);
+            }
+
+            gspawn!(clone!(
+                #[weak(rename_to = s)]
+                self,
+                async move {
+                    s.obj().client().setup_async().await;
+                    if s.settings.boolean("reload-on-startup") {
+                        s.video_list.reload();
+                    }
+                }
+            ));
+        }
+
+        fn show_privacy_notice(&self) {
+            let obj = self.obj();
+            let privacy_notice = PrivacyNotice::new();
+            privacy_notice.present(Some(&*obj));
+        }
+
+        fn show_privacy_toast(&self) {
+            let obj = self.obj();
+            let toast = Toast::builder()
+                .title(gettextrs::gettext("Privacy Notice"))
+                .button_label(gettextrs::gettext("More Information"))
+                .build();
+            toast.connect_button_clicked(clone!(
+                #[weak]
+                obj,
+                move |_| {
+                    obj.imp().show_privacy_notice();
+                }
+            ));
+
+            obj.show_toast(toast);
+            let _ = self.settings.set_boolean("setup-window-shown", true);
+        }
+
+        fn setup_filter_icon(&self) {
+            let obj = self.obj();
+            self.settings.connect_changed(
+                Some("filter-enabled"),
+                clone!(
+                    #[weak]
+                    obj,
+                    move |_, _| {
+                        obj.imp().set_filter_icon();
+                    }
+                ),
+            );
+            self.set_filter_icon();
+        }
+
+        fn set_filter_icon(&self) {
+            let enabled = self.settings.boolean("filter-enabled");
+            let icon_name = if enabled {
+                "funnel-symbolic"
+            } else {
+                "funnel-outline-symbolic"
+            };
+            self.btn_filter_menu.set_icon_name(icon_name);
+        }
+
+        fn setup_fullscreen(&self) {
+            // Unfullscreen the video page if the window gets unfullscreened.
+            let obj = self.obj();
+            obj.connect_fullscreened_notify(clone!(
+                #[weak]
+                obj,
+                move |_| {
+                    let Some(video_page) = obj.imp().visible_video_page() else {
+                        return;
+                    };
+                    if !obj.is_fullscreen() && video_page.fullscreened() {
+                        video_page.set_fullscreened(false);
+                    }
+                }
+            ));
+        }
+
+        fn allow_all_clapper_enhancers(&self) {
+            for proxy in clapper::global_enhancer_proxies()
+                .iter()
+                .flat_map(|p| (0..p.n_proxies()).flat_map(|i| p.peek_proxy(i)))
+            {
+                proxy.set_target_creation_allowed(true);
+            }
+        }
+
+        fn apply_seasonal_style(&self) {
+            if self.settings.boolean("seasonal-style") {
+                crate::pride::apply_seasonal_style(&self.progress_feed.get());
+            } else {
+                crate::pride::remove_seasonal_style(&self.progress_feed.get());
+            }
+        }
+    }
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for Window {
+        const NAME: &'static str = "TFWindow";
+        type Type = super::Window;
+        type ParentType = adw::ApplicationWindow;
+
+        fn class_init(klass: &mut Self::Class) {
+            VideoItem::ensure_type();
+            VideoPage::ensure_type();
+            ChannelItem::ensure_type();
+            VideoList::ensure_type();
+            FiniteVideoList::ensure_type();
+            SubscriptionsList::ensure_type();
+            VideoFetcherStream::ensure_type();
+            SubscriptionsStore::ensure_type();
+            SearchList::ensure_type();
+            SearchStream::ensure_type();
+            BottomBar::ensure_type();
+            Self::bind_template(klass);
+            Self::bind_template_callbacks(klass);
+            Utility::bind_template_callbacks(klass);
+        }
+
+        fn instance_init(obj: &InitializingObject<Self>) {
+            obj.init_template();
+        }
+    }
+
+    #[glib::derived_properties]
+    impl ObjectImpl for Window {
+        fn constructed(&self) {
+            self.parent_constructed();
+            self.setup_actions(&self.obj());
+            self.setup_splashes();
+            self.setup_sidebar();
+            self.setup_bottom_bar();
+            self.setup_main_navigation();
+            self.setup_compute_properties();
+            self.setup_filter_icon();
+            self.setup_fullscreen();
+            self.allow_all_clapper_enhancers();
+
+            self.setup_client();
+            self.sidebar_child_changed();
+
+            let obj = self.obj();
+            if PROFILE == "Devel" {
+                obj.add_css_class("devel");
+            }
+            obj.load_window_size();
+
+            self.apply_seasonal_style();
+            self.settings.connect_changed(
+                Some("seasonal-style"),
+                clone!(
+                    #[strong]
+                    obj,
+                    move |_, _| {
+                        obj.imp().apply_seasonal_style();
+                    }
+                ),
+            );
+
+            self.settings
+                .bind("watch-history-enabled", &*obj, "watch-history-enabled")
+                .build();
+
+            self.settings
+                .bind("sidebar-pinned", &*obj, "sidebar-pinned")
+                .build();
+
+            if !self.settings.boolean("setup-window-shown") {
+                self.show_privacy_toast();
+            }
+        }
+    }
+
+    impl WidgetImpl for Window {}
+    impl WindowImpl for Window {
+        fn close_request(&self) -> Propagation {
+            let obj = self.obj();
+            if let Err(err) = obj.save_window_size() {
+                log::warn!("Failed to save window state, {}", err);
+            }
+
+            // In particular, this marks all videos currently in the navigation as watched.
+            self.main_navigation.pop_to_tag("root");
+
+            let _ = obj.client().cleanup();
+
+            self.parent_close_request()
+        }
+    }
+    impl ApplicationWindowImpl for Window {}
+    impl AdwWindowImpl for Window {}
+    impl AdwApplicationWindowImpl for Window {}
+}

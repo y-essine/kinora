@@ -1,0 +1,67 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $TFSubscriptionsList: Adw.Bin {
+  vexpand: true;
+  valign: fill;
+  hexpand: true;
+  halign: fill;
+
+  Gtk.Stack stack {
+    Gtk.StackPage {
+      name: "normal";
+
+      child: ScrolledWindow scrolled_window_normal {
+        hscrollbar-policy: never;
+
+        Adw.Clamp {
+          ListBox list {
+            styles [
+              "boxed-list",
+            ]
+
+            selection-mode: none;
+            margin-top: 24;
+            margin-bottom: 24;
+            margin-start: 12;
+            margin-end: 12;
+            vexpand: true;
+            valign: start;
+            hexpand: true;
+            halign: fill;
+            tab-behavior: item;
+          }
+        }
+      };
+    }
+
+    Gtk.StackPage {
+      name: "many-subscriptions";
+
+      child: ScrolledWindow scrolled_window_many_subscriptions {
+        hscrollbar-policy: never;
+        valign: start;
+        propagate-natural-height: true;
+
+        Adw.ClampScrollable {
+          maximum-size: 1862;
+          tightening-threshold: 1862;
+
+          ListView grid {
+            styles [
+              "background-view",
+              "padded-grid",
+            ]
+
+            vexpand: true;
+            valign: fill;
+            hexpand: true;
+            halign: fill;
+            tab-behavior: item;
+            single-click-activate: true;
+          }
+        }
+      };
+    }
+  }
+}

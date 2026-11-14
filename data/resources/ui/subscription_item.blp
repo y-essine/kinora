@@ -1,0 +1,101 @@
+using Gtk 4.0;
+using Adw 1;
+using Gdk 4.0;
+
+template $TFSubscriptionItem: Adw.ActionRow {
+  activatable: true;
+  tooltip-text: bind template.channel as <$TFChannel>.name;
+
+  [prefix]
+  Box {
+    orientation: vertical;
+    valign: center;
+    margin-start: 6;
+
+    Label {
+      styles [
+        "heading",
+      ]
+
+      halign: start;
+      lines: 1;
+      ellipsize: end;
+      label: bind template.channel as <$TFChannel>.name;
+    }
+
+    Box {
+      halign: start;
+      spacing: 6;
+
+      Box {
+        spacing: 6;
+
+        Image {
+          styles [
+            "dimmed",
+          ]
+
+          icon-name: bind $icon_name_for_platform(template.channel as <$TFChannel>.platform) as <string>;
+        }
+
+        Label platform_name {
+          styles [
+            "subtitle",
+          ]
+
+          margin-end: 3;
+          visible: bind template.compact inverted;
+          label: bind $format_platform(template.channel as <$TFChannel>.platform) as <string>;
+        }
+      }
+
+      Label {
+        styles [
+          "subtitle",
+        ]
+
+        lines: 1;
+        label: bind $format_subscribers(template.channel as <$TFChannel>.subscribers) as <string>;
+        visible: bind template.channel as <$TFChannel>.has-subscribers;
+        ellipsize: end;
+      }
+    }
+  }
+
+  [prefix]
+  Adw.Avatar {
+    size: 48;
+    margin-top: 9;
+    margin-bottom: 9;
+    custom-image: bind $pixbuf_to_paintable(template.channel as <$TFChannel>.avatar) as <Gdk.Paintable>;
+    text: bind template.channel as <$TFChannel>.name;
+  }
+
+  [suffix]
+  Stack unsub_button_stack {
+    hhomogeneous: false;
+
+    StackPage {
+      name: "wide";
+
+      child: Button {
+        label: _("Unsubscribe");
+        can-shrink: true;
+        action-name: "subscription-item.unsubscribe-and-show-toast";
+        valign: center;
+      };
+    }
+
+    StackPage {
+      name: "compact";
+
+      child: Button {
+        icon-name: "user-trash-symbolic";
+        tooltip-text: _("Unsubscribe");
+        action-name: "subscription-item.unsubscribe-and-show-toast";
+        valign: center;
+        halign: end;
+      };
+    }
+  }
+}

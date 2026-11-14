@@ -1,0 +1,21 @@
+option(
+  'profile',
+  type: 'combo',
+  choices: [
+    'default',
+    'development',
+  ],
+  value: 'default',
+  description: 'The build profile for Pipeline. One of "default" or "development".'
+)
+
+option(
+  'flatpak',
+  type: 'combo',
+  choices: [
+    'true',
+    'false',
+  ],
+  value: 'false',
+  description: 'Is the build a flatpak build. One of "true" or "false".'
+)

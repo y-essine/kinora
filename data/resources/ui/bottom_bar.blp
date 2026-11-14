@@ -1,0 +1,129 @@
+using Gtk 4.0;
+using Adw 1;
+using Gdk 4.0;
+
+template $TFBottomBar: Adw.Bin {
+  Gtk.ListBox {
+    selection-mode: none;
+    accessible-role: generic;
+
+    Gtk.ListBoxRow video_bar {
+      styles [
+        "video-bar",
+        "flat",
+      ]
+
+      GestureClick {
+        button: 1;
+        exclusive: false;
+        released => $clicked() swapped;
+      }
+
+      ShortcutController {
+        scope: local;
+        propagation-phase: bubble;
+
+        Shortcut {
+          trigger: "Return|space";
+          action: "action(bottom-bar.clicked)";
+        }
+      }
+
+      height-request: 60;
+      hexpand: true;
+      tooltip-text: bind $tooltip(template.video_page as <$TFVideoPage>.video as <$TFVideo>.title) as <string>;
+      accessible-role: button;
+
+      Gtk.Box wrapping_box {
+        margin-start: 18;
+        margin-end: 18;
+        margin-top: 6;
+        margin-bottom: 6;
+        spacing: 6;
+
+        Adw.Clamp {
+          maximum-size: 100;
+
+          Picture thumbnail {
+            styles [
+              "card",
+            ]
+
+            content-fit: fill;
+            paintable: bind $pixbuf_to_paintable(
+              template.video_page as <$TFVideoPage>.video as <$TFVideo>.thumbnail
+              ) as <Gdk.Paintable>;
+          }
+        }
+
+        Gtk.Box {
+          halign: start;
+          valign: center;
+          hexpand: true;
+          orientation: vertical;
+
+          Gtk.Label {
+            styles [
+              "heading",
+            ]
+
+            halign: start;
+            xalign: 0;
+            lines: 1;
+            ellipsize: end;
+            label: bind template.video_page as <$TFVideoPage>.video as <$TFVideo>.title;
+          }
+
+          Gtk.Label label_uploader {
+            styles [
+              "dimmed",
+            ]
+
+            halign: start;
+            xalign: 0;
+            lines: 1;
+            ellipsize: end;
+            label: bind template.video_page as <$TFVideoPage>.video as <$TFVideo>.uploader as <$TFChannel>.name;
+          }
+        }
+
+        Gtk.Label label_duration {
+          styles [
+            "dimmed",
+            "monospace",
+          ]
+
+          label: bind $format_duration(
+            template.video_page as <$TFVideoPage>.position,
+            template.video_page as <$TFVideoPage>.duration
+            ) as <string>;
+        }
+
+        Gtk.Button {
+          styles [
+            "flat",
+            "circular",
+          ]
+
+          valign: center;
+          icon-name: bind $play_pause_icon(template.video_page as <$TFVideoPage>.state) as <string>;
+          sensitive: bind $play_pause_sensitive(template.video_page as <$TFVideoPage>.state) as <bool>;
+          tooltip-text: bind $play_pause_tooltip(template.video_page as <$TFVideoPage>.state) as <string>;
+          clicked => $play_pause() swapped;
+        }
+
+        Gtk.Button {
+          styles [
+            "flat",
+            "circular",
+          ]
+
+          valign: center;
+          icon-name: "window-close-symbolic";
+          tooltip-text: _("Dismiss bottom bar");
+          clicked => $dismissed() swapped;
+        }
+      }
+    }
+  }
+}

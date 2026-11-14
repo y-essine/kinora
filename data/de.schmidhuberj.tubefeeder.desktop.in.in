@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Icon=@app-id@
+Name=Pipeline
+Comment=Follow video creators
+StartupWMClass=Pipeline
+StartupNotify=true
+Exec=@bindir@/tubefeeder
+Categories=Video;AudioVideo
+X-Purism-FormFactor=Workstation;Mobile;
+Keywords=youtube;peertube;video;

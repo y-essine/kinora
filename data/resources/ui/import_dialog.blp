@@ -1,0 +1,136 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $TFImportDialog: Adw.Dialog {
+  title: _("Import");
+  content-width: 400;
+  content-height: 250;
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {}
+
+    Gtk.Box {
+      margin-start: 12;
+      margin-end: 12;
+      margin-bottom: 12;
+      margin-top: 6;
+      orientation: vertical;
+      vexpand: true;
+      valign: center;
+      halign: center;
+      spacing: 12;
+
+      Gtk.ListBox {
+        styles [
+          "boxed-list",
+        ]
+
+        selection-mode: none;
+
+        Adw.ComboRow format_row {
+          title: _("Format");
+
+          model: Gtk.StringList {
+            strings [
+              "YouTube",
+              "Pipeline",
+              "NewPipe",
+              "Invidious",
+            ]
+          };
+        }
+      }
+
+      Gtk.Stack stack {
+        styles [
+          "dimmed",
+        ]
+
+        visible-child-name: bind $get_format(format_row as <Adw.ComboRow>.selected-item) as <string>;
+
+        StackPage {
+          name: "Pipeline";
+
+          child: Gtk.Label {
+            styles [
+              "warning",
+              "caption",
+            ]
+
+            label: _(
+              "Importing data from a previous Pipeline export will overwrite all current data. Restarting is recommended after importing"
+            );
+            wrap: true;
+            justify: center;
+          };
+        }
+
+        StackPage {
+          name: "YouTube";
+
+          child: Gtk.Label {
+            styles [
+              "caption",
+            ]
+
+            label: _(
+              "To import subscriptions from YouTube, you need to export your subscriptions as a CSV from <a href=\"https://takeout.google.com/settings/takeout/downloads\">Google Takeout</a>. Afterwards, select the downloaded file to import it into Pipeline"
+            );
+            wrap: true;
+            use-markup: true;
+            justify: center;
+          };
+        }
+
+        StackPage {
+          name: "NewPipe";
+
+          child: Gtk.Label {
+            styles [
+              "caption",
+            ]
+
+            label: _(
+              "To import subscriptions from NewPipe, you need to export your subscriptions to a JSON file. Afterwards, select the downloaded file to import it into Pipeline"
+            );
+            wrap: true;
+            justify: center;
+          };
+        }
+
+        StackPage {
+          name: "Invidious";
+
+          child: Gtk.Label {
+            styles [
+              "caption",
+            ]
+
+            label: _(
+              "To import subscriptions from Invidious, you need to export your subscriptions to a JSON file. Afterwards, select the downloaded file to import it into Pipeline"
+            );
+            wrap: true;
+            justify: center;
+          };
+        }
+      }
+
+      Gtk.Button button {
+        styles [
+          "suggested-action",
+          "pill",
+        ]
+
+        child: Adw.ButtonContent {
+          icon-name: "folder-drag-accept-symbolic";
+          label: _("Import");
+        };
+
+        margin-top: 6;
+        halign: center;
+        clicked => $import() swapped;
+      }
+    }
+  };
+}

@@ -1,0 +1,535 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $TFWindow: Adw.ApplicationWindow {
+  can-focus: true;
+  width-request: 360;
+  height-request: 300;
+  title: _("Pipeline");
+
+  Adw.Breakpoint {
+    condition ("max-width: 600sp")
+
+    setters {
+      template.breakpoint-collapsed: true;
+    }
+  }
+
+  // Hide splash text if height is too small and the text could maybe overlap with the status page text.
+  Adw.Breakpoint {
+    condition ("max-height: 450sp")
+
+    setters {
+      label_splash.visible: false;
+    }
+  }
+
+  // There can only be one breakpoint active at a time (always the last one), therefore combine the above two breakpoints.
+  Adw.Breakpoint {
+    condition ("max-width: 800sp and max-height: 450sp")
+
+    setters {
+      template.breakpoint_collapsed: true;
+      label_splash.visible: false;
+    }
+  }
+
+  content: Adw.OverlaySplitView split_view {
+    content: Adw.NavigationPage {
+      Adw.ToastOverlay toast_overlay {
+        child: Adw.ToolbarView {
+          styles [
+            "main-toolbar",
+          ]
+
+          bottom-bar-style: bind $bottom_bar_style_for_video_bar_visible(
+            video_action_bar.reveal-child
+            ) as <Adw.ToolbarStyle>;
+
+          content: Adw.NavigationView main_navigation {
+            popped => $navigation_popped() swapped;
+          };
+
+          [bottom]
+          Gtk.Revealer video_action_bar {
+            reveal-child: bind $is_some(template.video_page_for_bottom_bar) as <bool>;
+
+            $TFBottomBar bottom_bar {
+              video_page: bind template.video_page_for_bottom_bar as <Adw.NavigationPage>.child;
+              compact: bind template.breakpoint_collapsed;
+              activated => $bottom_bar_clicked() swapped;
+              dismissed => $bottom_bar_dismissed() swapped;
+              play-pause => $bottom_bar_play_pause() swapped;
+            }
+          }
+
+          [bottom]
+          Adw.ViewSwitcherBar view_switcher {
+            stack: main_stack;
+          }
+        };
+      }
+    };
+
+    sidebar: sidebar_page;
+    show-sidebar: true;
+    collapsed: bind $or(template.breakpoint_collapsed, $not(template.sidebar-pinned) as <bool>) as <bool>;
+  };
+}
+
+Adw.NavigationPage main_page {
+  title: bind main_title.title;
+  tag: "root";
+
+  Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar main_headerbar {
+      show-back-button: false;
+
+      [start]
+      Gtk.ToggleButton main_toggle_sidebar {
+        visible: bind $or(
+          template.main-show-sidebar-visible,
+          template.breakpoint_collapsed,
+          $not(template.sidebar-pinned) as <bool>
+        ) as <bool>;
+        focus-on-click: false;
+        tooltip-text: _("Show Sidebar");
+        action-name: "win.toggle-sidebar";
+        icon-name: "sidebar-show-symbolic";
+      }
+
+      [start]
+      Gtk.Stack {
+        transition-type: crossfade;
+        visible: bind $feed_visible(main_stack.visible-child-name) as <bool>;
+        visible-child-name: bind $refresh_button_visible_child_name(
+          video_list.model as <$TFVideoFetcherStream>.loading
+          ) as <string>;
+
+        StackPage {
+          name: 'button';
+
+          child: Gtk.Button {
+            icon-name: "view-refresh-symbolic";
+            action-name: "win.reload";
+            tooltip-text: _("Reload");
+          };
+        }
+
+        StackPage {
+          name: 'spinner';
+
+          child: Adw.Spinner {
+            halign: center;
+            valign: center;
+
+            GestureClick {
+              button: 1;
+              exclusive: true;
+              pressed => $handle_spinner_pressed() swapped;
+            }
+          };
+        }
+      }
+
+      [end]
+      MenuButton main_primary_menu {
+        accessibility {
+          label: C_("accessibility", "Primary menu");
+        }
+
+        primary: true;
+        tooltip-text: C_("tooltip", "Primary menu");
+        menu-model: menubar;
+        icon-name: 'open-menu-symbolic';
+      }
+
+      [end]
+      Button btn_filter_menu {
+        visible: bind $feed_visible(main_stack.visible-child-name) as <bool>;
+        action-name: "win.filter-dialog";
+        tooltip-text: _("Filters");
+        icon-name: "funnel-symbolic";
+      }
+
+      title-widget: Adw.WindowTitle main_title {};
+    }
+
+    content: main_stack;
+  }
+}
+
+Adw.ViewStack main_stack {
+  notify::visible-child-name => $sidebar_child_changed() swapped;
+
+  Adw.ViewStackPage {
+    name: "feed";
+    title: _("Feed");
+    icon-name: "user-home-symbolic";
+
+    child: Gtk.Overlay {
+      [overlay]
+      Gtk.ProgressBar progress_feed {
+        styles [
+          "osd",
+        ]
+
+        valign: start;
+        fraction: bind video_list.model as <$TFVideoFetcherStream>.loaded-fraction;
+        visible: bind video_list.model as <$TFVideoFetcherStream>.loading;
+      }
+
+      Gtk.Box {
+        $TFVideoList video_list {
+          client: bind template.client;
+          compact: bind template.breakpoint_collapsed;
+          visible: bind $not(video_list.model as <$TFVideoFetcherStream>.is-empty) as <bool>;
+          play-video => $play_video() swapped;
+          copy-video-url => $copy_video_url() swapped;
+          download => $download() swapped;
+          remove-downloaded => $remove_downloaded() swapped;
+          filter-out-similar-enabled: true;
+        }
+
+        Adw.StatusPage {
+          visible: bind $and(
+            template.client as <$TFClient>.subscriptions-store as <$TFSubscriptionsStore>.is-empty,
+            video_list.model as <$TFVideoFetcherStream>.is-empty
+            ) as <bool>;
+          hexpand: true;
+          title: _("No Subscriptions Yet");
+          description: _("Subscribe to channels or import your subscriptions");
+          icon-name: "library-artists-symbolic";
+
+          child: Button {
+            styles [
+              "pill",
+            ]
+
+            halign: center;
+            label: _("Import Subscriptions");
+            action-name: "win.import";
+          };
+        }
+
+        Gtk.Overlay overlay_videos {
+          visible: bind $and(
+            video_list.model as <$TFVideoFetcherStream>.loading,
+            video_list.model as <$TFVideoFetcherStream>.is-empty
+            ) as <bool>;
+
+          Adw.StatusPage {
+            hexpand: true;
+            title: _("Loading Videos");
+            icon-name: "view-refresh-symbolic";
+          }
+
+          [overlay]
+          Gtk.Label label_splash {
+            valign: end;
+            halign: center;
+            use-markup: true;
+            wrap: true;
+            natural-wrap-mode: none;
+            margin-bottom: 12;
+            margin-start: 6;
+            margin-end: 6;
+            justify: center;
+          }
+        }
+
+        Adw.StatusPage {
+          visible: bind $and(
+            video_list.model as <$TFVideoFetcherStream>.is-empty,
+            $not(video_list.model as <$TFVideoFetcherStream>.loading) as <bool>,
+            $not(template.client as <$TFClient>.subscriptions-store as <$TFSubscriptionsStore>.is-empty) as <bool>
+          ) as <bool>;
+          hexpand: true;
+          title: _("No Videos");
+          description: _("Try Reloading");
+          icon-name: "user-home-symbolic";
+        }
+      }
+    };
+  }
+
+  Adw.ViewStackPage search_page {
+    name: "search";
+    title: _("Search");
+    icon-name: "system-search-symbolic";
+
+    child: Gtk.Box {
+      orientation: vertical;
+
+      Adw.Clamp {
+        Gtk.SearchEntry search_entry {
+          styles [
+            "search",
+            "rounded",
+          ]
+
+          activate => $search() swapped;
+          placeholder-text: _("Explore videos and creators");
+          hexpand: true;
+          margin-top: 6;
+          margin-bottom: 6;
+          margin-start: 6;
+          margin-end: 6;
+        }
+      }
+
+      $TFSearchList search_list {
+        client: bind template.client;
+        compact: bind template.breakpoint_collapsed;
+        visible: bind $not(search_list.model as <$TFSearchStream>.is-empty) as <bool>;
+        play-video => $play_video() swapped;
+        copy-video-url => $copy_video_url() swapped;
+        download => $download() swapped;
+        remove-downloaded => $remove_downloaded() swapped;
+        display-channel => $display_channel() swapped;
+      }
+
+      Adw.StatusPage status_search {
+        visible: bind $and(
+          search_list.model as <$TFSearchStream>.loading,
+          search_list.model as <$TFSearchStream>.is-empty
+          ) as <bool>;
+        hexpand: true;
+        vexpand: true;
+        title: _("Searching");
+
+        paintable: Adw.SpinnerPaintable {
+          widget: status_search;
+        };
+      }
+
+      Adw.StatusPage {
+        visible: bind $and(
+          $not(search_list.model as <$TFSearchStream>.loading) as <bool>,
+          search_list.model as <$TFSearchStream>.is-empty
+          ) as <bool>;
+        hexpand: true;
+        vexpand: true;
+        title: _("Search");
+        icon-name: "system-search-symbolic";
+      }
+    };
+  }
+
+  Adw.ViewStackPage {
+    name: "watch-later";
+    title: _("Watch Later");
+    icon-name: "bookmark-toggled-symbolic";
+
+    child: Box {
+      $TFFiniteVideoList watch_later_list {
+        visible: bind $not(
+          template.client as <$TFClient>.watch-later-store as <$TFFiniteVideoStore>.is-empty
+          ) as <bool>;
+        client: bind template.client;
+        model: bind template.client as <$TFClient>.watch-later-store;
+        compact: bind template.breakpoint_collapsed;
+        play-video => $play_video() swapped;
+        copy-video-url => $copy_video_url() swapped;
+        download => $download() swapped;
+        remove-downloaded => $remove_downloaded() swapped;
+      }
+
+      Adw.StatusPage {
+        visible: bind template.client as <$TFClient>.watch-later-store as <$TFFiniteVideoStore>.is-empty;
+        hexpand: true;
+        title: _("No Videos");
+        description: _("Add videos to your watch later list to display them here");
+        icon-name: "bookmark-toggled-symbolic";
+      }
+    };
+  }
+
+  Adw.ViewStackPage {
+    name: "downloades";
+    title: _("Downloads");
+    icon-name: "folder-download-symbolic";
+
+    child: Box {
+      $TFFiniteVideoList downloaded_list {
+        visible: bind $not(template.client as <$TFClient>.downloaded-store as <$TFFiniteVideoStore>.is-empty) as <bool>;
+        client: bind template.client;
+        model: bind template.client as <$TFClient>.downloaded-store;
+        compact: bind template.breakpoint_collapsed;
+        play-video => $play_video() swapped;
+        copy-video-url => $copy_video_url() swapped;
+        download => $download() swapped;
+        remove-downloaded => $remove_downloaded() swapped;
+      }
+
+      Adw.StatusPage {
+        visible: bind template.client as <$TFClient>.downloaded-store as <$TFFiniteVideoStore>.is-empty;
+        hexpand: true;
+        title: _("No Videos");
+        description: _("Download videos to display them here");
+        icon-name: "folder-download-symbolic";
+      }
+    };
+  }
+
+  Adw.ViewStackPage {
+    name: "history";
+    title: _("History");
+    icon-name: "emoji-recent-symbolic";
+
+    child: Box {
+      $TFFiniteVideoList history_list {
+        visible: bind $not(template.client as <$TFClient>.watched-store as <$TFFiniteVideoStore>.is-empty) as <bool>;
+        client: bind template.client;
+        model: bind template.client as <$TFClient>.watched-store;
+        compact: bind template.breakpoint_collapsed;
+        play-video => $play_video() swapped;
+        copy-video-url => $copy_video_url() swapped;
+        download => $download() swapped;
+        remove-downloaded => $remove_downloaded() swapped;
+      }
+
+      Adw.StatusPage {
+        visible: bind $and(
+          template.client as <$TFClient>.watched-store as <$TFFiniteVideoStore>.is-empty,
+          template.watch-history-enabled
+          ) as <bool>;
+        hexpand: true;
+        title: _("No History");
+        description: _("Watched videos will be displayed here");
+        icon-name: "emoji-recent-symbolic";
+      }
+
+      Adw.StatusPage {
+        visible: bind $not(template.watch-history-enabled) as <bool>;
+        hexpand: true;
+        title: _("No History");
+        description: _("You turned off your watch history in the preferences");
+        icon-name: "emoji-recent-symbolic";
+      }
+    };
+  }
+
+  Adw.ViewStackPage {
+    name: "subscriptions";
+    title: _("Subscriptions");
+    icon-name: "library-artists-symbolic";
+
+    child: Box {
+      Adw.StatusPage {
+        visible: bind template.client as <$TFClient>.subscriptions-store as <$TFSubscriptionsStore>.is-empty;
+        hexpand: true;
+        title: _("No Subscriptions Yet");
+        description: _("Subscribe to channels or import your subscriptions");
+        icon-name: "library-artists-symbolic";
+
+        child: Button {
+          styles [
+            "pill",
+          ]
+
+          halign: center;
+          label: _("Import Subscriptions");
+          action-name: "win.import";
+        };
+      }
+
+      $TFSubscriptionsList subscription_list {
+        visible: bind $not(
+          template.client as <$TFClient>.subscriptions-store as <$TFSubscriptionsStore>.is-empty
+          ) as <bool>;
+        compact: bind template.breakpoint_collapsed;
+        client: bind template.client;
+        model: bind template.client as <$TFClient>.subscriptions-store;
+        display-channel => $display_channel() swapped;
+        show-unsubscribe-toast => $show_unsubscribe_toast() swapped;
+      }
+    };
+  }
+}
+
+Adw.NavigationPage sidebar_page {
+  // I don't think this will ever be shown.
+  title: _("Sidebar");
+
+  Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar sidebar_headerbar {
+      [start]
+      Gtk.ToggleButton sidebar_toggle_sidebar {
+        visible: bind split_view.collapsed inverted;
+        focus-on-click: false;
+        tooltip-text: _("Hide Sidebar");
+        action-name: "win.toggle-sidebar";
+        icon-name: "sidebar-show-symbolic";
+      }
+
+      [end]
+      Gtk.ToggleButton toggle_sidebar_pinned {
+        active: bind template.sidebar-pinned bidirectional;
+        visible: bind template.breakpoint_collapsed inverted;
+        focus-on-click: false;
+        tooltip-text: bind $pin_label(template.sidebar-pinned) as <string>;
+        icon-name: "view-pin-symbolic";
+      }
+
+      title-widget: Gtk.Box {
+        Adw.WindowTitle sidebar_title {
+          title: _("Pipeline");
+        }
+      };
+    }
+
+    content: Gtk.ListBox sidebar_list {
+      styles [
+        "navigation-sidebar",
+      ]
+
+      selection-mode: none;
+      tab-behavior: item;
+    };
+  }
+}
+
+Adw.Toast toast_error {
+  button-label: _("Show");
+  action-name: "win.show-errors";
+}
+
+// Keep up-to-date with video_page.blp  and channel_page.blp.
+menu menubar {
+  section {
+    item {
+      label: _("Import");
+      action: 'win.import';
+    }
+
+    item {
+      label: _("Export");
+      action: 'win.export';
+    }
+  }
+
+  section {
+    item {
+      label: _("Preferences");
+      action: 'win.settings';
+    }
+
+    item {
+      label: _("Privacy Notice");
+      action: 'win.privacy-notice';
+    }
+
+    item {
+      label: _("Keyboard Shortcuts");
+      action: 'win.show-help-overlay';
+    }
+
+    item {
+      label: _("About Pipeline");
+      action: 'win.about';
+    }
+  }
+}

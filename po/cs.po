@@ -1,0 +1,1727 @@
+# Czech translations
+# This file is distributed under the same license as the PACKAGE package.
+# vikdevelop <super-vik1@protonmail.com>, 2022.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: 1.5.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-18 11:19+0200\n"
+"PO-Revision-Date: 2026-04-19 12:09+0000\n"
+"Last-Translator: Rosťa Václavík <placa22@gmail.com>\n"
+"Language-Team: Czech <https://hosted.weblate.org/projects/schmiddi-on-mobile/"
+"pipeline/cs/>\n"
+"Language: cs\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=((n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2);\n"
+"X-Generator: Weblate 5.17.1-dev\n"
+
+#: data/de.schmidhuberj.tubefeeder.desktop.in.in:4
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:6
+#: data/resources/ui/window.blp:8 data/resources/ui/window.blp:479
+#: src/gui/video_page.rs:606 src/main.rs:163
+msgid "Pipeline"
+msgstr "Pipeline"
+
+#: data/de.schmidhuberj.tubefeeder.desktop.in.in:5
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:7
+msgid "Follow video creators"
+msgstr "Sledujte tvůrce videí"
+
+#: data/de.schmidhuberj.tubefeeder.desktop.in.in:11
+msgid "youtube;peertube;video;"
+msgstr "youtube;peertube;video;"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:460
+msgid ""
+"Pipeline lets you watch and download videos from YouTube and PeerTube, all "
+"without needing to navigate through different websites. Its adaptive design "
+"allows you to enjoy content on any screen size."
+msgstr ""
+"Pipeline vám umožňuje sledovat a stahovat videa z YouTube a PeerTube, a to "
+"bez nutnosti procházet více různých webových stránek. Díky jeho adaptivnímu "
+"designu si můžete užít obsah na obrazovce jakékoli velikosti."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:465
+msgid "Pipeline allows you to:"
+msgstr "Pipeline Vám umožňuje:"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:471
+msgid "Search for you favorite channels and subscribe to them."
+msgstr "Najděte svoje oblíbené kanály a dejte jim odběr."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:473
+msgid "Aggregate the videos of all subscriptions into a single feed."
+msgstr "Získejte sjednocený přehled nových videí od všech vašich odběrů."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:475
+msgid ""
+"Filter out unwanted items from the feed, like short videos or videos from a "
+"series."
+msgstr ""
+"Skryjte nežádoucí položky jako je krátkometrážní obsah nebo videa ze série."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:477
+msgid ""
+"Play those videos either in the built-in video player or with any other "
+"video player of your choice."
+msgstr ""
+"Přehrávejte videa buď pomocí zabudovaného přehrávače nebo jakéhokoli jiného "
+"dle vaší volby."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:479
+msgid "Download videos for offline viewing."
+msgstr "Stahujte videa pro sledování bez internetu."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:481
+msgid "Manage videos you want to watch later."
+msgstr "Označte videa, která chcete zhlédnout později."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:483
+msgid "Import your subscriptions from NewPipe or YouTube."
+msgstr "Importujte odběry z aplikace NewPipe nebo webu YouTube."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:485
+msgid ""
+"Supports YouTube, PeerTube with the possibility to extend to other platforms "
+"on request."
+msgstr ""
+"Podporuje YouTube a PeerTube s možností rozšířit podporu o jiné platformy, "
+"kdyby byl zájem."
+
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:491
+msgid "Playing a Video"
+msgstr "Přehrávání videa"
+
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:495
+msgid "Viewing Videos of a Channel"
+msgstr "Procházení videí na kanálu"
+
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:499
+msgid "Managing your Subscriptions"
+msgstr "Správa vašich odběrů"
+
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:503
+msgid "Listing Videos to Watch Later"
+msgstr "Zobrazování videí v seznamu Přehrát později"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:6
+msgid "Window width"
+msgstr "Šířka okna"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:10
+msgid "Window height"
+msgstr "Výška okna"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:14
+msgid "Window maximized state"
+msgstr "Maximalizovaný stav okna"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:18
+msgid "Whether the sidebar is pinned"
+msgstr "Zda postranní panel připnutý"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:22
+msgid "The player to use"
+msgstr "Přehrávač k použití"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:26
+msgid "The downloader to use"
+msgstr "Služba stahování k použití"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:30
+msgid "The default format for downloading videos."
+msgstr "Výchozí formát pro stahování videí."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:34
+msgid "Additional yt-dlp arguments."
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:38
+msgid "Let Pipeline fetch videos from YouTube"
+msgstr "Umožněte Pipeline načíst videa z YouTube"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:42
+msgid "The piped api url"
+msgstr "URL piped api"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:46
+msgid "Automatically manage Piped instances."
+msgstr "Automaticky spravovat instance Piped."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:50
+msgid "The piped api urls"
+msgstr "URL adresy piped api"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:55
+msgid ""
+"How to query data from YouTube; can be either \"rustyipe\", \"piped\", "
+"\"rustypipe-then-piped\", or \"piped-then-rustypipe\" (with potential future "
+"values reserved for in the future)."
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:60
+msgid "Let Pipeline fetch videos from PeerTube"
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:64
+msgid "The peertube api used for searches"
+msgstr "peertube api sloužící pro hledání"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:68
+msgid "Only show videos of yesterday."
+msgstr "Zobrazovat pouze včerejší videa."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:72
+msgid "Remove short videos."
+msgstr "Odebrat krátká videa."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:76
+msgid "Remove videos which require payment."
+msgstr "Odebrat videa které vyžadují platbu."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:80
+msgid "Remove videos which have already been watched."
+msgstr "Odstraňte videa, která jste již shlédli."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:84
+msgid "Whether the filter is enabled."
+msgstr "Zda je filtr zapnut."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:88
+msgid "Whether the application keeps the history of watched videos."
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:92
+msgid "The type of platform for which the last subscription was added."
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:96
+msgid "Whether to reload when starting the application."
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:100
+msgid "Whether to play with the external player by default."
+msgstr ""
+
+#. Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:105
+msgid "Whether to show the splash text when reloading the feed."
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:109
+msgid ""
+"Whether to apply seasonal styling to the application, based on annual "
+"celebrations (e.g. pride month)."
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:113
+msgid "Whether the setup window was already shown."
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:117
+msgid "Whether cairo should be used for rendering."
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:123
+msgid "Stores last volume value to apply on startup"
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:127
+msgid "Stores last speed value to apply on startup"
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:131
+msgid "Stores whether subtitles are enabled value to apply on startup"
+msgstr ""
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:136
+msgid "Stores initial adaptive streaming bitrate to apply on startup"
+msgstr ""
+
+#: data/resources/ui/bottom_bar.blp:123
+msgid "Dismiss bottom bar"
+msgstr "Zahodit spodní pruh"
+
+#: data/resources/ui/channel_page.blp:15 data/resources/ui/video_page.blp:121
+#: data/resources/ui/window.blp:97
+msgid "Show Sidebar"
+msgstr ""
+
+#: data/resources/ui/channel_page.blp:33 data/resources/ui/window.blp:116
+msgid "Reload"
+msgstr "Načíst znovu"
+
+#: data/resources/ui/channel_page.blp:50 data/resources/ui/video_page.blp:129
+#: data/resources/ui/window.blp:139
+msgctxt "accessibility"
+msgid "Primary menu"
+msgstr "Hlavní nabídka"
+
+#: data/resources/ui/channel_page.blp:55 data/resources/ui/video_page.blp:134
+#: data/resources/ui/window.blp:143
+msgctxt "tooltip"
+msgid "Primary menu"
+msgstr ""
+
+#: data/resources/ui/channel_page.blp:194
+msgid "Description"
+msgstr "Popis"
+
+#: data/resources/ui/channel_page.blp:222 data/resources/ui/window.blp:224
+msgid "Loading Videos"
+msgstr ""
+
+#: data/resources/ui/channel_page.blp:245 data/resources/ui/import_dialog.blp:5
+#: data/resources/ui/import_dialog.blp:127 data/resources/ui/video_page.blp:511
+#: data/resources/ui/window.blp:504 src/gui/import_dialog.rs:69
+#: src/gui/import_dialog.rs:107 src/gui/import_dialog.rs:145
+#: src/gui/import_dialog.rs:183
+msgid "Import"
+msgstr "Importovat"
+
+#: data/resources/ui/channel_page.blp:250 data/resources/ui/export_dialog.blp:7
+#: data/resources/ui/export_dialog.blp:105 data/resources/ui/video_page.blp:516
+#: data/resources/ui/window.blp:509 src/gui/export_dialog.rs:60
+#: src/gui/export_dialog.rs:99 src/gui/export_dialog.rs:140
+msgid "Export"
+msgstr "Exportovat"
+
+#: data/resources/ui/channel_page.blp:257 data/resources/ui/video_page.blp:523
+#: data/resources/ui/window.blp:516
+msgid "Preferences"
+msgstr "Předvolby"
+
+#: data/resources/ui/channel_page.blp:262
+#: data/resources/ui/privacy_notice.blp:13 data/resources/ui/video_page.blp:528
+#: data/resources/ui/window.blp:521 src/gui/window.rs:1491
+msgid "Privacy Notice"
+msgstr ""
+
+#: data/resources/ui/channel_page.blp:267 data/resources/ui/video_page.blp:533
+#: data/resources/ui/window.blp:526
+msgid "Keyboard Shortcuts"
+msgstr ""
+
+#: data/resources/ui/channel_page.blp:272 data/resources/ui/video_page.blp:538
+#: data/resources/ui/window.blp:531
+msgid "About Pipeline"
+msgstr "O aplikaci Pipeline"
+
+#: data/resources/ui/error_dialog.blp:12
+msgid "Errors"
+msgstr "Chyby"
+
+#: data/resources/ui/error_dialog.blp:20
+msgid "Clear Errors"
+msgstr "Smazat chybová hlášení"
+
+#. Translators: The format a video will be downloaded in.
+#: data/resources/ui/export_dialog.blp:32
+#: data/resources/ui/import_dialog.blp:32
+#: data/resources/ui/preferences_dialog.blp:36
+msgid "Format"
+msgstr ""
+
+#: data/resources/ui/export_dialog.blp:60
+msgid ""
+"Export all the data Pipeline stores, in order to backup the data or import "
+"into another Pipeline instance"
+msgstr ""
+
+#: data/resources/ui/export_dialog.blp:76
+msgid ""
+"Export as a YouTube CSV format. While YouTube itself cannot import it, it "
+"can be used in other applications. This only exports YouTube subscriptions"
+msgstr ""
+
+#: data/resources/ui/export_dialog.blp:92
+msgid ""
+"Produces a JSON file with your subscriptions which can be imported into "
+"NewPipe"
+msgstr ""
+
+#: data/resources/ui/filter_dialog.blp:5 data/resources/ui/filter_dialog.blp:8
+msgid "Manage Filters"
+msgstr "Spravovat filtry"
+
+#: data/resources/ui/filter_dialog.blp:19
+msgid "Use Filters"
+msgstr "Použít filtry"
+
+#: data/resources/ui/filter_dialog.blp:20
+msgid "Hide videos from the feed"
+msgstr "Skrýt videa z kanálu"
+
+#: data/resources/ui/filter_dialog.blp:26
+msgid "General Filters"
+msgstr "Obecné filtry"
+
+#: data/resources/ui/filter_dialog.blp:30
+msgid "Hide Watched Videos"
+msgstr "Skrýt zhlédnutá videa"
+
+#: data/resources/ui/filter_dialog.blp:31
+msgid "Hide videos you have already watched from the feed"
+msgstr "Skrýt z kanálu ta videa, která už jste shlédli"
+
+#: data/resources/ui/filter_dialog.blp:35
+msgid "Hide Short Videos"
+msgstr "Skrýt krátká videa"
+
+#: data/resources/ui/filter_dialog.blp:36
+msgid "Hide videos shorter than one minute from the feed"
+msgstr "Skrýt z kanálu videa kratší než jedna minuta"
+
+#: data/resources/ui/filter_dialog.blp:40
+msgid "Hide Payed Videos"
+msgstr "Skrýt placená videa"
+
+#: data/resources/ui/filter_dialog.blp:41
+msgid "Hide videos that require a payment from the feed"
+msgstr "Skrýt z kanálu videa vyžadující platbu"
+
+#: data/resources/ui/filter_dialog.blp:45
+msgid "Hide Videos from Today"
+msgstr "Skrýt videa z dnešního dne"
+
+#: data/resources/ui/filter_dialog.blp:46
+msgid "Hide videos that came out today from the feed"
+msgstr "Skrýt z kanálu videa zveřejněná dnes"
+
+#: data/resources/ui/filter_dialog.blp:52
+#: data/resources/ui/filter_dialog.blp:57
+msgid "Custom Filters"
+msgstr "Vlastní filtry"
+
+#: data/resources/ui/filter_dialog.blp:59
+msgid ""
+"Hide a channel's videos whose titles contain a certain word or phrase\n"
+"\n"
+"You can create custom filters either here or prepopulate the information "
+"from a video's context menu"
+msgstr ""
+
+#: data/resources/ui/filter_dialog.blp:71
+#: data/resources/ui/filter_similar_dialog.blp:5
+#: data/resources/ui/filter_similar_dialog.blp:28
+msgid "Add Filter"
+msgstr "Přidat filtr"
+
+#: data/resources/ui/filter_similar_dialog.blp:7
+msgid ""
+"Hide videos from the feed if they contain a specific phrase in their titles "
+"and were uploaded by a specific channel"
+msgstr ""
+
+#: data/resources/ui/filter_similar_dialog.blp:17
+msgid "Phrase to Filter"
+msgstr "Fráze které filtrovat"
+
+#: data/resources/ui/filter_similar_dialog.blp:21
+msgid "Channel"
+msgstr "Kanál"
+
+#: data/resources/ui/filter_similar_dialog.blp:29
+#: src/gui/preferences_dialog.rs:545
+msgid "Cancel"
+msgstr "Zrušit"
+
+#: data/resources/ui/import_dialog.blp:62
+msgid ""
+"Importing data from a previous Pipeline export will overwrite all current "
+"data. Restarting is recommended after importing"
+msgstr ""
+
+#: data/resources/ui/import_dialog.blp:78
+msgid ""
+"To import subscriptions from YouTube, you need to export your subscriptions "
+"as a CSV from <a href=\"https://takeout.google.com/settings/takeout/"
+"downloads\">Google Takeout</a>. Afterwards, select the downloaded file to "
+"import it into Pipeline"
+msgstr ""
+
+#: data/resources/ui/import_dialog.blp:95
+msgid ""
+"To import subscriptions from NewPipe, you need to export your subscriptions "
+"to a JSON file. Afterwards, select the downloaded file to import it into "
+"Pipeline"
+msgstr ""
+
+#: data/resources/ui/import_dialog.blp:111
+msgid ""
+"To import subscriptions from Invidious, you need to export your "
+"subscriptions to a JSON file. Afterwards, select the downloaded file to "
+"import it into Pipeline"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:6
+#: data/resources/ui/preferences_dialog.blp:10
+#: data/resources/ui/shortcuts.blp:6
+msgid "General"
+msgstr "Obecné"
+
+#: data/resources/ui/preferences_dialog.blp:13
+msgid "Reload on Startup"
+msgstr "Znovunačíst při spuštění"
+
+#: data/resources/ui/preferences_dialog.blp:17
+msgid "Keep Watch History"
+msgstr "Ponechat historii přehrávání"
+
+#: data/resources/ui/preferences_dialog.blp:32
+#, fuzzy
+#| msgid "External Video Downloader"
+msgid "Video Downloads"
+msgstr "Externí nástroj pro stahování videí"
+
+#: data/resources/ui/preferences_dialog.blp:40
+msgid "Custom Download Format"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:46
+msgid "Custom yt-dlp Arguments"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:53
+msgid "External Programs"
+msgstr "Externí programy"
+
+#: data/resources/ui/preferences_dialog.blp:56
+msgid "Play with External Player by Default"
+msgstr "Přehrávání externím přehrávačem jako výchozí"
+
+#: data/resources/ui/preferences_dialog.blp:60
+msgid "External Video Player"
+msgstr "Externí přehrávač videa"
+
+#: data/resources/ui/preferences_dialog.blp:68
+msgid "YouTube Preferences"
+msgstr "Předvolby pro YouTube"
+
+#: data/resources/ui/preferences_dialog.blp:78
+msgid "Enable YouTube"
+msgstr "Povolit YouTube"
+
+#: data/resources/ui/preferences_dialog.blp:79
+msgid "Allow Pipeline to fetch YouTube videos"
+msgstr "Umožnit Pipeline načíst videa z YouTube"
+
+#: data/resources/ui/preferences_dialog.blp:94
+msgid "Prefer Fetching Information Directly from YouTube"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:95
+msgid "On errors, try to fetch information using Piped. Recommended."
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:103
+msgid "Prefer Fetching Information Using Piped"
+msgstr "Upřednostnit stahování informací pomocí Piped"
+
+#: data/resources/ui/preferences_dialog.blp:104
+msgid "On errors, try to fetch information from YouTube"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:112
+msgid "Always Fetch Information Directly from YouTube"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:120
+msgid "Always Fetch Information Using Piped"
+msgstr "Vždy získávat informace pomocí Piped"
+
+#: data/resources/ui/preferences_dialog.blp:136
+msgid "YouTube Cookies File"
+msgstr "Soubor s YouTube cookies"
+
+#: data/resources/ui/preferences_dialog.blp:137
+msgid "No cookies file used"
+msgstr "Nepoužit žádný soubor s cookies"
+
+#: data/resources/ui/preferences_dialog.blp:142
+msgid "Choose a cookies file"
+msgstr "Zvolte soubor s cookies"
+
+#: data/resources/ui/preferences_dialog.blp:148
+msgid "Remove cookies file"
+msgstr "Odebrat soubor s cookies"
+
+#: data/resources/ui/preferences_dialog.blp:153
+msgid "Extractor Arguments for yt-dlp"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:166
+msgid ""
+"Specify the list of instances to use. Pipeline can maintain this list "
+"automatically, which will refresh it on every startup. You can freely modify "
+"this list if you have your own Piped instances you want to use. The requests "
+"will be balanced across all listed instances. For a complete list of public "
+"APIs, see the <a href=\"https://github.com/TeamPiped/documentation/blob/main/"
+"content/docs/public-instances/index.md\">Instances page</a>."
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:186
+msgid "Peertube Preferences"
+msgstr "Předvolby PeerTube"
+
+#: data/resources/ui/preferences_dialog.blp:190
+msgid "Enable Peertube"
+msgstr "Povolit Peertube"
+
+#: data/resources/ui/preferences_dialog.blp:191
+msgid "Allow Pipeline to fetch Peertube videos"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:195
+msgid "Search Instance"
+msgstr "Instance vyhledávání"
+
+#. Translators: Preferences section containing some fun features of the application, like showing a random splash text or seasonal styling.
+#: data/resources/ui/preferences_dialog.blp:206
+msgid "Fun"
+msgstr "Pro pobavení"
+
+#. Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+#: data/resources/ui/preferences_dialog.blp:210
+msgid "Show Splash Text"
+msgstr ""
+
+#. Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+#: data/resources/ui/preferences_dialog.blp:212
+msgid "A random splash text is shown when reloading the feed."
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:216
+msgid "Seasonal Styling"
+msgstr "Sezónní styl"
+
+#: data/resources/ui/preferences_dialog.blp:217
+msgid ""
+"The progress bar will be styled based on annual celebrations, for example "
+"pride month."
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:222
+msgid "Performance"
+msgstr "Výkon"
+
+#: data/resources/ui/preferences_dialog.blp:224
+msgid ""
+"If Pipeline performs badly on your device, you may want to change some of "
+"those settings. In general, keeping the default settings is recommended. For "
+"older devices which do not support GLES 3.0 like the PinePhone, you may want "
+"to switch to software rendering. Changing these settings require a restart "
+"of Pipeline."
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:228
+msgid "Software Rendering"
+msgstr ""
+
+#: data/resources/ui/preferences_dialog.blp:229
+msgid "Using the Cairo renderer"
+msgstr "Pomocí vykreslování Cairo"
+
+#: data/resources/ui/privacy_notice.blp:30
+msgid "Dismiss"
+msgstr "Zahodit"
+
+#: data/resources/ui/privacy_notice.blp:47
+msgid ""
+"Pipeline connects directly to YouTube and PeerTube for getting data and when "
+"playing videos. Pipeline can be configured to use Piped for retrieving "
+"Youtube data, but videos are still played over YouTube"
+msgstr ""
+
+#: data/resources/ui/shortcuts.blp:10
+msgid "Go Back"
+msgstr "Zpět"
+
+#: data/resources/ui/shortcuts.blp:15
+msgid "Quit"
+msgstr "Zavřít"
+
+#: data/resources/ui/shortcuts.blp:20
+msgid "Show Shortcuts"
+msgstr "Ukázat zkratky"
+
+#: data/resources/ui/shortcuts.blp:25
+msgid "Show Preferences"
+msgstr "Zobrazit předvolby"
+
+#: data/resources/ui/shortcuts.blp:30
+msgid "Open Menu"
+msgstr "Otevřít menu"
+
+#: data/resources/ui/shortcuts.blp:35
+msgid "Toggle Sidebar"
+msgstr "Zobraz./skrýt postranní lištu"
+
+#: data/resources/ui/shortcuts.blp:40
+msgid "Pages"
+msgstr "Stránky"
+
+#: data/resources/ui/shortcuts.blp:44
+msgid "Switch to Feed Page"
+msgstr "Přepnout na stránku kanálů"
+
+#: data/resources/ui/shortcuts.blp:49 data/resources/ui/window.blp:259
+#: data/resources/ui/window.blp:314
+msgid "Search"
+msgstr "Hledat"
+
+#: data/resources/ui/shortcuts.blp:54
+msgid "Switch to Watch-Later Page"
+msgstr "Přepnout na stránku „Shlédnout později“"
+
+#: data/resources/ui/shortcuts.blp:59
+msgid "Switch to Subscriptions Page"
+msgstr "Přepnout na stránku odběrů"
+
+#: data/resources/ui/shortcuts.blp:64
+msgid "Playback"
+msgstr "Přehrávání"
+
+#: data/resources/ui/shortcuts.blp:68
+msgid "Play or Pause the Video"
+msgstr "Pustit nebo zastavit video"
+
+#: data/resources/ui/shortcuts.blp:69
+msgid "Only when the video page is in focus"
+msgstr ""
+
+#: data/resources/ui/shortcuts.blp:74
+msgid "Increase Speed"
+msgstr ""
+
+#: data/resources/ui/shortcuts.blp:79
+msgid "Decrease Speed"
+msgstr ""
+
+#: data/resources/ui/shortcuts.blp:84
+msgid "Increase Volume"
+msgstr ""
+
+#: data/resources/ui/shortcuts.blp:89
+msgid "Decrease Volume"
+msgstr ""
+
+#: data/resources/ui/shortcuts.blp:94
+msgid "Seek Backward"
+msgstr ""
+
+#: data/resources/ui/shortcuts.blp:95
+msgid "Or double tap (left side)"
+msgstr "Nebo dvakrát klepněte (na levé straně)"
+
+#: data/resources/ui/shortcuts.blp:100
+msgid "Seek Forward"
+msgstr ""
+
+#: data/resources/ui/shortcuts.blp:101
+msgid "Or double tap (right side)"
+msgstr ""
+
+#: data/resources/ui/shortcuts.blp:106
+msgid "Seek to Percentage"
+msgstr "Přeskočit na dané procento"
+
+#: data/resources/ui/shortcuts.blp:111
+msgid "Toggle Mute"
+msgstr "Přepnout ztlumení"
+
+#: data/resources/ui/shortcuts.blp:116
+msgid "Toggle Fullscreen"
+msgstr "Vyp/zapnout režim celé obrazovky"
+
+#: data/resources/ui/shortcuts.blp:121
+msgid "Application"
+msgstr "Aplikace"
+
+#: data/resources/ui/shortcuts.blp:125
+msgid "Bookmark Video or Subscribe to Channel"
+msgstr "Přihlásit se k odběru kanálu"
+
+#: data/resources/ui/shortcuts.blp:130
+msgid "Reload Video Feed or Channel Page"
+msgstr "Znovu načíst kanál videí nebo stránku kanálu"
+
+#: data/resources/ui/subscription_item.blp:82
+#: data/resources/ui/subscription_item.blp:94 src/gui/channel_item.rs:127
+#: src/gui/channel_page.rs:194
+msgid "Unsubscribe"
+msgstr "Zrušit odběr"
+
+#: data/resources/ui/video_item.blp:143
+#, fuzzy
+#| msgid "Video is Buffering"
+msgid "Video is downloading"
+msgstr "Ukládání videa do vyrovnávací paměti"
+
+#: data/resources/ui/video_item.blp:202
+msgid "More Actions"
+msgstr "Další akce"
+
+#: data/resources/ui/video_page.blp:183
+msgid "Video is Playing Externally"
+msgstr "Video se přehrává externě"
+
+#: data/resources/ui/video_page.blp:328 src/gui/video_item.rs:288
+#: src/gui/video_item.rs:329
+msgid "Download"
+msgstr "Stáhnout"
+
+#: data/resources/ui/video_page.blp:362 src/gui/video_item.rs:283
+#: src/gui/video_item.rs:324
+msgid "Remove Local Copy"
+msgstr ""
+
+#: data/resources/ui/video_page.blp:383
+msgid "Copy Video Link"
+msgstr "Kopírovat odkaz na video"
+
+#: data/resources/ui/window.blp:152
+msgid "Filters"
+msgstr "Filtry"
+
+#: data/resources/ui/window.blp:168
+msgid "Feed"
+msgstr "Odběry"
+
+#: data/resources/ui/window.blp:201 data/resources/ui/window.blp:423
+msgid "No Subscriptions Yet"
+msgstr "Zatím žádné odběry"
+
+#: data/resources/ui/window.blp:202 data/resources/ui/window.blp:424
+msgid "Subscribe to channels or import your subscriptions"
+msgstr "Přihlaste se k odběru kanálů nebo naimportujte své odběry"
+
+#: data/resources/ui/window.blp:211 data/resources/ui/window.blp:433
+msgid "Import Subscriptions"
+msgstr "Naimportovat odběry"
+
+#: data/resources/ui/window.blp:249 data/resources/ui/window.blp:342
+#: data/resources/ui/window.blp:369
+msgid "No Videos"
+msgstr "Žádná videa"
+
+#: data/resources/ui/window.blp:250
+msgid "Try Reloading"
+msgstr ""
+
+#: data/resources/ui/window.blp:273
+msgid "Explore videos and creators"
+msgstr "Prozkoumejte videa a tvůrce"
+
+#: data/resources/ui/window.blp:300
+msgid "Searching"
+msgstr "Hledání"
+
+#: data/resources/ui/window.blp:322 src/gui/video_item.rs:259
+msgid "Watch Later"
+msgstr "Přehrát později"
+
+#: data/resources/ui/window.blp:343
+msgid "Add videos to your watch later list to display them here"
+msgstr ""
+
+#: data/resources/ui/window.blp:351
+#, fuzzy
+#| msgid "Download"
+msgid "Downloads"
+msgstr "Stáhnout"
+
+#: data/resources/ui/window.blp:370
+#, fuzzy
+#| msgid "Download videos for offline viewing."
+msgid "Download videos to display them here"
+msgstr "Stahujte videa pro sledování bez internetu."
+
+#: data/resources/ui/window.blp:378
+msgid "History"
+msgstr ""
+
+#: data/resources/ui/window.blp:399 data/resources/ui/window.blp:407
+msgid "No History"
+msgstr ""
+
+#: data/resources/ui/window.blp:400
+msgid "Watched videos will be displayed here"
+msgstr ""
+
+#: data/resources/ui/window.blp:408
+msgid "You turned off your watch history in the preferences"
+msgstr ""
+
+#: data/resources/ui/window.blp:416
+msgid "Subscriptions"
+msgstr "Odběry"
+
+#. I don't think this will ever be shown.
+#: data/resources/ui/window.blp:454
+msgid "Sidebar"
+msgstr "Postranní panel"
+
+#: data/resources/ui/window.blp:463
+msgid "Hide Sidebar"
+msgstr "Skrýt postranní lištu"
+
+#: data/resources/ui/window.blp:496
+msgid "Show"
+msgstr "Zobrazit"
+
+#: src/backend/channel.rs:87
+msgid "Unknown Channel"
+msgstr "Neznámý kanál"
+
+#: src/backend/search_stream.rs:100
+msgid "Error searching one platform"
+msgstr "Chyba při hledání na jedné platformě"
+
+#: src/backend/video_fetcher_stream.rs:150
+msgid "Error loading one channel"
+msgid_plural "Error loading {} channels"
+msgstr[0] "Chyba při načítání jednoho kanálu"
+msgstr[1] "Chyba při načítání {} kanálů"
+msgstr[2] "Chyba při načítání {} kanálů"
+
+#: src/gui/bottom_bar.rs:94
+msgid "Pause Video"
+msgstr "Pozastavit video"
+
+#: src/gui/bottom_bar.rs:95
+msgid "Resume Video"
+msgstr "Pokračovat ve videu"
+
+#: src/gui/bottom_bar.rs:96
+msgid "Video is Buffering"
+msgstr "Ukládání videa do vyrovnávací paměti"
+
+#. Should never happen
+#: src/gui/bottom_bar.rs:98 src/gui/bottom_bar.rs:99
+msgid "Video is Stopped"
+msgstr "Video je zastavené"
+
+#: src/gui/bottom_bar.rs:114
+msgid "Expand Video \"{title}\""
+msgstr "Rozbalit video „{title}“"
+
+#: src/gui/channel_item.rs:132 src/gui/channel_page.rs:197
+msgid "Subscribe"
+msgstr "Odebírat"
+
+#: src/gui/channel_page.rs:45
+msgid "Failed to load channel data"
+msgstr "Nepodařilo se načíst data kanálu"
+
+#: src/gui/export_dialog.rs:61
+msgid "Export Pipeline"
+msgstr "Exportovat Pipeline"
+
+#: src/gui/export_dialog.rs:76
+msgid "Error exporting pipeline subscriptions"
+msgstr "Chyba při exportování odběrů pipeline"
+
+#: src/gui/export_dialog.rs:81
+msgid "Successfully exported data"
+msgstr "Data úspěšně exportována"
+
+#: src/gui/export_dialog.rs:101
+msgid "Export YouTube Subscriptions"
+msgstr "Exportovat odběry YouTube"
+
+#: src/gui/export_dialog.rs:116
+msgid "Error exporting YouTube subscriptions"
+msgstr "Chyba při exportování odběrů YouTube"
+
+#: src/gui/export_dialog.rs:121 src/gui/export_dialog.rs:162
+msgid "Successfully exported subscriptions"
+msgstr "Odběry úspěšně exportovány"
+
+#: src/gui/export_dialog.rs:142
+msgid "Export NewPipe Subscriptions"
+msgstr "Exportovat NewPipe odběry"
+
+#: src/gui/export_dialog.rs:157
+msgid "Error exporting NewPipe subscriptions"
+msgstr "Chyba při exportování odběrů NewPipe"
+
+#: src/gui/filter_dialog.rs:89
+msgid ""
+"This filter is disabled due to your preference to not save your watch "
+"history. Enable the preference to allow for enabling this filter."
+msgstr ""
+
+#: src/gui/filter_dialog.rs:154 src/gui/filter_similar_dialog.rs:34
+msgid "Edit Filter"
+msgstr "Přidat filtr"
+
+#: src/gui/filter_dialog.rs:181
+msgid "Remove Filter"
+msgstr "Odebrat filtr"
+
+#: src/gui/filter_similar_dialog.rs:35
+msgid "Save Filter"
+msgstr "Uložit filtr"
+
+#: src/gui/import_dialog.rs:70
+msgid "Import Pipeline Data"
+msgstr "Naimportovat Pipeline data"
+
+#: src/gui/import_dialog.rs:84
+msgid "Error importing Pipeline Data"
+msgstr "Chyba při importování dat Pipeline"
+
+#: src/gui/import_dialog.rs:89
+msgid ""
+"Successfully imported data. A restart of the application is recommended."
+msgstr ""
+
+#: src/gui/import_dialog.rs:109
+msgid "Import YouTube Subscriptions"
+msgstr "Importovat odběry YouTube"
+
+#: src/gui/import_dialog.rs:123
+msgid "Error importing YouTube subscriptions"
+msgstr "Chyba při importování odběrů YouTube"
+
+#: src/gui/import_dialog.rs:128 src/gui/import_dialog.rs:166
+#: src/gui/import_dialog.rs:204
+msgid "Successfully imported subscriptions"
+msgstr "Odběry úspěšně naimportovány"
+
+#: src/gui/import_dialog.rs:147
+msgid "Import NewPipe Subscriptions"
+msgstr "Importovat odběry NewPipe"
+
+#: src/gui/import_dialog.rs:161
+msgid "Error importing NewPipe subscriptions"
+msgstr "Chyba při importování odběrů NewPipe"
+
+#: src/gui/import_dialog.rs:185
+#, fuzzy
+#| msgid "Import Subscriptions"
+msgid "Import Invidious Subscriptions"
+msgstr "Naimportovat odběry"
+
+#: src/gui/import_dialog.rs:199
+#, fuzzy
+#| msgid "Error importing YouTube subscriptions"
+msgid "Error importing Invidious subscriptions"
+msgstr "Chyba při importování odběrů YouTube"
+
+#. Translators: For selecting the best video format when downloading.
+#: src/gui/preferences_dialog.rs:31
+msgid "Best"
+msgstr ""
+
+#. Translators: For selecting a custom video format when downloading.
+#: src/gui/preferences_dialog.rs:33
+#, fuzzy
+#| msgid "Custom Filters"
+msgid "Custom"
+msgstr "Vlastní filtry"
+
+#: src/gui/preferences_dialog.rs:463
+msgid "Automatically Manage Piped Instances"
+msgstr "Automaticky spravovat instance Piped"
+
+#: src/gui/preferences_dialog.rs:464
+msgid "Recommended"
+msgstr "Doporučeno"
+
+#: src/gui/preferences_dialog.rs:485
+msgid "New Piped API"
+msgstr "Nové API Piped"
+
+#: src/gui/preferences_dialog.rs:535
+msgid ""
+"If watching too many YouTube videos, YouTube can require confirmation that "
+"you are a real person. This is done by logging into your account using "
+"cookies stored in your browser. Refer to the <a href=\"https://github.com/yt-"
+"dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp\">yt-dlp documentation</"
+"a> on how to obtain such a file. Note that this associates the videos you "
+"watch with your account. Furthermore, this may get your account deactivated "
+"due to not using offical YouTube applications. The developers of Pipeline "
+"are not responsible for your account being deactivated."
+msgstr ""
+
+#: src/gui/preferences_dialog.rs:541
+msgid "Accept the Risk and Continue"
+msgstr "Přijmout riziko a pokračovat"
+
+#: src/gui/preferences_dialog.rs:562
+msgid "Select File"
+msgstr "Vybrat soubor"
+
+#: src/gui/preferences_dialog.rs:563
+msgid "Select Cookies File"
+msgstr "Vybrat soubor s cookies"
+
+#: src/gui/preferences_dialog.rs:812
+msgid ""
+"To use external players with Pipeline, you will need to grant Pipeline "
+"additional permissions. See <a href=\"https://gitlab.com/schmiddi-on-mobile/"
+"pipeline/-/wikis/External-Player-for-Flatpak\">this page</a> for details."
+msgstr ""
+
+#: src/gui/utility.rs:62
+msgid "One Subscriber"
+msgid_plural "{} Subscribers"
+msgstr[0] "Jeden odběratel"
+msgstr[1] "{} odběratelé"
+msgstr[2] "{} odběratelů"
+
+#: src/gui/utility.rs:68
+msgid "No Subscribers"
+msgstr "Žádní odběratelé"
+
+#: src/gui/utility.rs:84
+msgid "Remove video from Watch Later"
+msgstr "Odstranit video ze seznamu Přehrát později"
+
+#: src/gui/utility.rs:86
+msgid "Add video to Watch Later"
+msgstr "Přidat video do seznamu Přehrát později"
+
+#. Note to translators: Format numbers compactly. For numbers at least one billion.
+#: src/gui/utility.rs:102
+msgctxt "number-formatting"
+msgid "{}B"
+msgstr ""
+
+#. Note to translators: Format numbers compactly. For numbers at least one million.
+#: src/gui/utility.rs:106
+msgctxt "number-formatting"
+msgid "{}M"
+msgstr ""
+
+#. Note to translators: Format numbers compactly. For numbers at least one thousand.
+#: src/gui/utility.rs:110
+msgctxt "number-formatting"
+msgid "{}K"
+msgstr ""
+
+#: src/gui/utility.rs:128
+msgid "{title} uploaded by {channel} on {date}"
+msgstr "{title} zveřejněno kanálem {channel} {date}"
+
+#. Translators: For accessibility about a channel, e.g. "Channel Name with 100 subscribers".
+#: src/gui/utility.rs:136
+msgid "{name} with {subscribers} subscribers"
+msgstr "{name} s {subscribers} odběrateli"
+
+#. Translators: formatting of time of day in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+#: src/gui/utility.rs:158
+msgid "%H:%M"
+msgstr ""
+
+#: src/gui/utility.rs:160
+msgid "Tomorrow"
+msgstr "Zítra"
+
+#: src/gui/utility.rs:162
+msgid "Yesterday"
+msgstr "Včera"
+
+#. Translators: formatting of dates without year in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+#: src/gui/utility.rs:165
+msgid "%a, %d. %B"
+msgstr ""
+
+#. Translators: formatting of dates with year in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+#: src/gui/utility.rs:168
+msgid "%Y-%m-%d"
+msgstr ""
+
+#. Translators: Formatting for percentage labels (e.g. "50%").
+#: src/gui/utility.rs:219
+msgid "{}%"
+msgstr ""
+
+#: src/gui/video_item.rs:254
+msgid "Remove from Watch Later"
+msgstr "Odstranit ze seznamu Přehrát později"
+
+#: src/gui/video_item.rs:266 src/gui/video_item.rs:307
+msgid "Play with Internal Player"
+msgstr "Přehrát vestavěným přehrávačem"
+
+#: src/gui/video_item.rs:271 src/gui/video_item.rs:312
+msgid "Play with External Player"
+msgstr "Přehrát externím přehrávačem"
+
+#: src/gui/video_item.rs:277 src/gui/video_item.rs:318
+msgid "Copy Video URL"
+msgstr "Kopírovat adresu videa"
+
+#: src/gui/video_item.rs:295 src/gui/video_item.rs:336
+msgid "Filter out Similar Videos"
+msgstr "Odfiltrovat podobná videa"
+
+#: src/gui/video_page.rs:111
+msgid "Configure your external player in the preferences first"
+msgstr ""
+
+#: src/gui/video_page.rs:137
+msgid "Failed to spawn video player"
+msgstr "Nepodařilo se vyvolat přehrávač videa"
+
+#: src/gui/video_page.rs:190 src/gui/window.rs:918
+msgid "Downloaded video not available locally anymore"
+msgstr ""
+
+#: src/gui/video_page.rs:347
+msgid "Failed to populate video information"
+msgstr "Nepodařilo se zobrazit informace o videu"
+
+#: src/gui/video_page.rs:361
+msgid "Failed to fetch channel information"
+msgstr "Nepodařilo se načíst informace o kanálu"
+
+#: src/gui/video_page.rs:402
+msgid "Uploaded {}"
+msgstr ""
+
+#: src/gui/video_page.rs:469 src/gui/video_page.rs:482
+#: src/gui/video_page.rs:506 src/gui/video_page.rs:511
+msgid "10 Seconds"
+msgstr ""
+
+#: src/gui/window.rs:174
+msgid "One Error"
+msgid_plural "{} Errors"
+msgstr[0] "Jedna chyba"
+msgstr[1] "{} chyby"
+msgstr[2] "{} chyb"
+
+#: src/gui/window.rs:389
+#, fuzzy
+#| msgid "Hide Sidebar"
+msgid "Unpin Sidebar"
+msgstr "Skrýt postranní lištu"
+
+#: src/gui/window.rs:391
+#, fuzzy
+#| msgid "Hide Sidebar"
+msgid "Pin Sidebar"
+msgstr "Skrýt postranní lištu"
+
+#: src/gui/window.rs:495
+msgid "Switched to video page {}"
+msgstr "Přepnuto na stránku videa {}"
+
+#: src/gui/window.rs:626
+msgid "Switched to channel page {}"
+msgstr "Přepnuto na stránku kanálu {}"
+
+#: src/gui/window.rs:735
+msgid "Unsubscribed from {channel}"
+msgstr "Zrušit odebírání {channel}"
+
+#: src/gui/window.rs:740
+msgid "Undo"
+msgstr "Zpět"
+
+#: src/gui/window.rs:835 src/gui/window.rs:875
+msgid "Switched to page {}"
+msgstr "Přepnuto na stránku {}"
+
+#: src/gui/window.rs:887
+msgid "Copied URL"
+msgstr ""
+
+#: src/gui/window.rs:905
+#, fuzzy
+#| msgid "Failed to spawn video downloader"
+msgid "Failed to remove downloaded file"
+msgstr "Nepodařilo se vyvolat službu stahování videí"
+
+#: src/gui/window.rs:910
+msgid "Removed downloaded copy of the video"
+msgstr ""
+
+#: src/gui/window.rs:947
+msgid "Started Download"
+msgstr "Stahování spuštěno"
+
+#: src/gui/window.rs:956
+msgid "Error creating the directory where the video will be downloaded"
+msgstr ""
+
+#: src/gui/window.rs:997 src/gui/window.rs:1022
+#, fuzzy
+#| msgid "Error loading one channel"
+#| msgid_plural "Error loading {} channels"
+msgid "Error downloading a video"
+msgstr "Chyba při načítání jednoho kanálu"
+
+#: src/gui/window.rs:1016
+msgid "Finished Download"
+msgstr "Stahování dokončeno"
+
+#. translators: One per line: How you want to be credited as a translator, e.g. by the name you use, and optionally an email address ("Edgar Allan Poe <edgar@poe.com>")
+#: src/gui/window.rs:1276
+msgid "translator-credits"
+msgstr ""
+
+#: src/gui/window.rs:1467
+msgid "Failed to set up application"
+msgstr "Nepodařilo se nastavit aplikaci"
+
+#: src/gui/window.rs:1492
+msgid "More Information"
+msgstr "Více informací"
+
+#: src/splashes.rs:11
+msgctxt "Displayed as a splash text"
+msgid "Pipeline was once called Tubefeeder."
+msgstr "Pipeline se dříve jmenovalo Tubefeeder."
+
+#: src/splashes.rs:17
+msgctxt "Displayed as a splash text"
+msgid ""
+"Pipeline was built for mobile linux devices like the PinePhone. That it "
+"works on desktops is just a happy side effect."
+msgstr ""
+
+#: src/splashes.rs:23
+msgctxt "Displayed as a splash text"
+msgid "The first commit of Pipeline was {} days ago."
+msgstr ""
+
+#: src/splashes.rs:35
+msgctxt "Displayed as a splash text"
+msgid "You are running commit number {} of Pipeline."
+msgstr ""
+
+#: src/splashes.rs:42
+msgctxt "Displayed as a splash text"
+msgid "You are running release number {} of Pipeline."
+msgstr ""
+
+#: src/splashes.rs:49
+msgctxt "Displayed as a splash text"
+msgid "Pipeline is built from {} lines of Rust code."
+msgstr ""
+
+#: src/splashes.rs:56
+msgctxt "Displayed as a splash text"
+msgid "Pipeline is built from {} lines of Blueprint UI markup."
+msgstr ""
+
+#: src/splashes.rs:64
+msgctxt "Displayed as a splash text"
+msgid "There are {} different splash texts which can be displayed here."
+msgstr ""
+
+#. Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+#: src/splashes.rs:74
+msgctxt "Displayed as a splash text"
+msgid ""
+"In expectation, you will need to reload {} times to have seen all splash "
+"texts at least once."
+msgstr ""
+
+#: src/splashes.rs:80
+msgctxt "Displayed as a splash text"
+msgid ""
+"Pipeline is translated in {languages} different languages by {translators} "
+"translators"
+msgstr ""
+
+#: src/splashes.rs:94
+msgctxt "Displayed as a splash text"
+msgid ""
+"You can help translate Pipeline using <a href=\"https://hosted.weblate.org/"
+"engage/schmiddi-on-mobile/\">Weblate</a>."
+msgstr ""
+
+#: src/splashes.rs:100
+msgctxt "Displayed as a splash text"
+msgid ""
+"The source code of Pipeline is hosted on <a href=\"https://gitlab.com/"
+"schmiddi-on-mobile/pipeline\">GitLab</a>."
+msgstr ""
+
+#: src/splashes.rs:106
+#, c-format
+msgctxt "Displayed as a splash text"
+msgid ""
+"We have a <a href=\"https://matrix.to/#/%23pipelineapp:matrix.org\">Matrix "
+"room</a> where you can come and talk with us."
+msgstr ""
+
+#: src/splashes.rs:112
+msgctxt "Displayed as a splash text"
+msgid ""
+"Pipeline has a <a href=\"https://mobile.schmidhuberj.de/pipeline\">website</"
+"a>."
+msgstr ""
+
+#: src/splashes.rs:118
+msgctxt "Displayed as a splash text"
+msgid ""
+"You can get Pipeline on <a href=\"https://flathub.org/apps/"
+"de.schmidhuberj.tubefeeder\">Flathub</a>."
+msgstr ""
+
+#: src/splashes.rs:124
+msgctxt "Displayed as a splash text"
+msgid ""
+"We use <a href=\"https://github.com/Rafostar/clapper\">Clapper</a> as the "
+"video player."
+msgstr ""
+
+#: src/splashes.rs:130
+msgctxt "Displayed as a splash text"
+msgid ""
+"We use <a href=\"https://codeberg.org/ThetaDev/rustypipe/\">rustypipe</a> "
+"and <a href=\"https://piped.video/\">Piped</a> to get data from YouTube."
+msgstr ""
+
+#: src/splashes.rs:136
+msgctxt "Displayed as a splash text"
+msgid ""
+"The creator of Pipeline has also built other applications, like <a "
+"href=\"https://flathub.org/apps/de.schmidhuberj.DieBahn\">Railway</a> and <a "
+"href=\"https://flathub.org/apps/de.schmidhuberj.Flare\">Flare</a>."
+msgstr ""
+
+#: src/splashes.rs:142
+msgctxt "Displayed as a splash text"
+msgid ""
+"When using Piped to fetch data, Pipeline will be able to fetch your "
+"subscriptions faster with more public Piped instances. So consider <a "
+"href=\"https://docs.piped.video/docs/self-hosting/\">hosting Piped</a> and "
+"making it available for everyone."
+msgstr ""
+
+#: src/splashes.rs:148
+msgctxt "Displayed as a splash text"
+msgid ""
+"No animals were harmed while making this application. But two cats were "
+"petted."
+msgstr ""
+
+#: src/splashes.rs:155
+msgctxt "Displayed as a splash text"
+msgid ""
+"Add videos to your watch-later list by bringing up their context menu, or "
+"directly when watching videos."
+msgstr ""
+
+#: src/splashes.rs:161
+msgctxt "Displayed as a splash text"
+msgid ""
+"Seeing something you don't like? You can hide videos from your feed based on "
+"the title and uploader of the video."
+msgstr ""
+
+#: src/splashes.rs:167
+msgctxt "Displayed as a splash text"
+msgid ""
+"You can hide videos you already watched. Enable this by managing your "
+"filters."
+msgstr ""
+
+#: src/splashes.rs:173
+msgctxt "Displayed as a splash text"
+msgid ""
+"You can quickly toggle on and off filters in the feed from the filter dialog."
+msgstr ""
+
+#: src/splashes.rs:179
+msgctxt "Displayed as a splash text"
+msgid ""
+"Want to keep your subscriptions from YouTube or NewPipe? You can import "
+"those into Pipeline."
+msgstr ""
+
+#: src/splashes.rs:185
+msgctxt "Displayed as a splash text"
+msgid ""
+"Want to bring your own video player instead of the one built-in? You can "
+"manage an external video player in the settings and tell Pipeline to use it "
+"by default."
+msgstr ""
+
+#: src/splashes.rs:191
+msgctxt "Displayed as a splash text"
+msgid ""
+"You want to keep a video you watched? You can directly download it from the "
+"video page."
+msgstr ""
+
+#: src/splashes.rs:197
+msgctxt "Displayed as a splash text"
+msgid ""
+"Want to share a video? You can copy its URL to the clipboard directly from "
+"the video page."
+msgstr ""
+
+#: src/splashes.rs:203
+msgctxt "Displayed as a splash text"
+msgid ""
+"Are you hosting your own Piped instance? You can tell Pipeline to use it in "
+"the settings."
+msgstr ""
+
+#: src/splashes.rs:210
+msgctxt "Displayed as a splash text"
+msgid ""
+"Not interested in those splash texts? You can disable them in the settings."
+msgstr ""
+
+#: src/splashes.rs:216
+msgctxt "Displayed as a splash text"
+msgid ""
+"Don't like YouTube anymore? Pipeline also works with <a href=\"https://"
+"joinpeertube.org\">PeerTube</a>."
+msgstr ""
+
+#: src/splashes.rs:222
+msgctxt "Displayed as a splash text"
+msgid ""
+"Searching for something? Pipeline can help you with that and search for "
+"channels and videos on YouTube and Peertube."
+msgstr ""
+
+#: src/splashes.rs:228
+msgctxt "Displayed as a splash text"
+msgid ""
+"Pipeline has four different ways to fetch videos from YouTube. Just to be "
+"sure you don't miss any of your precious cat videos."
+msgstr ""
+
+#: src/splashes.rs:243
+#, c-format
+msgctxt "Displayed as a splash text"
+msgid ""
+"Have ideas for further splash text? Tell us on <a href=\"https://matrix.to/#/"
+"%23pipelineapp:matrix.org\">Matrix</a>."
+msgstr ""
+
+#: src/splashes.rs:249
+msgctxt "Displayed as a splash text"
+msgid "Pretty sure {year} will be the year of the Linux desktop."
+msgstr ""
+
+#. Translators: A reference to the "I use Arch btw" meme.
+#: src/splashes.rs:255
+msgctxt "Displayed as a splash text"
+msgid "I can be used on Arch btw."
+msgstr ""
+
+#: src/splashes.rs:260
+msgctxt "Displayed as a splash text"
+msgid "Do you want to advertise here? You can't."
+msgstr ""
+
+#: src/splashes.rs:277
+msgctxt "Displayed as a splash text"
+msgid "🎉 Pipeline turned {} years old today. Happy Birthday! 🎉"
+msgstr ""
+
+#: src/splashes.rs:331
+msgctxt "Displayed as a splash text"
+msgid "Also try {}!"
+msgstr "Také zkuste {}!"
+
+#~ msgid "Export to Pipeline"
+#~ msgstr "Exportovat do Pipeline"
+
+#~ msgid "Export to YouTube"
+#~ msgstr "Exportovat na YouTube"
+
+#~ msgid "Export to NewPipe"
+#~ msgstr "Exportovat na NewPipe"
+
+#~ msgid "Import from Pipeline"
+#~ msgstr "Naimportovat z Pipeline"
+
+#~ msgid "Import from YouTube"
+#~ msgstr "Naimportovat z YouTube"
+
+#~ msgid "Import from NewPipe"
+#~ msgstr "Naimportovat z NewPipe"
+
+#, fuzzy
+#~| msgid "Import from YouTube"
+#~ msgid "Import from Invidious"
+#~ msgstr "Naimportovat z YouTube"
+
+#, fuzzy
+#~ msgid "Welcome to Pipeline"
+#~ msgstr "O aplikaci Pipeline"
+
+#~ msgid "Piped Preferences"
+#~ msgstr "Předvolby Piped"
+
+#~ msgid "Main Page"
+#~ msgstr "Domovská stránka"
+
+#~ msgid "Video"
+#~ msgstr "Video"
+
+#~ msgid "Search for Videos and Channels"
+#~ msgstr "Hledat videa a kanály"
+
+#~ msgid "Channel Name"
+#~ msgstr "Název kanálu"
+
+#~ msgid "Piped APIs"
+#~ msgstr "Rozhraní Piped API"
+
+#, fuzzy
+#~| msgid "Copy to Clipboard"
+#~ msgid "Copy URL to Clipboard"
+#~ msgstr "Zkopírovat do schránky"
+
+#, fuzzy
+#~| msgid "Downloader"
+#~ msgid "Download Video"
+#~ msgstr "Stahovač"
+
+#, fuzzy
+#~ msgid "Feed List"
+#~ msgstr "Feed"
+
+#, fuzzy
+#~ msgid "Filter List"
+#~ msgstr "Filtry"
+
+#~ msgid "Close"
+#~ msgstr "Zavřít"
+
+#~ msgid "Remove"
+#~ msgstr "Odstránit"
+
+#, fuzzy
+#~ msgctxt "accessibility"
+#~ msgid "Add Filter…"
+#~ msgstr "Přidat filtr…"
+
+#, fuzzy
+#~ msgctxt "tooltip"
+#~ msgid "Add Filter…"
+#~ msgstr "Přidat filtr…"
+
+#, fuzzy
+#~ msgid "Add Filter…"
+#~ msgstr "Přidat filtr…"
+
+#~ msgid "Add"
+#~ msgstr "Přidat"
+
+#, fuzzy
+#~ msgid ""
+#~ "This will import your subscriptions from exported data from NewPipe or "
+#~ "YouTube."
+#~ msgstr ""
+#~ "Tímto způsobem importujete odběry z exportovaných dat ze služby NewPipe "
+#~ "nebo Youtube."
+
+#~ msgid "NewPipe"
+#~ msgstr "NewPipe"
+
+#~ msgid "Player"
+#~ msgstr "Přehrávač"
+
+#~ msgid "APIs"
+#~ msgstr "API"
+
+#, fuzzy
+#~ msgid ""
+#~ "For a complete list of public APIs, see the <a href=\"https://github.com/"
+#~ "TeamPiped/Piped/wiki/Instances\">Instances page</a>."
+#~ msgstr ""
+#~ "Seznam veřejných rozhraní API naleznete na adrese https://github.com/"
+#~ "TeamPiped/Piped/wiki/Instances."
+
+#, fuzzy
+#~ msgid "Custom Piped API"
+#~ msgstr "Rizhraní Pipe-API"
+
+#~ msgid "Subscribe to a Channel…"
+#~ msgstr "Přihlásit se k odběru kanálu…"
+
+#, fuzzy
+#~ msgid "Add Subscription"
+#~ msgstr "Přidat odběr"
+
+#~ msgid "Base URL"
+#~ msgstr "Základní adresa URL"
+
+#~ msgid "Channel ID or Name"
+#~ msgstr "ID nebo název kanálu"
+
+#, fuzzy
+#~ msgctxt "accessibility"
+#~ msgid "Add Subscription…"
+#~ msgstr "Přidat odběr"
+
+#, fuzzy
+#~ msgctxt "tooltip"
+#~ msgid "Add Subscription…"
+#~ msgstr "Přidat odběr"
+
+#, fuzzy
+#~ msgctxt "accessibility"
+#~ msgid "Go back to subscription list"
+#~ msgstr "Žádné odběry"
+
+#~ msgid "Everything Watched"
+#~ msgstr "Vše sledované"
+
+#~ msgid "How about going outside?"
+#~ msgstr "Co takhle jít ven?"
+
+#~ msgid "Error connecting to the network"
+#~ msgstr "Chyba připojení k síti"
+
+#~ msgid "Some error occured"
+#~ msgstr "Došlo k nějaké chybě"
+
+#~ msgid "%F %T"
+#~ msgstr "%F %T"
+
+#~ msgid "Select YouTube subscription file"
+#~ msgstr "Vybrat soubor odběrů YouTube"
+
+#~ msgid ""
+#~ "Note that on Flatpak, there are some more steps required when using a "
+#~ "player external to the Flatpak. For more information, please consult the "
+#~ "wiki."
+#~ msgstr ""
+#~ "Všimněte si, že v případě Flatpaku je při použití přehrávače externího k "
+#~ "Flatpaku nutné provést několik dalších kroků. Další informace naleznete "
+#~ "na wiki."
+
+#~ msgid "Donate"
+#~ msgstr "Podpořit"
+
+#~ msgid "Load more"
+#~ msgstr "Načíst více"
+
+#~ msgid "Settings"
+#~ msgstr "Nastavení"
+
+#~ msgid "About"
+#~ msgstr "O programu"
+
+#~ msgid "Overwritten by environmental variable."
+#~ msgstr "Přepsáno proměnnou prostředí."

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/">
+    <file preprocess="xml-stripblanks">ui/video_list.ui</file>
+    <file preprocess="xml-stripblanks">ui/video_item.ui</file>
+    <file preprocess="xml-stripblanks">ui/window.ui</file>
+    <file preprocess="xml-stripblanks">ui/video_page.ui</file>
+    <file preprocess="xml-stripblanks">ui/finite_video_list.ui</file>
+    <file preprocess="xml-stripblanks">ui/subscriptions_list.ui</file>
+    <file preprocess="xml-stripblanks">ui/channel_item.ui</file>
+    <file preprocess="xml-stripblanks">ui/channel_page.ui</file>
+    <file preprocess="xml-stripblanks">ui/preferences_dialog.ui</file>
+    <file preprocess="xml-stripblanks">ui/filter_dialog.ui</file>
+    <file preprocess="xml-stripblanks">ui/filter_similar_dialog.ui</file>
+    <file preprocess="xml-stripblanks">ui/search_list.ui</file>
+    <file preprocess="xml-stripblanks">ui/search_list_item.ui</file>
+    <file preprocess="xml-stripblanks">ui/shortcuts.ui</file>
+    <file preprocess="xml-stripblanks">ui/error_dialog.ui</file>
+    <file preprocess="xml-stripblanks">ui/import_dialog.ui</file>
+    <file preprocess="xml-stripblanks">ui/export_dialog.ui</file>
+    <file preprocess="xml-stripblanks">ui/privacy_notice.ui</file>
+    <file preprocess="xml-stripblanks">ui/subscription_item.ui</file>
+    <file preprocess="xml-stripblanks">ui/bottom_bar.ui</file>
+  </gresource>
+  <gresource prefix="/de/schmidhuberj/tubefeeder/icons/">
+    <file alias="icon-non-symbolic.svg">../icons/de.schmidhuberj.tubefeeder.svg</file>
+    <file alias="scalable/actions/icon-symbolic.svg">../icons/de.schmidhuberj.tubefeeder-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/funnel-symbolic.svg">../icons/funnel-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/funnel-outline-symbolic.svg">../icons/funnel-outline-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/library-artists-symbolic.svg">../icons/library-artists-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/eye-open-negative-filled-symbolic.svg">../icons/eye-open-negative-filled-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/thumbs-up-symbolic.svg">../icons/thumbs-up-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/thumbs-down-symbolic.svg">../icons/thumbs-down-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/bookmark-toggled-symbolic.svg">../icons/bookmark-toggled-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/bookmark-untoggled-symbolic.svg">../icons/bookmark-untoggled-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/sidebar-show-symbolic.svg">../icons/sidebar-show-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/user-trash-symbolic.svg">../icons/user-trash-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/emoji-recent-symbolic.svg">../icons/emoji-recent-symbolic.svg</file>
+
+    <!-- Third-party icons -->
+    <file preprocess="xml-stripblanks" alias="scalable/actions/peertube-symbolic.svg">../icons/third-party/peertube-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/youtube-symbolic.svg">../icons/third-party/youtube-symbolic.svg</file>
+  </gresource>
+  <gresource prefix="/de/schmidhuberj/tubefeeder/">
+    <file compressed="true">style.css</file>
+
+    <file preprocess="xml-stripblanks">@app-id@.metainfo.xml</file>
+  </gresource>
+</gresources>

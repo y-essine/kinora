@@ -1,0 +1,133 @@
+using Gtk 4.0;
+using Adw 1;
+
+Adw.ShortcutsDialog help_overlay {
+  Adw.ShortcutsSection {
+    title: _("General");
+
+    Adw.ShortcutsItem {
+      accelerator: '<Alt>Left';
+      title: _("Go Back");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: '<Control>q <Control>w';
+      title: _("Quit");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: '<Control>question';
+      title: _("Show Shortcuts");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: '<Control>comma';
+      title: _("Show Preferences");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: 'F10';
+      title: _("Open Menu");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: 'F9';
+      title: _("Toggle Sidebar");
+    }
+  }
+
+  Adw.ShortcutsSection {
+    title: _("Pages");
+
+    Adw.ShortcutsItem {
+      accelerator: '<Alt>1';
+      title: _("Switch to Feed Page");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: '<Alt>2 <Ctrl>F F3';
+      title: _("Search");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: '<Alt>3';
+      title: _("Switch to Watch-Later Page");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: '<Alt>4';
+      title: _("Switch to Subscriptions Page");
+    }
+  }
+
+  Adw.ShortcutsSection {
+    title: _("Playback");
+
+    Adw.ShortcutsItem {
+      accelerator: 'space';
+      title: _("Play or Pause the Video");
+      subtitle: _("Only when the video page is in focus");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: 'greater';
+      title: _("Increase Speed");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: 'less';
+      title: _("Decrease Speed");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: 'Up';
+      title: _("Increase Volume");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: 'Down';
+      title: _("Decrease Volume");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: 'Left';
+      title: _("Seek Backward");
+      subtitle: _("Or double tap (left side)");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: 'Right';
+      title: _("Seek Forward");
+      subtitle: _("Or double tap (right side)");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: '0...9';
+      title: _("Seek to Percentage");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: 'm';
+      title: _("Toggle Mute");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: 'f F11';
+      title: _("Toggle Fullscreen");
+    }
+  }
+
+  Adw.ShortcutsSection {
+    title: _("Application");
+
+    Adw.ShortcutsItem {
+      accelerator: '<Control>d';
+      title: _("Bookmark Video or Subscribe to Channel");
+    }
+
+    Adw.ShortcutsItem {
+      accelerator: '<Control>r F5';
+      title: _("Reload Video Feed or Channel Page");
+    }
+  }
+}

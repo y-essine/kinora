@@ -1,0 +1,569 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>@app-id@</id>
+  <project_license>GPL-3.0-or-later</project_license>
+  <metadata_license>FSFAP</metadata_license>
+  <name>Pipeline</name>
+  <summary>Follow video creators</summary>
+  <launchable type="desktop-id">@app-id@.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+  <developer_name translate="no">Julian Schmidhuber</developer_name>
+  <developer id="de.schmidhuberj.mobile">
+    <name translate="no">Julian Schmidhuber</name>
+  </developer>
+  <translation type="gettext">@gettext-package@</translation>
+  <update_contact>flatpak@schmidhuberj.de</update_contact>
+
+  <releases>
+    <release version="4.1.1" date="2026-10-11">
+      <description translate="no">
+        <p>Fixed</p> <ul> <li>Fetching Piped instance list timing out, preventing loading the feed.</li> </ul>
+      </description>
+    </release>
+    <release version="4.1.0" date="2026-07-22">
+      <description translate="no">
+        <p>Added</p> <ul> <li>Added a menu entry to mark videos as watched or unwatched.</li> </ul>
+      </description>
+    </release>
+    <release version="4.0.4" date="2026-05-24">
+      <description translate="no">
+        <p>Fixed</p> <ul> <li>Proper fix for videos from YouTube not showing up.</li> </ul>
+      </description>
+    </release>
+    <release version="4.0.3" date="2026-05-22">
+      <description translate="no">
+        <p>HOTFIX</p> <ul> <li>Fixed only very few videos from YouTube showing up. The workaround has negative performance implications, we will try to fix this in a subsequent MR.</li> </ul> <p>Fixed</p> <ul> <li>Restoring a backed up Pipeline-export failing in the Flatpak. Note that you need to do a new export for the fix to work, old exports remain broken.</li> <li>Very wide feed and channel page layouts having a single-column video view (again).</li> </ul>
+      </description>
+    </release>
+    <release version="4.0.2" date="2026-04-29">
+      <description translate="no">
+        <p>Fixed</p> <ul> <li>Fixed 4.0.1 release not containing vendored crates.</li> </ul>
+      </description>
+    </release>
+    <release version="4.0.1" date="2026-04-28">
+      <description translate="no">
+        <p>Fixed</p> <ul> <li>Very wide feed and channel page layouts having a single-column video view.</li> </ul>
+      </description>
+    </release>
+    <release version="4.0.0" date="2026-04-22">
+      <description translate="no">
+        <p>BREAKING</p> <ul> <li>The flatpak distributed on Flathub does not have the permission to run external commands, and therefore also not external players, by default. If you use external players, you will need to manually grant the permission, as detailed in the preferences dialog.</li> </ul> <p>Added</p> <ul> <li>Heavily reworked downloading functionality: Downloading is now built-in into Pipeline, backed by yt-dlp. You can also now play downloaded videos in the internal (or external) player. You can display the list of all videos you have downloaded in a new page.</li> <li>Introduced a history page.</li> <li>On a mobile layout, the downloads, history, and subscription entries were moved into an overlay sidebar.</li> <li>Add the ability to pin and unpin the sidebar on desktop mode.</li> <li>Improved the UI of the import and export dialogs.</li> </ul> <p>Changed</p> <ul> <li>Improved image loading performance for thumbnails and avatars.</li> <li>By default, the external player is now unset, informing the user to set it if he tries to play videos externally.</li> </ul> <p>Fixed</p> <ul> <li>Un-fullscreening a video always showing the sidebar, even though it was hidden before fullscreening.</li> <li>Fixed spaced in front of links being stripped in descriptions.</li> </ul>
+      </description>
+    </release>
+    <release version="3.3.1" date="2026-03-18">
+      <description translate="no">
+        <p>Fixed</p> <ul> <li>Bad performance with lots of subscriptions.</li> <li>Loading bar jumping around with many subscriptions.</li> </ul>
+      </description>
+    </release>
+    <release version="3.3.0" date="2026-03-12">
+      <description translate="no">
+        <p>Added</p> <ul> <li>Subscription import from Invidious.</li> </ul> <p>Fixed</p> <ul> <li>Video title updating when switching clicking on a video.</li> </ul>
+      </description>
+    </release>
+    <release version="3.2.4" date="2026-02-24">
+      <description translate="no">
+        <p>Added</p> <ul> <li>Colored progress bars.</li> <li>Added a small Easter egg.</li> </ul> <p>Fixed</p> <ul> <li>Subtitle settings not persisting.</li> </ul> <p>Changed</p> <ul> <li>Updated splash texts.</li> </ul>
+      </description>
+    </release>
+    <release version="3.2.3" date="2026-02-15">
+      <description translate="no">
+        <p>Added</p> <ul> <li>Pipeline can now use <code>yt-dlp</code> as a fallback to other providers.</li> <li>Pipeline can now use YouTube RSS feeds as a fallback to other providers.</li> </ul>
+      </description>
+    </release>
+    <release version="3.2.2" date="2026-02-04">
+      <description translate="no">
+        <p>HOTFIX</p> <ul> <li>Fixed videos failing to fetch from YouTube.</li> </ul>
+      </description>
+    </release>
+    <release version="3.2.1" date="2026-02-02">
+      <description translate="no">
+        <p>Added</p> <ul> <li>Remember video position when restarting a video.</li> <li>Option to use Piped as a fallback to fetching from YouTube, and vice versa. This is activated by default on new installations, and if you previously set to query from YouTube.</li> </ul>
+      </description>
+    </release>
+    <release version="3.2.0" date="2026-01-29">
+      <description translate="no">
+        <p>Added</p> <ul> <li>Keyboard shortcut F11 to fullscreen.</li> <li>Keyboard shortcut F9 to toggle the sidebar.</li> <li>Option to give a cookies file for video playback to confirm that you are not a bot.</li> <li>Option to set extractor arguments for internal video player.</li> </ul> <p>Changed</p> <ul> <li>Updated the internal video player to the newest version.</li> <li>Disabled creating error files for the backend.</li> <li>Updated the shortcuts dialog to the new one in libadwaita.</li> </ul> <p>Fixed</p> <ul> <li>Low-resolution thumbnails for YouTube.</li> <li>Rare crash when searching.</li> <li>Search keyboard shortcut not being usable in the search page.</li> <li>Focus changing when toggling the sidebar.</li> </ul>
+      </description>
+    </release>
+    <release version="3.1.1" date="2025-10-22">
+      <description translate="no">
+        <p>Fixed</p> <ul> <li>Channel video count being interpreted as subscriber count.</li> <li>Removing a video from the watch-later list sometimes duplicating the video in the list instead.</li> </ul> <p>Changed</p> <ul> <li>Removed the setup dialog in favor of a privacy notice dialog.</li> </ul>
+      </description>
+    </release>
+    <release version="3.1.0" date="2025-10-15">
+      <description translate="no">
+        <p>Added</p> <ul> <li>Option to directly connect to YouTube instead of proxying over Piped. Note that this option is enabled by default as currently all Piped instances seem to be down.</li> </ul>
+      </description>
+    </release>
+    <release version="3.0.1" date="2025-08-15">
+      <description translate="no">
+        <p>Fixed</p> <ul> <li>Fix playing Peertube videos using the external player if Clapper is used.</li> <li>Fix the setup window being slightly too wide in a narrow layout.</li> <li>Fix punctuation errors in some splash texts.</li> </ul>
+      </description>
+    </release>
+    <release version="3.0.0" date="2025-08-07">
+      <description translate="no">
+        <p>This release is a major redesign of the application UI to be more intuitive to use, being more adaptive for both the desktop and mobile layout as well as more visually pleasing. The release notes of this release will only contain some of the more noteworthy changes, many minor improvements are left out.</p> <p>BREAKING</p> <ul> <li>In case you are on an older device without support for GLES 3.0 or later, Pipeline will now use software rendering due to a GTK update. This will in particular break the internal video player. Please use an external video player instead (for example Clapper, which is also the internal video player we use). You can configure this, as well as make the external video player the default, in the preferences menu.</li> </ul> <p>Added</p> <ul> <li>Toast when unsubscribing to a channel, in order to undo the action if wanted.</li> <li>Keyboard shortcut for fullscreening a video.</li> <li>Filters can now be edited.</li> <li>Hovering over a video displays a button to bookmark the video, as well as a button to bring up the context menu (only works on a desktop layout).</li> <li>Export of data to either a Pipeline-specific database, NewPipe JSON file or YouTube CSV file.</li> <li>Option to disable YouTube or PeerTube providers.</li> <li>Option to use cairo software rendering in the settings, which may in some cases behave better compared to LLVMpipe software rendering on weak devices.</li> </ul> <p>Fixed</p> <ul> <li>Keyboard shortcuts for videos were only available when focused on the video widget, instead of the video page.</li> <li>Popover menus for videos and channels will now point to where the user clicked.</li> <li>Filters will now not be applied to channel pages anymore.</li> <li>When the window is unfullscreened via a keyboard shortcut, playing videos were still taking up the full window.</li> <li>Ensure all links, both in video descriptions and channel descriptions, are clickable.</li> <li>Fix some UI elements not being visible on a mobile layout.</li> <li>Ignored some Piped errors like internal server errors, which we can do nothing about.</li> <li>When manually managing Piped instances and only having one Piped instance, the 'automatically manage instances' was impossible to turn back on until another instance was added.</li> <li>When turning on automatically managed Piped instances, the updated list of instances is now directly fetched instead of only after a restart.</li> </ul>
+      </description>
+    </release>
+    <release version="2.6.1" date="2025-06-28">
+      <description translate="no">
+        <p>Fixed</p> <ul> <li>Some splash texts containing wrong information.</li> <li>The wide layout was used for windows with small height disregarding the width.</li> </ul>
+      </description>
+    </release>
+    <release version="2.6.0" date="2025-06-21">
+      <description translate="no">
+        <p>Added</p> <ul> <li>Keyboard shortcuts for changing volume and playback speed when playing a video.</li> <li>Keyboard shortcuts for seeking forward or backward, as well as to specific percentiles of a video.</li> <li>Toggle to hide the sidebar.</li> <li>Setup window to inform about Pipeline privacy and to import subscriptions.</li> </ul> <p>Fixed</p> <ul> <li>Error when Piped does not report any working instances.</li> <li>Avatars of channels being unset if no video was watched from this channel in a while.</li> <li>Multi-line video titles displaying weirdly.</li> <li>Status page that there are no subscriptions being displayed even if there are videos in the feed.</li> </ul>
+      </description>
+    </release>
+    <release version="2.5.0" date="2025-06-14">
+      <description translate="no">
+        <p>Added</p> <ul> <li>Random splash text when reloading the feed.</li> <li>Debug information into the about window.</li> </ul> <p>Fixed</p> <ul> <li>Some buttons being hidden on the video page in a narrow layout.</li> <li>Description of YouTube videos containing unescaped characters.</li> <li>Add videos to the watched list when closing the video while it is still being displayed.</li> </ul>
+      </description>
+    </release>
+    <release version="2.4.1" date="2025-06-09">
+      <description translate="no">
+        <p>Fixed</p> <ul> <li>The watch history was not correctly persisted.</li> <li>Filters which contained an ampersand where not correctly displayed in the UI.</li> </ul>
+      </description>
+    </release>
+    <release version="2.4.0" date="2025-06-07">
+      <description translate="no">
+        <p>Added</p> <ul> <li>New menu item for videos in the feed to filter out similar videos.</li> <li>Filter to remove already watched videos from the feed.</li> </ul> <p>Fixed</p> <ul> <li>Bug where 'hide videos from today' filter was wrong depending on the local timezone.</li> </ul> <p>Changed</p> <ul> <li>UI change for adding filters from the filter management dialog.</li> </ul>
+      </description>
+    </release>
+    <release version="2.3.0" date="2025-05-28">
+      <description translate="no">
+        <p>Added</p> <ul> <li>Option to hide videos which require payment; this is enabled by default as Pipeline cannot play those.</li> </ul> <p>Fixed</p> <ul> <li>Improved startup speed.</li> <li>Some extra information for YouTube videos not loading.</li> <li>Searches including YouTube videos with extremely many views not loading.</li> </ul> <p>Removed</p> <ul> <li>Support for importing data from versions earlier than 2.0.0.</li> </ul>
+      </description>
+    </release>
+    <release version="2.2.3" date="2025-05-24">
+      <description translate="no">
+        <p>Added</p> <ul> <li>When playing with the external player, click the thumbnail to spawn the external player again.</li> </ul> <p>Fixed</p> <ul> <li>Bug where video appears multiple times in watch later list.</li> <li>Videos starting playback with low resolution.</li> </ul> <p>Changed</p> <ul> <li>Disable the override to the GL renderer for new GTK versions, where the renderer was removed.</li> </ul>
+      </description>
+    </release>
+    <release version="2.2.2" date="2025-04-22">
+      <description translate="no">
+        <p>Added</p> <ul> <li>Option to automatically update the Piped instance list on every startup.</li> </ul>
+      </description>
+    </release>
+    <release version="2.2.1" date="2025-04-20">
+      <description translate="no">
+        <p>Re-release of version 2.2.0 as CI failed to run.</p>
+      </description>
+    </release>
+    <release version="2.2.0" date="2025-04-20">
+      <description translate="no">
+        <p>Changed</p> <ul> <li>Make Piped requests distributed among all instances in the instance list. This should speed up refreshing the feed a lot.</li> </ul> <p>Fixed</p> <ul> <li>Videos with the same uploaded timestamp replacing each other in the watch-later list.</li> </ul> <p>Chores</p> <ul> <li>Updated the Piped API list to add more APIs.</li> </ul>
+      </description>
+    </release>
+    <release version="2.1.1" date="2025-01-30">
+      <description translate="no">
+        <p>Fixed</p>
+        <ul>
+          <li>Buttons and some video information being cut off in the video page on small height.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="2.1.0" date="2024-12-05">
+      <description translate="no">
+        <p>Changed</p>
+        <ul>
+          <li>Major UI improvements to the video page.</li>
+          <li>Major UI improvements to the channel page.</li>
+          <li>Minor UI improvements to duration indicators.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Start with the watch-later list at the top instead of the bottom.</li>
+          <li>Long video and channel names breaking window size on small screens.</li>
+          <li>Wrong background color for video list and channel list.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="2.0.3" date="2024-11-02">
+      <description translate="no">
+        <p>Changed</p>
+        <ul>
+          <li>Improved import dialogs.</li>
+          <li>Make the search bar wider.</li>
+          <li>Improved error dialog.</li>
+          <li>Show that the app is loading when starting the app.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Panic for migrating watch-later list to the new version for some YouTube videos.</li>
+          <li>Importing NewPipe videos not showing the file to import.</li>
+        </ul>
+        <p>Chores</p>
+        <ul>
+          <li>Updated to GNOME 47 runtimes.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="2.0.2" date="2024-09-14">
+      <description translate="no">
+        <p>HOTFIX</p>
+        <ul>
+          <li>Bad performance of the built-in video player.</li>
+        </ul>
+        <p>Added</p>
+        <ul>
+          <li>Ignore Piped error when opening a video.</li>
+          <li>Don't show video title in player when not fullscreened.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="2.0.1" date="2024-09-12">
+      <description translate="no">
+        <p>Fixed</p>
+        <ul>
+          <li>Infinite loading on channels with no videos.</li>
+          <li>Video not stopping when displaying channel in the subscriptions tab.</li>
+          <li>Video player not centered on fullscreen when video aspect ratio does not match display aspect ratio.</li>
+          <li>Slight redesign of channel page to fix video widgets growing in size when scrolling.</li>
+          <li>Swiping not pausing video and exiting fullscreen.</li>
+          <li>UI not fitting in window with certain widths.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="2.0.0" date="2024-09-10">
+      <description translate="no">
+        <p>A complete rewrite of the application, in order to allow for easier maintenance, more features and a better user experience.</p>
+        <p>Added</p>
+        <ul>
+          <li>Search for videos and channels.</li>
+          <li>Play videos inside the application using Clapper.</li>
+          <li>Show toast when the video URL was copied.</li>
+          <li>Import PeerTube subscriptions from NewPipe</li>
+          <li>Allow for backup Piped instances.</li>
+          <li>Option to not automatically refresh when started.</li>
+          <li>Infinite scrolling of the feed.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Many videos not showing up in the feed anymore. Workaround for an upstream Piped issue.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.15.0" date="2024-05-28">
+      <description translate="no">
+        <p>Fix</p>
+        <ul>
+          <li>Crash with certain channels.</li>
+        </ul>
+        <p>Chores</p>
+        <ul>
+          <li>Updated to GNOME 46 libraries.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.14.5" date="2024-02-24">
+      <description translate="no">
+        <p>HOTFIX</p>
+        <ul>
+          <li>Subscription names not showing up in the subscription list anymore.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.14.4" date="2024-02-22">
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Action to open video in the browser.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Outdated window title</li>
+          <li>Wrong offset of the reload-spinner in relation to the reload-button.</li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>Updated selected Piped instance list.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.14.3" date="2024-01-11">
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Livi video player in the list of predefined video players.</li>
+          <li>Option to hide all short videos.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.14.2" date="2023-12-08">
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Video title as tooltip of the video.</li>
+          <li>Video title in the video information screen.</li>
+          <li>Error handling when failing to add a subscription.</li>
+          <li>Error handling when failing to play or download videos.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.14.1" date="2023-11-11">
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Keyboard shortcuts for actions.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Video duration placed out-of-bounds if thumbnail does not load.</li>
+        </ul>
+        <p>Chores</p>
+        <ul>
+          <li>Updated dependencies.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.13.1" date="2023-08-24">
+      <description translate="no">
+        <p>Fixed</p>
+        <ul>
+          <li>Copy video URL not working anymore.</li>
+          <li>Missing accesibility labels.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.13.0" date="2023-08-20">
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Dialog showing video information including likes, dislikes (not for YouTube), views and video description.</li>
+          <li>Show video duration on video thumbnails.</li>
+        </ul>
+        <p>Removed</p>
+        <ul>
+          <li>Removed Lbry support as it will have to shut down soon.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>File chooser dialog for importing videos not working.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.12.0" date="2023-07-29">
+      <description translate="no">
+        <p>Update dependencies. Fix issue with some Peertube subscriptions.</p>
+      </description>
+    </release>
+    <release version="1.11.0" date="2023-07-16">
+      <description translate="no">
+        <p>Rebranding to Pipeline.</p>
+      </description>
+    </release>
+    <release version="1.10.0" date="2023-06-09">
+      <description translate="no">
+        <p>Load videos in feed automatically and introduce an option to only show videos from yesterday.</p>
+      </description>
+    </release>
+    <release version="1.9.6" date="2023-04-16">
+      <description translate="no">
+        <p>Hotfix for too large thumbnails.</p>
+      </description>
+    </release>
+    <release version="1.9.5" date="2023-04-15">
+      <description translate="no">
+        <p>Major UI updates to the feed list.</p>
+      </description>
+    </release>
+    <release version="1.9.4" date="2023-03-17">
+      <description translate="no">
+        <p>Minor UI improvements and bug fix.</p>
+      </description>
+    </release>
+    <release version="1.9.3" date="2022-11-20">
+      <description translate="no">
+        <p>Great UI improvements and bug fixes.</p>
+      </description>
+    </release>
+    <release version="1.9.2" date="2022-10-02">
+      <description translate="no">
+        <p>Support the new libadwaita widgets and greatly speed up Piped feed loading.</p>
+      </description>
+    </release>
+    <release version="1.9.1" date="2022-08-22">
+      <description translate="no">
+        <p>Fix incorrect ordering of subscriptions in the subscriptions list</p>
+      </description>
+    </release>
+    <release version="1.9.0" date="2022-08-13">
+      <description translate="no">
+        <p>Settings and UI for importing subscriptions</p>
+      </description>
+    </release>
+    <release version="1.8.5" date="2022-07-31">
+      <description translate="no"><p>Dutch and Czech translations</p></description>
+    </release>
+    <release version="1.8.4" date="2022-07-16">
+      <description translate="no"><p>Fix playing local videos for some video formats</p></description>
+    </release>
+    <release version="1.8.3" date="2022-07-05">
+      <description translate="no"><p>Allow for custom Piped URLs, view local videos</p></description>
+    </release>
+    <release version="1.8.2" date="2022-06-25">
+      <description translate="no"><p>Russian translation, symbolic app icon</p></description>
+    </release>
+    <release version="1.8.1" date="2022-06-22">
+      <description translate="no"><p>Fix compilation</p></description>
+    </release>
+    <release version="1.8.0" date="2022-06-22">
+      <description translate="no"><p>New icon (thanks @daudix-UFO), better adaptive UI for bigger screens</p></description>
+    </release>
+    <release version="1.7.1" date="2022-06-11">
+      <description translate="no"><p>Fix flatpak build</p></description>
+    </release>
+    <release version="1.7.0" date="2022-06-11">
+      <description translate="no"><p>Look at the videos of a single subscription using a dedicated button in the subscriptions list</p></description>
+    </release>
+    <release version="1.6.6" date="2022-04-27">
+      <description translate="no">
+        <p>Minor fix with the italic translation preventing packaging</p>
+      </description>
+    </release>
+    <release version="1.6.5" date="2022-04-27">
+      <description translate="no">
+        <p>Italian translation</p>
+      </description>
+    </release>
+    <release version="1.6.4" date="2022-04-23">
+      <description translate="no">
+        <p>Fix crash when the systems locale was not translated yet.</p>
+      </description>
+    </release>
+    <release version="1.6.3" date="2022-04-22">
+      <description translate="no">
+        <p>Fix some subscription names not showing and some icons not theming correctly.</p>
+      </description>
+    </release>
+    <release version="1.6.2" date="2022-04-09">
+      <description translate="no">
+        <p>Fix for some subscriptions not loading</p>
+      </description>
+    </release>
+    <release version="1.6.1" date="2022-03-29">
+      <description translate="no">
+        <p>Hotfix: Fixed a bug where only one subscription could have been added at a time.</p>
+      </description>
+    </release>
+    <release version="1.6.0" date="2022-03-24">
+      <description translate="no">
+        <p>Port to GTK4 with UI-improvements and internationalization.</p>
+      </description>
+    </release>
+    <release version="1.5.0" date="2021-12-02">
+      <description translate="no">
+        <p>Add support for downloading videos and copying the link to clipboard.</p>
+      </description>
+    </release>
+    <release version="1.4.0" date="2021-10-22">
+      <description translate="no">
+        <p>Added support for the platforms peertube and lbry.</p>
+      </description>
+    </release>
+    <release version="1.3.1" date="2021-09-28">
+      <description translate="no">
+        <p>Hotfix flatpak not compiling.</p>
+      </description>
+    </release>
+    <release version="1.3.0" date="2021-09-28">
+      <description translate="no">
+        <p>Major refactoring, no big changes to features or gui but preparations for such features.</p>
+      </description>
+    </release>
+    <release version="1.2.3" date="2021-07-08">
+      <description translate="no">
+        <p>Made the application visible in phoshs "show only adaptive apps".</p>
+      </description>
+    </release>
+    <release version="1.2.2" date="2021-07-08">
+      <description translate="no">
+        <p>Fixed too small window size, header bar not having a close button and not beeing draggable.</p>
+      </description>
+    </release>
+    <release version="1.2.1" date="2021-06-30">
+      <description translate="no">
+        <p>Stylistic upgrades and flatpak packaging format</p>
+      </description>
+    </release>
+    <release version="1.2.0" date="2021-05-19"/>
+  </releases>
+
+  <description>
+    <!-- Translators: Part of the description of the application in the metainfo. -->
+    <p>
+      Pipeline lets you watch and download videos from YouTube and PeerTube, all without needing to navigate through
+      different websites. Its adaptive design allows you to enjoy content on any screen size.
+    </p>
+    <!-- Translators: Part of the description of the application in the metainfo. -->
+    <p>
+      Pipeline allows you to:
+    </p>
+    <!-- Translators: Part of the description of the application in the metainfo. -->
+    <ul>
+      <!-- Translators: Part of the description of the application in the metainfo. -->
+      <li>Search for you favorite channels and subscribe to them.</li>
+      <!-- Translators: Part of the description of the application in the metainfo. -->
+      <li>Aggregate the videos of all subscriptions into a single feed.</li>
+      <!-- Translators: Part of the description of the application in the metainfo. -->
+      <li>Filter out unwanted items from the feed, like short videos or videos from a series.</li>
+      <!-- Translators: Part of the description of the application in the metainfo. -->
+      <li>Play those videos either in the built-in video player or with any other video player of your choice.</li>
+      <!-- Translators: Part of the description of the application in the metainfo. -->
+      <li>Download videos for offline viewing.</li>
+      <!-- Translators: Part of the description of the application in the metainfo. -->
+      <li>Manage videos you want to watch later.</li>
+      <!-- Translators: Part of the description of the application in the metainfo. -->
+      <li>Import your subscriptions from NewPipe or YouTube.</li>
+      <!-- Translators: Part of the description of the application in the metainfo. -->
+      <li>Supports YouTube, PeerTube with the possibility to extend to other platforms on request.</li>
+    </ul>
+  </description>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Playing a Video</caption>
+      <image>https://gitlab.com/schmiddi-on-mobile/pipeline/-/raw/master/data/screenshots/video.png</image>
+    </screenshot>
+    <screenshot type="default">
+      <caption>Viewing Videos of a Channel</caption>
+      <image>https://gitlab.com/schmiddi-on-mobile/pipeline/-/raw/master/data/screenshots/channel.png</image>
+    </screenshot>
+    <screenshot type="default">
+      <caption>Managing your Subscriptions</caption>
+      <image>https://gitlab.com/schmiddi-on-mobile/pipeline/-/raw/master/data/screenshots/subscriptions.png</image>
+    </screenshot>
+    <screenshot type="default">
+      <caption>Listing Videos to Watch Later</caption>
+      <image>https://gitlab.com/schmiddi-on-mobile/pipeline/-/raw/master/data/screenshots/watch-later.png</image>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://mobile.schmidhuberj.de/pipeline/</url>
+  <url type="bugtracker">https://gitlab.com/schmiddi-on-mobile/pipeline/-/work_items</url>
+  <url type="help">https://gitlab.com/schmiddi-on-mobile/pipeline/-/wikis/home</url>
+  <url type="contact">https://matrix.to/#/#pipelineapp:matrix.org</url>
+  <url type="vcs-browser">https://gitlab.com/schmiddi-on-mobile/pipeline</url>
+  <url type="contribute">https://gitlab.com/schmiddi-on-mobile/pipeline/-/blob/master/CONTRIBUTING.md</url>
+  <url type="translate">https://hosted.weblate.org/engage/schmiddi-on-mobile/</url>
+
+  <provides>
+    <binary>tubefeeder</binary>
+  </provides>
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>touch</control>
+    <internet>always</internet>
+  </recommends>
+  <requires>
+    <display_length compare="ge" side="shortest">300</display_length>
+    <display_length compare="ge" side="longest">360</display_length>
+  </requires>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#62a0ea</color>
+    <color type="primary" scheme_preference="dark">#1a5fb4</color>
+  </branding>
+</component>

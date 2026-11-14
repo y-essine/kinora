@@ -1,0 +1,276 @@
+using Gtk 4.0;
+using Adw 1;
+using Gdk 4.0;
+
+template $TFChannelPage: Adw.Bin {
+  focusable: true;
+  can-focus: true;
+
+  Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      [start]
+      Gtk.ToggleButton main_toggle_sidebar {
+        visible: bind template.show-sidebar-visible;
+        tooltip-text: _("Show Sidebar");
+        action-name: "win.toggle-sidebar";
+        icon-name: "sidebar-show-symbolic";
+      }
+
+      [start]
+      Gtk.Stack {
+        transition-type: crossfade;
+        visible-child-name: bind $refresh_button_visible_child_name(
+          template.model as <$TFVideoFetcherStream>.loading
+          ) as <string>;
+
+        StackPage {
+          name: 'button';
+
+          child: Gtk.Button {
+            icon-name: "view-refresh-symbolic";
+            action-name: "channel-page.reload";
+            tooltip-text: _("Reload");
+          };
+        }
+
+        StackPage {
+          name: 'spinner';
+
+          child: Adw.Spinner {
+            halign: center;
+            valign: center;
+          };
+        }
+      }
+
+      [end]
+      MenuButton primary_menu_button {
+        accessibility {
+          label: C_("accessibility", "Primary menu");
+        }
+
+        primary: true;
+        menu-model: menubar;
+        tooltip-text: C_("tooltip", "Primary menu");
+        icon-name: 'open-menu-symbolic';
+      }
+
+      title-widget: Adw.WindowTitle main_title {};
+    }
+
+    Gtk.Box box_main_area {
+      focusable: true;
+      can-focus: true;
+      orientation: vertical;
+      spacing: 6;
+      hexpand: true;
+      halign: fill;
+      vexpand: true;
+      margin-top: 6;
+      // TODO
+      // Picture banner {
+      //     styles [
+      //         "card",
+      //     ]
+      //     halign: center;
+      //     valign: fill;
+      //     hexpand: true;
+      //     vexpand: true;
+      //     paintable: bind template.channel as <$TFChannel>.banner;
+      // }
+      Adw.MultiLayoutView multi_layout_view {
+        Adw.Layout {
+          name: "wide";
+
+          content: Adw.Clamp {
+            maximum-size: bind video_list.clamped_to;
+            tightening-threshold: 1862;
+
+            Adw.LayoutSlot {
+              id: "header";
+            }
+          };
+        }
+
+        Adw.Layout {
+          name: "compact";
+
+          content: Adw.LayoutSlot {
+            id: "header";
+          };
+        }
+
+        [header]
+        Gtk.Box {
+          orientation: vertical;
+          spacing: 8;
+
+          Gtk.Box {
+            margin-top: 6;
+            margin-bottom: 6;
+            margin-start: 12;
+            margin-end: 12;
+
+            Adw.Avatar {
+              custom-image: bind $pixbuf_to_paintable(template.channel as <$TFChannel>.avatar) as <Gdk.Paintable>;
+              text: bind template.channel as <$TFChannel>.name;
+              size: 100;
+              valign: start;
+            }
+
+            Box {
+              orientation: vertical;
+              margin-start: 12;
+              spacing: 6;
+
+              Label label_author {
+                styles [
+                  "title-2",
+                ]
+
+                label: bind template.channel as <$TFChannel>.name;
+                selectable: true;
+                wrap: true;
+                wrap-mode: word_char;
+                ellipsize: end;
+                lines: 2;
+                justify: left;
+                valign: start;
+                halign: start;
+                xalign: 0.0;
+              }
+
+              Box {
+                spacing: 6;
+
+                Image {
+                  styles [
+                    "dimmed",
+                  ]
+
+                  icon-name: bind $icon_name_for_platform(template.channel as <$TFChannel>.platform) as <string>;
+                }
+
+                Label platform_name {
+                  styles [
+                    "subtitle",
+                    "dimmed",
+                  ]
+
+                  margin-end: 3;
+                  visible: bind template.compact inverted;
+                  label: bind $format_platform(template.channel as <$TFChannel>.platform) as <string>;
+                }
+
+                Label label_subscribers {
+                  styles [
+                    "dimmed",
+                  ]
+
+                  label: bind $format_subscribers(template.channel as <$TFChannel>.subscribers) as <string>;
+                  visible: bind template.channel as <$TFChannel>.has-subscribers;
+                  single-line-mode: true;
+                  justify: left;
+                  valign: start;
+                  halign: start;
+                  xalign: 0.0;
+                }
+              }
+
+              Gtk.Button button_subscribe {
+                styles [
+                  "pill",
+                ]
+
+                halign: start;
+                action-name: "win.subscribe";
+                label: bind $subscribe_label(template.channel as <$TFChannel>.subscribed) as <string>;
+              }
+            }
+          }
+
+          Gtk.Expander {
+            label: _("Description");
+            margin-start: 12;
+            margin-end: 12;
+
+            child: Label label_description {
+              use-markup: true;
+              label: bind $format_description(template.channel as <$TFChannel>.description as <string>) as <string>;
+              selectable: true;
+              wrap: true;
+              wrap-mode: word_char;
+              halign: start;
+              margin-top: 6;
+              margin-start: 6;
+              justify: left;
+              valign: start;
+              xalign: 0.0;
+            };
+          }
+        }
+      }
+
+      Adw.StatusPage {
+        visible: bind $and(
+          template.model as <$TFVideoFetcherStream>.loading,
+          template.model as <$TFVideoFetcherStream>.is-empty
+          ) as <bool>;
+        hexpand: true;
+        vexpand: true;
+        title: _("Loading Videos");
+        icon-name: "view-refresh-symbolic";
+      }
+
+      $TFVideoList video_list {
+        visible: bind $not(
+          $and(
+            template.model as <$TFVideoFetcherStream>.loading,
+            template.model as <$TFVideoFetcherStream>.is-empty
+            ) as <bool>
+        ) as <bool>;
+        model: bind template.model;
+        client: bind template.client;
+        compact: bind template.compact;
+      }
+    }
+  }
+}
+
+// Keep up-to-date with window.blp and video_page.blp.
+menu menubar {
+  section {
+    item {
+      label: _("Import");
+      action: 'win.import';
+    }
+
+    item {
+      label: _("Export");
+      action: 'win.export';
+    }
+  }
+
+  section {
+    item {
+      label: _("Preferences");
+      action: 'win.settings';
+    }
+
+    item {
+      label: _("Privacy Notice");
+      action: 'win.privacy-notice';
+    }
+
+    item {
+      label: _("Keyboard Shortcuts");
+      action: 'win.show-help-overlay';
+    }
+
+    item {
+      label: _("About Pipeline");
+      action: 'win.about';
+    }
+  }
+}

@@ -1,0 +1,112 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $TFExportDialog: Adw.Dialog {
+  content-width: 400;
+  content-height: 210;
+  title: _("Export");
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {}
+
+    Gtk.Box {
+      margin-start: 12;
+      margin-end: 12;
+      margin-bottom: 12;
+      margin-top: 6;
+      orientation: vertical;
+      vexpand: true;
+      valign: center;
+      halign: center;
+      spacing: 12;
+
+      Gtk.ListBox {
+        styles [
+          "boxed-list",
+        ]
+
+        selection-mode: none;
+
+        Adw.ComboRow format_row {
+          title: _("Format");
+
+          model: Gtk.StringList {
+            strings [
+              "Pipeline",
+              "YouTube",
+              "NewPipe",
+            ]
+          };
+        }
+      }
+
+      Gtk.Stack stack {
+        styles [
+          "dimmed",
+        ]
+
+        visible-child-name: bind $get_format(format_row as <Adw.ComboRow>.selected-item) as <string>;
+
+        StackPage {
+          name: "Pipeline";
+
+          child: Gtk.Label {
+            styles [
+              "caption",
+            ]
+
+            label: _(
+              "Export all the data Pipeline stores, in order to backup the data or import into another Pipeline instance"
+            );
+            wrap: true;
+            justify: center;
+          };
+        }
+
+        StackPage {
+          name: "YouTube";
+
+          child: Gtk.Label {
+            styles [
+              "caption",
+            ]
+
+            label: _(
+              "Export as a YouTube CSV format. While YouTube itself cannot import it, it can be used in other applications. This only exports YouTube subscriptions"
+            );
+            wrap: true;
+            use-markup: true;
+            justify: center;
+          };
+        }
+
+        StackPage {
+          name: "NewPipe";
+
+          child: Gtk.Label {
+            styles [
+              "caption",
+            ]
+
+            label: _("Produces a JSON file with your subscriptions which can be imported into NewPipe");
+            wrap: true;
+            justify: center;
+          };
+        }
+      }
+
+      Gtk.Button {
+        styles [
+          "suggested-action",
+          "pill",
+        ]
+
+        label: _("Export");
+        margin-top: 6;
+        halign: center;
+        clicked => $export() swapped;
+      }
+    }
+  };
+}

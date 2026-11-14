@@ -1,0 +1,272 @@
+using Gtk 4.0;
+using Adw 1;
+using Gdk 4.0;
+
+template $TFVideoItem: Box {
+  margin-end: 6;
+  margin-start: 6;
+  margin-top: 6;
+  margin-bottom: 6;
+  tooltip-text: bind template.video as <$TFVideo>.title;
+
+  EventControllerMotion {
+    enter => $handle_hover_enter() swapped;
+    leave => $handle_hover_leave() swapped;
+  }
+
+  GestureClick {
+    button: 3;
+    exclusive: true;
+    pressed => $handle_right_clicked() swapped;
+  }
+
+  GestureLongPress {
+    touch-only: true;
+    exclusive: true;
+    pressed => $handle_long_pressed() swapped;
+  }
+
+  Adw.MultiLayoutView multi_layout_view {
+    Adw.Layout {
+      name: "wide";
+
+      content: Adw.Clamp {
+        maximum-size: 288;
+
+        child: Gtk.Box {
+          orientation: vertical;
+          spacing: 6;
+
+          Adw.LayoutSlot {
+            id: "image";
+            width-request: 288;
+            height-request: 162;
+          }
+
+          Box {
+            orientation: vertical;
+            spacing: 5;
+
+            Adw.LayoutSlot {
+              id: "title";
+            }
+
+            Box {
+              spacing: 6;
+
+              Adw.LayoutSlot {
+                id: "avatar";
+              }
+
+              Adw.LayoutSlot {
+                id: "author";
+              }
+
+              Adw.LayoutSlot {
+                id: "date";
+              }
+            }
+          }
+        };
+      };
+    }
+
+    Adw.Layout {
+      name: "compact";
+
+      content: Gtk.Box {
+        orientation: horizontal;
+
+        Adw.Clamp {
+          maximum-size: 128;
+
+          Adw.LayoutSlot {
+            id: "image";
+            width-request: 128;
+            height-request: 72;
+            valign: start;
+          }
+        }
+
+        Gtk.Box {
+          orientation: vertical;
+          spacing: 6;
+          margin-start: 6;
+
+          Adw.LayoutSlot {
+            id: "title";
+          }
+
+          Box {
+            spacing: 6;
+
+            Adw.LayoutSlot {
+              id: "avatar";
+            }
+
+            Adw.LayoutSlot {
+              id: "author";
+            }
+          }
+
+          Adw.LayoutSlot {
+            id: "date";
+            halign: start;
+          }
+        }
+      };
+    }
+
+    [image]
+    Overlay overlay {
+      [overlay]
+      Box {
+        styles [
+          "osd",
+          "duration-osd",
+          "numeric",
+        ]
+
+        valign: end;
+        halign: start;
+        margin-bottom: 5;
+        margin-start: 5;
+        spacing: 3;
+        visible: bind $or(template.video as <$TFVideo>.downloading, template.video as <$TFVideo>.downloaded) as <bool>;
+
+        Image {
+          icon-name: "folder-download-symbolic";
+        }
+
+        Adw.Spinner {
+          accessibility {
+            description: _("Video is downloading");
+          }
+
+          visible: bind template.video as <$TFVideo>.downloading;
+        }
+      }
+
+      [overlay]
+      Box {
+        styles [
+          "osd",
+          "duration-osd",
+          "numeric",
+        ]
+
+        valign: end;
+        halign: end;
+        margin-bottom: 5;
+        margin-end: 5;
+        spacing: 3;
+
+        Label {
+          label: bind template.video as <$TFVideo>.duration-label;
+        }
+
+        Image {
+          icon-name: bind $icon_name_for_platform(template.video as <$TFVideo>.platform) as <string>;
+        }
+      }
+
+      [overlay]
+      Box {
+        margin-top: 6;
+        margin-start: 6;
+        margin-end: 6;
+        visible: bind $and(template.hovering, $not(template.compact) as <bool>) as <bool>;
+        valign: start;
+
+        Button {
+          styles [
+            "circular",
+            "osd",
+          ]
+
+          tooltip-text: bind $watch_later_tooltip_text(template.video as <$TFVideo>.watch-later) as <string>;
+          icon-name: bind $watch_later_icon_name(template.video as <$TFVideo>.watch-later) as <string>;
+          action-name: "video-item.watch-later";
+        }
+
+        Gtk.Button btn_more_actions {
+          halign: end;
+          hexpand: true;
+          visible: bind template.hovering;
+
+          styles [
+            "circular",
+            "osd",
+          ]
+
+          tooltip-text: _("More Actions");
+          icon-name: "view-more-horizontal-symbolic";
+          clicked => $handle_more_actions_clicked() swapped;
+        }
+      }
+
+      Picture thumbnail {
+        styles [
+          "card",
+        ]
+
+        paintable: bind $pixbuf_to_paintable(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+      }
+    }
+
+    [avatar]
+    Adw.Avatar {
+      styles [
+        "card",
+        "avatar-card",
+      ]
+
+      custom-image: bind $pixbuf_to_paintable(
+        template.video as <$TFVideo>.uploader as <$TFChannel>.avatar
+        ) as <Gdk.Paintable>;
+      text: bind template.video as <$TFVideo>.uploader as <$TFChannel>.name;
+      size: 24;
+    }
+
+    [author]
+    Label {
+      styles [
+        "dimmed",
+      ]
+
+      label: bind template.video as <$TFVideo>.uploader as <$TFChannel>.name;
+      ellipsize: end;
+      lines: 1;
+      halign: start;
+      hexpand: true;
+      margin-end: 6;
+    }
+
+    [date]
+    Label {
+      styles [
+        "dimmed",
+      ]
+
+      label: bind template.video as <$TFVideo>.uploaded-label;
+      ellipsize: end;
+      lines: 1;
+    }
+
+    [title]
+    Label label_title {
+      styles [
+        "title-4",
+      ]
+
+      label: bind template.video as <$TFVideo>.title;
+      wrap: true;
+      wrap-mode: word_char;
+      ellipsize: end;
+      lines: 2;
+      xalign: 0;
+    }
+  }
+
+  PopoverMenu popover_menu {}
+}

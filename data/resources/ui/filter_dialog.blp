@@ -1,0 +1,87 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $TFFilterDialog: Adw.PreferencesDialog {
+  title: _("Manage Filters");
+
+  Adw.PreferencesPage {
+    title: _("Manage Filters");
+    icon-name: "funnel-symbolic";
+    name: "general";
+
+    Adw.PreferencesGroup {
+      Adw.SwitchRow global_toggle {
+        [prefix]
+        Image {
+          icon-name: "funnel-symbolic";
+        }
+
+        title: _("Use Filters");
+        subtitle: _("Hide videos from the feed");
+        action-name: "win.filter-enabled";
+      }
+    }
+
+    Adw.PreferencesGroup {
+      title: _("General Filters");
+      sensitive: bind global_toggle.active;
+
+      Adw.SwitchRow switch_hide_watched {
+        title: _("Hide Watched Videos");
+        subtitle: _("Hide videos you have already watched from the feed");
+      }
+
+      Adw.SwitchRow switch_hide_shorts {
+        title: _("Hide Short Videos");
+        subtitle: _("Hide videos shorter than one minute from the feed");
+      }
+
+      Adw.SwitchRow switch_hide_requires_payment {
+        title: _("Hide Payed Videos");
+        subtitle: _("Hide videos that require a payment from the feed");
+      }
+
+      Adw.SwitchRow switch_hide_today {
+        title: _("Hide Videos from Today");
+        subtitle: _("Hide videos that came out today from the feed");
+      }
+    }
+  }
+
+  Adw.PreferencesPage {
+    title: _("Custom Filters");
+    icon-name: "avatar-default-symbolic";
+    name: "custom";
+
+    Adw.PreferencesGroup {
+      title: _("Custom Filters");
+      description: _(
+        "Hide a channel's videos whose titles contain a certain word or phrase\n\nYou can create custom filters either here or prepopulate the information from a video's context menu"
+      );
+      sensitive: bind global_toggle.active;
+
+      ListBox {
+        styles [
+          "boxed-list",
+        ]
+
+        selection-mode: none;
+
+        Adw.ButtonRow {
+          title: _("Add Filter");
+          start-icon-name: "list-add-symbolic";
+          activated => $add_filter() swapped;
+        }
+      }
+
+      ListBox custom_filter_box {
+        styles [
+          "boxed-list",
+        ]
+
+        selection-mode: none;
+        margin-top: 12;
+      }
+    }
+  }
+}

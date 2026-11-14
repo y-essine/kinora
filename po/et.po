@@ -1,0 +1,1761 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the tubefeeder package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: tubefeeder\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-18 11:19+0200\n"
+"PO-Revision-Date: 2026-04-19 12:09+0000\n"
+"Last-Translator: Priit Jõerüüt <jrthwlate@users.noreply.hosted.weblate.org>\n"
+"Language-Team: Estonian <https://hosted.weblate.org/projects/schmiddi-on-"
+"mobile/pipeline/et/>\n"
+"Language: et\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+"X-Generator: Weblate 5.17.1-dev\n"
+
+#: data/de.schmidhuberj.tubefeeder.desktop.in.in:4
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:6
+#: data/resources/ui/window.blp:8 data/resources/ui/window.blp:479
+#: src/gui/video_page.rs:606 src/main.rs:163
+msgid "Pipeline"
+msgstr "Pipeline"
+
+#: data/de.schmidhuberj.tubefeeder.desktop.in.in:5
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:7
+msgid "Follow video creators"
+msgstr "Vaata, mida videote loojad teevad"
+
+#: data/de.schmidhuberj.tubefeeder.desktop.in.in:11
+msgid "youtube;peertube;video;"
+msgstr "youtube;peertube;video;muusikavideo;"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:460
+msgid ""
+"Pipeline lets you watch and download videos from YouTube and PeerTube, all "
+"without needing to navigate through different websites. Its adaptive design "
+"allows you to enjoy content on any screen size."
+msgstr ""
+"Pipeline võimaldab sul vaadata ja allalaadida videoid YouTube'i ja "
+"PeerTube'i teenustest nii, et sa ei pea ei saitide vahel klõpsima. Ekraaniga "
+"kohanduv kujundus võimaldab seda rakendust kasutada eri mõõtu ekraaniga "
+"arvutites ja nutiseadmetes."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:465
+msgid "Pipeline allows you to:"
+msgstr "Pipeline annab võimaluse sul:"
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:471
+msgid "Search for you favorite channels and subscribe to them."
+msgstr "Otsida lemmikkanaleid ja neid tellida/jälgida."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:473
+msgid "Aggregate the videos of all subscriptions into a single feed."
+msgstr "Koondada kõikide tellimuste videod ühte meediavoogu."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:475
+msgid ""
+"Filter out unwanted items from the feed, like short videos or videos from a "
+"series."
+msgstr ""
+"Jätta meediavoost välja mittevajalikud kirjed, nagu näiteks lühivideod või "
+"seriaalide sisu."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:477
+msgid ""
+"Play those videos either in the built-in video player or with any other "
+"video player of your choice."
+msgstr ""
+"Vaadata videoid kas rakenduse sees või sulle sobiva välise meediamängijaga."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:479
+msgid "Download videos for offline viewing."
+msgstr ""
+"Laadida videoid alla vallasrežiimis (ehk ilma võrguühenduseta) vaatamiseks."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:481
+msgid "Manage videos you want to watch later."
+msgstr "Hallata hiljemvaadatavaid videoid."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:483
+msgid "Import your subscriptions from NewPipe or YouTube."
+msgstr "Importida oma tellimusi YouTube'i ja PeerTube'i teenustest."
+
+#. Translators: Part of the description of the application in the metainfo.
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:485
+msgid ""
+"Supports YouTube, PeerTube with the possibility to extend to other platforms "
+"on request."
+msgstr ""
+"Toetab YouTube'i ja PeerTube'i teenuseid, aga huviliste korral saab lisada "
+"teisi sarnaseid teenuseid."
+
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:491
+msgid "Playing a Video"
+msgstr "Esitame videot"
+
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:495
+msgid "Viewing Videos of a Channel"
+msgstr "Vaatame kanali videoid"
+
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:499
+msgid "Managing your Subscriptions"
+msgstr "Halda oma tellimusi"
+
+#: data/de.schmidhuberj.tubefeeder.metainfo.xml.in.in:503
+msgid "Listing Videos to Watch Later"
+msgstr "Videote loend hiljem vaatamiseks"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:6
+msgid "Window width"
+msgstr "Akna laius"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:10
+msgid "Window height"
+msgstr "Akna kõrgus"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:14
+msgid "Window maximized state"
+msgstr "Akna maksimaalne vaade"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:18
+msgid "Whether the sidebar is pinned"
+msgstr "Kas külgriba on tõstetud esile"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:22
+msgid "The player to use"
+msgstr "Kasutatav meediamängija"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:26
+msgid "The downloader to use"
+msgstr "Kasutatav allalaadimisrakendus"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:30
+msgid "The default format for downloading videos."
+msgstr "Videote allalaadimisel kasutatav vaikimisi vorming."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:34
+msgid "Additional yt-dlp arguments."
+msgstr "Täiendavad yt-dlp argumendid."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:38
+msgid "Let Pipeline fetch videos from YouTube"
+msgstr "Kasuta YouTube'ist videote laadimiseks Pipeline'i teenust"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:42
+msgid "The piped api url"
+msgstr "Piped'i teenuse API võrguaadress"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:46
+msgid "Automatically manage Piped instances."
+msgstr "Halda Piped'i servereid automaatselt."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:50
+msgid "The piped api urls"
+msgstr "Piped'i teenuse API võrguaadressid"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:55
+msgid ""
+"How to query data from YouTube; can be either \"rustyipe\", \"piped\", "
+"\"rustypipe-then-piped\", or \"piped-then-rustypipe\" (with potential future "
+"values reserved for in the future)."
+msgstr ""
+"Eelistus kirjeldab viisi, kuidas YouTube'ist andmeid laaditakse - ja see "
+"saab olla kas „rustyipe“ „piped“, „rustypipe-then-piped“ või „piped-then-"
+"rustypipe“ (tulevikus võib küll muidki variante tekkida)."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:60
+msgid "Let Pipeline fetch videos from PeerTube"
+msgstr "Kasuta PeerTube'ist videote laadimiseks Pipeline'i teenust"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:64
+msgid "The peertube api used for searches"
+msgstr "Otsinguteks kasutatav Peertube'i API"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:68
+msgid "Only show videos of yesterday."
+msgstr "Näita vaid eilseid videoid."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:72
+msgid "Remove short videos."
+msgstr "Eemalda lühivideod."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:76
+msgid "Remove videos which require payment."
+msgstr "Eemalda tasulised videod."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:80
+msgid "Remove videos which have already been watched."
+msgstr "Eemalda juba vaadatud videod."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:84
+msgid "Whether the filter is enabled."
+msgstr "Kas filter on kasutusel."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:88
+msgid "Whether the application keeps the history of watched videos."
+msgstr "Kas rakendus salvestab vaadatud videote ajaloo."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:92
+msgid "The type of platform for which the last subscription was added."
+msgstr "Teenuse tüüp, millele viimane tellimus lisati."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:96
+msgid "Whether to reload when starting the application."
+msgstr "Kas rakenduse käivitamisel peaks andmed uuesti laadima."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:100
+msgid "Whether to play with the external player by default."
+msgstr "Kas vaikimisi peaksime videoid vaatama välise rakendusega."
+
+#. Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:105
+msgid "Whether to show the splash text when reloading the feed."
+msgstr "Kas peaksime meediavoo laadimise ajal kuvama vaheteadete lehte."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:109
+msgid ""
+"Whether to apply seasonal styling to the application, based on annual "
+"celebrations (e.g. pride month)."
+msgstr ""
+"Kas peaks rakenduses kasutama hooajalist tähtpäevadega seotud kujundust."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:113
+msgid "Whether the setup window was already shown."
+msgstr "Tuvastame, kas seadistuste aken on juba kuvatud."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:117
+msgid "Whether cairo should be used for rendering."
+msgstr "Kas cairo peaks olema kasutusel esitusvalmenduse jaoks."
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:123
+msgid "Stores last volume value to apply on startup"
+msgstr ""
+"Salvestame viimatikasutatud helivaljuse kasutamiseks järgmisel käivitusel"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:127
+msgid "Stores last speed value to apply on startup"
+msgstr ""
+"Salvestame viimatikasutatud esituskiiruse kasutamiseks järgmisel käivitusel"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:131
+msgid "Stores whether subtitles are enabled value to apply on startup"
+msgstr "Salvestame subtiitrite oleku kasutamiseks järgmisel käivitusel"
+
+#: data/de.schmidhuberj.tubefeeder.gschema.xml:136
+msgid "Stores initial adaptive streaming bitrate to apply on startup"
+msgstr ""
+"Salvestame voogedastuse kohanduva bitikiiruse kasutamiseks järgmisel "
+"käivitusel"
+
+#: data/resources/ui/bottom_bar.blp:123
+msgid "Dismiss bottom bar"
+msgstr "Ära kasuta alumist riba"
+
+#: data/resources/ui/channel_page.blp:15 data/resources/ui/video_page.blp:121
+#: data/resources/ui/window.blp:97
+msgid "Show Sidebar"
+msgstr "Näita külgriba"
+
+#: data/resources/ui/channel_page.blp:33 data/resources/ui/window.blp:116
+msgid "Reload"
+msgstr "Laadi uuesti"
+
+#: data/resources/ui/channel_page.blp:50 data/resources/ui/video_page.blp:129
+#: data/resources/ui/window.blp:139
+msgctxt "accessibility"
+msgid "Primary menu"
+msgstr "Põhimenüü"
+
+#: data/resources/ui/channel_page.blp:55 data/resources/ui/video_page.blp:134
+#: data/resources/ui/window.blp:143
+msgctxt "tooltip"
+msgid "Primary menu"
+msgstr "Põhimenüü"
+
+#: data/resources/ui/channel_page.blp:194
+msgid "Description"
+msgstr "Kirjeldus"
+
+#: data/resources/ui/channel_page.blp:222 data/resources/ui/window.blp:224
+msgid "Loading Videos"
+msgstr "Laadime videoid"
+
+#: data/resources/ui/channel_page.blp:245 data/resources/ui/import_dialog.blp:5
+#: data/resources/ui/import_dialog.blp:127 data/resources/ui/video_page.blp:511
+#: data/resources/ui/window.blp:504 src/gui/import_dialog.rs:69
+#: src/gui/import_dialog.rs:107 src/gui/import_dialog.rs:145
+#: src/gui/import_dialog.rs:183
+msgid "Import"
+msgstr "Impordi"
+
+#: data/resources/ui/channel_page.blp:250 data/resources/ui/export_dialog.blp:7
+#: data/resources/ui/export_dialog.blp:105 data/resources/ui/video_page.blp:516
+#: data/resources/ui/window.blp:509 src/gui/export_dialog.rs:60
+#: src/gui/export_dialog.rs:99 src/gui/export_dialog.rs:140
+msgid "Export"
+msgstr "Ekspordi"
+
+#: data/resources/ui/channel_page.blp:257 data/resources/ui/video_page.blp:523
+#: data/resources/ui/window.blp:516
+msgid "Preferences"
+msgstr "Eelistused"
+
+#: data/resources/ui/channel_page.blp:262
+#: data/resources/ui/privacy_notice.blp:13 data/resources/ui/video_page.blp:528
+#: data/resources/ui/window.blp:521 src/gui/window.rs:1491
+msgid "Privacy Notice"
+msgstr "Privaatsusteade"
+
+#: data/resources/ui/channel_page.blp:267 data/resources/ui/video_page.blp:533
+#: data/resources/ui/window.blp:526
+msgid "Keyboard Shortcuts"
+msgstr "Klaviatuuri kiirklahvid"
+
+#: data/resources/ui/channel_page.blp:272 data/resources/ui/video_page.blp:538
+#: data/resources/ui/window.blp:531
+msgid "About Pipeline"
+msgstr "Rakenduse teave"
+
+#: data/resources/ui/error_dialog.blp:12
+msgid "Errors"
+msgstr "Vead"
+
+#: data/resources/ui/error_dialog.blp:20
+msgid "Clear Errors"
+msgstr "Eemalda vead"
+
+#. Translators: The format a video will be downloaded in.
+#: data/resources/ui/export_dialog.blp:32
+#: data/resources/ui/import_dialog.blp:32
+#: data/resources/ui/preferences_dialog.blp:36
+msgid "Format"
+msgstr "Vorming"
+
+#: data/resources/ui/export_dialog.blp:60
+msgid ""
+"Export all the data Pipeline stores, in order to backup the data or import "
+"into another Pipeline instance"
+msgstr ""
+"Ekspordi kõik Pipeline'i salvestatud andmed kas lihtsalt varundamiseks või "
+"teise arvutisse/seadmesse tõstmiseks"
+
+#: data/resources/ui/export_dialog.blp:76
+msgid ""
+"Export as a YouTube CSV format. While YouTube itself cannot import it, it "
+"can be used in other applications. This only exports YouTube subscriptions"
+msgstr ""
+"Sellega eksporditakse andmed YouTube'i CSV-vormingus. Kuigi sa seda "
+"YouTube'i importida ei saa, siis muud rakendused oskavad neid andmeid "
+"kasutada. Sellega eksporditakse vaid YouTube'i tellimused"
+
+#: data/resources/ui/export_dialog.blp:92
+msgid ""
+"Produces a JSON file with your subscriptions which can be imported into "
+"NewPipe"
+msgstr ""
+"Tulemuseks on JSON-fail sinu tellimustega, mida saad importida NewPipe'i"
+
+#: data/resources/ui/filter_dialog.blp:5 data/resources/ui/filter_dialog.blp:8
+msgid "Manage Filters"
+msgstr "Halda filtreid"
+
+#: data/resources/ui/filter_dialog.blp:19
+msgid "Use Filters"
+msgstr "Kasuta filtreid"
+
+#: data/resources/ui/filter_dialog.blp:20
+msgid "Hide videos from the feed"
+msgstr "Peida meediavoost videod"
+
+#: data/resources/ui/filter_dialog.blp:26
+msgid "General Filters"
+msgstr "Üldfiltrid"
+
+#: data/resources/ui/filter_dialog.blp:30
+msgid "Hide Watched Videos"
+msgstr "Peida vaadatud videod"
+
+#: data/resources/ui/filter_dialog.blp:31
+msgid "Hide videos you have already watched from the feed"
+msgstr "Peida videod, mida oled meediaviist juba vaadanud"
+
+#: data/resources/ui/filter_dialog.blp:35
+msgid "Hide Short Videos"
+msgstr "Peida lühivideod"
+
+#: data/resources/ui/filter_dialog.blp:36
+msgid "Hide videos shorter than one minute from the feed"
+msgstr "Peida meediavoost videod kestusega alla ühe minuti"
+
+#: data/resources/ui/filter_dialog.blp:40
+msgid "Hide Payed Videos"
+msgstr "Peida tasulised videod"
+
+#: data/resources/ui/filter_dialog.blp:41
+msgid "Hide videos that require a payment from the feed"
+msgstr "Peida meediavoost videod, mille vaatamine on tasuline"
+
+#: data/resources/ui/filter_dialog.blp:45
+msgid "Hide Videos from Today"
+msgstr "Peida tänased videod"
+
+#: data/resources/ui/filter_dialog.blp:46
+msgid "Hide videos that came out today from the feed"
+msgstr "Peida meediavoost täna avaldatud videod"
+
+#: data/resources/ui/filter_dialog.blp:52
+#: data/resources/ui/filter_dialog.blp:57
+msgid "Custom Filters"
+msgstr "Sinu loodud filtrid"
+
+#: data/resources/ui/filter_dialog.blp:59
+msgid ""
+"Hide a channel's videos whose titles contain a certain word or phrase\n"
+"\n"
+"You can create custom filters either here or prepopulate the information "
+"from a video's context menu"
+msgstr ""
+"Peida kanalite videod, mille pealkirjades leidub konkreetne sõna või fraas\n"
+"\n"
+"Sa võid sellise filtri lisada siin või eeltäita andmed videovaate "
+"kontekstimenüüst"
+
+#: data/resources/ui/filter_dialog.blp:71
+#: data/resources/ui/filter_similar_dialog.blp:5
+#: data/resources/ui/filter_similar_dialog.blp:28
+msgid "Add Filter"
+msgstr "Lisa filter"
+
+#: data/resources/ui/filter_similar_dialog.blp:7
+msgid ""
+"Hide videos from the feed if they contain a specific phrase in their titles "
+"and were uploaded by a specific channel"
+msgstr ""
+"Peida meediavoost videod pealkirjas leiduva fraasi ja konkreetse kanali nime "
+"alusel"
+
+#: data/resources/ui/filter_similar_dialog.blp:17
+msgid "Phrase to Filter"
+msgstr "Filtreeritav fraas"
+
+#: data/resources/ui/filter_similar_dialog.blp:21
+msgid "Channel"
+msgstr "Kanal"
+
+#: data/resources/ui/filter_similar_dialog.blp:29
+#: src/gui/preferences_dialog.rs:545
+msgid "Cancel"
+msgstr "Katkesta"
+
+#: data/resources/ui/import_dialog.blp:62
+msgid ""
+"Importing data from a previous Pipeline export will overwrite all current "
+"data. Restarting is recommended after importing"
+msgstr ""
+"Importides varasemalt Pipeline'ist eksporditud andmed kirjutab olemasolevad "
+"andmed üle. Peale importimist palun käivita rakendus uuesti"
+
+#: data/resources/ui/import_dialog.blp:78
+msgid ""
+"To import subscriptions from YouTube, you need to export your subscriptions "
+"as a CSV from <a href=\"https://takeout.google.com/settings/takeout/"
+"downloads\">Google Takeout</a>. Afterwards, select the downloaded file to "
+"import it into Pipeline"
+msgstr ""
+"Importimaks YouTube'i tellimusi, pead nad esmalt <a href=\"https://"
+"takeout.google.com/settings/takeout/downloads\">Google Takeouti</a> "
+"teenusest eksportima CSV-faili. Seejärel saad allalaaditud faili valida "
+"Pipeline'i importimiseks"
+
+#: data/resources/ui/import_dialog.blp:95
+msgid ""
+"To import subscriptions from NewPipe, you need to export your subscriptions "
+"to a JSON file. Afterwards, select the downloaded file to import it into "
+"Pipeline"
+msgstr ""
+"Importimaks NewPipe'i tellimusi, pead nad esmalt eksportima JSON-faili. "
+"Seejärel saad allalaaditud faili valida Pipeline'i importimiseks"
+
+#: data/resources/ui/import_dialog.blp:111
+msgid ""
+"To import subscriptions from Invidious, you need to export your "
+"subscriptions to a JSON file. Afterwards, select the downloaded file to "
+"import it into Pipeline"
+msgstr ""
+"Importimaks Invidiouse tellimusi, pead nad esmalt eksportima JSON-faili. "
+"Seejärel saad allalaaditud faili valida Pipeline'i importimiseks"
+
+#: data/resources/ui/preferences_dialog.blp:6
+#: data/resources/ui/preferences_dialog.blp:10
+#: data/resources/ui/shortcuts.blp:6
+msgid "General"
+msgstr "Üldised seadistused"
+
+#: data/resources/ui/preferences_dialog.blp:13
+msgid "Reload on Startup"
+msgstr "Laadi andmed rakenduse käivitamisel uuesti"
+
+#: data/resources/ui/preferences_dialog.blp:17
+msgid "Keep Watch History"
+msgstr "Säilita vaatamiste ajalugu"
+
+#: data/resources/ui/preferences_dialog.blp:32
+msgid "Video Downloads"
+msgstr "Videote allalaadimised"
+
+#: data/resources/ui/preferences_dialog.blp:40
+msgid "Custom Download Format"
+msgstr "Sinu valitud vorming allalaadimiseks"
+
+#: data/resources/ui/preferences_dialog.blp:46
+msgid "Custom yt-dlp Arguments"
+msgstr "Sinu lisatud yt-dlp argumendid"
+
+#: data/resources/ui/preferences_dialog.blp:53
+msgid "External Programs"
+msgstr "Välised rakendused"
+
+#: data/resources/ui/preferences_dialog.blp:56
+msgid "Play with External Player by Default"
+msgstr "Vaikimisi esita videoid välise meediamängijaga"
+
+#: data/resources/ui/preferences_dialog.blp:60
+msgid "External Video Player"
+msgstr "Väline meediamängija"
+
+#: data/resources/ui/preferences_dialog.blp:68
+msgid "YouTube Preferences"
+msgstr "YouTube'i eelistused"
+
+#: data/resources/ui/preferences_dialog.blp:78
+msgid "Enable YouTube"
+msgstr "Kasuta YouTube'i"
+
+#: data/resources/ui/preferences_dialog.blp:79
+msgid "Allow Pipeline to fetch YouTube videos"
+msgstr "Luba Pipeline'il laadida YouTube'ist videoid"
+
+#: data/resources/ui/preferences_dialog.blp:94
+msgid "Prefer Fetching Information Directly from YouTube"
+msgstr "Eelista teabe laadimist otse YouTube'ist"
+
+#: data/resources/ui/preferences_dialog.blp:95
+msgid "On errors, try to fetch information using Piped. Recommended."
+msgstr "Soovitame, et vigade puhul proovi laadida teavet Pipedi abil."
+
+#: data/resources/ui/preferences_dialog.blp:103
+msgid "Prefer Fetching Information Using Piped"
+msgstr "Eelista teabe laadimist Piped'i vahendusel"
+
+#: data/resources/ui/preferences_dialog.blp:104
+msgid "On errors, try to fetch information from YouTube"
+msgstr "Vigade puhul proovi laadida teavet otse YouTube'ist"
+
+#: data/resources/ui/preferences_dialog.blp:112
+msgid "Always Fetch Information Directly from YouTube"
+msgstr "Alati laadi teavet otse YouTube'ist"
+
+#: data/resources/ui/preferences_dialog.blp:120
+msgid "Always Fetch Information Using Piped"
+msgstr "Alati laadi teavet Piped'i vahendusel"
+
+#: data/resources/ui/preferences_dialog.blp:136
+msgid "YouTube Cookies File"
+msgstr "YouTube'i küpsiste fail"
+
+#: data/resources/ui/preferences_dialog.blp:137
+msgid "No cookies file used"
+msgstr "Ühtegi küpsiste fail pole kasutusel"
+
+#: data/resources/ui/preferences_dialog.blp:142
+msgid "Choose a cookies file"
+msgstr "Vali küpsiste fail"
+
+#: data/resources/ui/preferences_dialog.blp:148
+msgid "Remove cookies file"
+msgstr "Eemalda küpsiste fail"
+
+#: data/resources/ui/preferences_dialog.blp:153
+msgid "Extractor Arguments for yt-dlp"
+msgstr "Argumendid yt-dlp jaoks"
+
+#: data/resources/ui/preferences_dialog.blp:166
+msgid ""
+"Specify the list of instances to use. Pipeline can maintain this list "
+"automatically, which will refresh it on every startup. You can freely modify "
+"this list if you have your own Piped instances you want to use. The requests "
+"will be balanced across all listed instances. For a complete list of public "
+"APIs, see the <a href=\"https://github.com/TeamPiped/documentation/blob/main/"
+"content/docs/public-instances/index.md\">Instances page</a>."
+msgstr ""
+"Sisesta kasutatavad Piped'i serverid, mille kaudu Pipeline laadib YouTube'i "
+"videoid. Andmeid igal käivitamisel uuendades haldab Pipeline seda loendit "
+"automaatselt. Kui sul on mõni oma Piped'i server, mida tahad kasutada, siis "
+"muuda seda loendit vastavalt oma eelistustele. Liikluse jagamiseks jagunevad "
+"päringud võrdselt kõikide loendis olevate serverite vahel. Avalike API "
+"serverite loendi <a href=\"https://github.com/TeamPiped/documentation/blob/"
+"main/content/docs/public-instances/index.md\">leiad siit lehelt</a>."
+
+#: data/resources/ui/preferences_dialog.blp:186
+msgid "Peertube Preferences"
+msgstr "Peertube'i eelistused"
+
+#: data/resources/ui/preferences_dialog.blp:190
+msgid "Enable Peertube"
+msgstr "Kasuta Peertube'i"
+
+#: data/resources/ui/preferences_dialog.blp:191
+msgid "Allow Pipeline to fetch Peertube videos"
+msgstr "Luba Pipeline'il laadida Peertube'ist videoid"
+
+#: data/resources/ui/preferences_dialog.blp:195
+msgid "Search Instance"
+msgstr "Otsi serverit"
+
+#. Translators: Preferences section containing some fun features of the application, like showing a random splash text or seasonal styling.
+#: data/resources/ui/preferences_dialog.blp:206
+msgid "Fun"
+msgstr "Nalja kah"
+
+#. Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+#: data/resources/ui/preferences_dialog.blp:210
+msgid "Show Splash Text"
+msgstr "Näita vaheteadete lehte"
+
+#. Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+#: data/resources/ui/preferences_dialog.blp:212
+msgid "A random splash text is shown when reloading the feed."
+msgstr "Meediavoo laadimise ajal kuvame lehe juhusliku vaheteatega."
+
+#: data/resources/ui/preferences_dialog.blp:216
+msgid "Seasonal Styling"
+msgstr "Hooajaline kujundus"
+
+#: data/resources/ui/preferences_dialog.blp:217
+msgid ""
+"The progress bar will be styled based on annual celebrations, for example "
+"pride month."
+msgstr "Edenemisriba kujundatakse vastavalt hooajalistele pidustustele."
+
+#: data/resources/ui/preferences_dialog.blp:222
+msgid "Performance"
+msgstr "Jõudlus"
+
+#: data/resources/ui/preferences_dialog.blp:224
+msgid ""
+"If Pipeline performs badly on your device, you may want to change some of "
+"those settings. In general, keeping the default settings is recommended. For "
+"older devices which do not support GLES 3.0 like the PinePhone, you may want "
+"to switch to software rendering. Changing these settings require a restart "
+"of Pipeline."
+msgstr ""
+"Kui Pipeline toimib sinu seadmes aeglaselt, siis siin saad muuta asjaomaseid "
+"seadistusi. Üldiselt on hea mõte kasutada vaikimisi seadistusi. Kui kasutad "
+"mõnda vanemat seadet, nagu näiteks PinePhone, kus puudub GLES 3.0 tugi, siis "
+"võid proovida kasutada tarkvaralist renderdust. Nende seadistuste muutmine "
+"eeldab Pipeline'i uuesti käivitamist."
+
+#: data/resources/ui/preferences_dialog.blp:228
+msgid "Software Rendering"
+msgstr "Tarkvaraline renderdus"
+
+#: data/resources/ui/preferences_dialog.blp:229
+msgid "Using the Cairo renderer"
+msgstr "Kasuta Cairo esitusvalmendajat"
+
+#: data/resources/ui/privacy_notice.blp:30
+msgid "Dismiss"
+msgstr "Loobu"
+
+#: data/resources/ui/privacy_notice.blp:47
+msgid ""
+"Pipeline connects directly to YouTube and PeerTube for getting data and when "
+"playing videos. Pipeline can be configured to use Piped for retrieving "
+"Youtube data, but videos are still played over YouTube"
+msgstr ""
+"Andmete laadimiseks ja videote esitamiseks teeb Pipeline alati päringu "
+"YouTube'i või PeerTube'i. Pipeline'i saad küll seadistada küsima videote "
+"andmeid Pipedi kaudi, kuid videote esitamine toimub ikka otse YouTube'ist"
+
+#: data/resources/ui/shortcuts.blp:10
+msgid "Go Back"
+msgstr "Mine tagasi"
+
+#: data/resources/ui/shortcuts.blp:15
+msgid "Quit"
+msgstr "Välju"
+
+#: data/resources/ui/shortcuts.blp:20
+msgid "Show Shortcuts"
+msgstr "Näita kiirklahve"
+
+#: data/resources/ui/shortcuts.blp:25
+msgid "Show Preferences"
+msgstr "Näita eelistusi"
+
+#: data/resources/ui/shortcuts.blp:30
+msgid "Open Menu"
+msgstr "Ava menüü"
+
+#: data/resources/ui/shortcuts.blp:35
+msgid "Toggle Sidebar"
+msgstr "Lülita külgriba sisse/välja"
+
+#: data/resources/ui/shortcuts.blp:40
+msgid "Pages"
+msgstr "Lehed"
+
+#: data/resources/ui/shortcuts.blp:44
+msgid "Switch to Feed Page"
+msgstr "Lülita meediavoo lehele"
+
+#: data/resources/ui/shortcuts.blp:49 data/resources/ui/window.blp:259
+#: data/resources/ui/window.blp:314
+msgid "Search"
+msgstr "Otsing"
+
+#: data/resources/ui/shortcuts.blp:54
+msgid "Switch to Watch-Later Page"
+msgstr "Lülita hilisemate vaatamiste lehele"
+
+#: data/resources/ui/shortcuts.blp:59
+msgid "Switch to Subscriptions Page"
+msgstr "Lülita tellimuste lehele"
+
+#: data/resources/ui/shortcuts.blp:64
+msgid "Playback"
+msgstr "Taasesitus"
+
+#: data/resources/ui/shortcuts.blp:68
+msgid "Play or Pause the Video"
+msgstr "Esita videot või peata esitamine"
+
+#: data/resources/ui/shortcuts.blp:69
+msgid "Only when the video page is in focus"
+msgstr "Vaid siis kui videovaade on fookuses"
+
+#: data/resources/ui/shortcuts.blp:74
+msgid "Increase Speed"
+msgstr "Suurenda taasesituse kiirust"
+
+#: data/resources/ui/shortcuts.blp:79
+msgid "Decrease Speed"
+msgstr "Vähenda taasesituse kiirust"
+
+#: data/resources/ui/shortcuts.blp:84
+msgid "Increase Volume"
+msgstr "Suurenda helivaljust"
+
+#: data/resources/ui/shortcuts.blp:89
+msgid "Decrease Volume"
+msgstr "Vähenda helivaljust"
+
+#: data/resources/ui/shortcuts.blp:94
+msgid "Seek Backward"
+msgstr "Keri tagasi"
+
+#: data/resources/ui/shortcuts.blp:95
+msgid "Or double tap (left side)"
+msgstr "Või topeltklõpsa (vasakul)"
+
+#: data/resources/ui/shortcuts.blp:100
+msgid "Seek Forward"
+msgstr "Keri edasi"
+
+#: data/resources/ui/shortcuts.blp:101
+msgid "Or double tap (right side)"
+msgstr "Või topeltklõpsa (paremal)"
+
+#: data/resources/ui/shortcuts.blp:106
+msgid "Seek to Percentage"
+msgstr "Keri protsentuaalse asukohani"
+
+#: data/resources/ui/shortcuts.blp:111
+msgid "Toggle Mute"
+msgstr "Lülita summutamine sisse/välja"
+
+#: data/resources/ui/shortcuts.blp:116
+msgid "Toggle Fullscreen"
+msgstr "Lülita täisekraanivaade sisse/välja"
+
+#: data/resources/ui/shortcuts.blp:121
+msgid "Application"
+msgstr "Rakendus"
+
+#: data/resources/ui/shortcuts.blp:125
+msgid "Bookmark Video or Subscribe to Channel"
+msgstr "Lisa videole järjehoidja või kanalile tellimus"
+
+#: data/resources/ui/shortcuts.blp:130
+msgid "Reload Video Feed or Channel Page"
+msgstr "Laadi videovoog või kanali leht"
+
+#: data/resources/ui/subscription_item.blp:82
+#: data/resources/ui/subscription_item.blp:94 src/gui/channel_item.rs:127
+#: src/gui/channel_page.rs:194
+msgid "Unsubscribe"
+msgstr "Loobu tellimusest"
+
+#: data/resources/ui/video_item.blp:143
+msgid "Video is downloading"
+msgstr "Video on allalaadimisel"
+
+#: data/resources/ui/video_item.blp:202
+msgid "More Actions"
+msgstr "Täiendavad tegevused"
+
+#: data/resources/ui/video_page.blp:183
+msgid "Video is Playing Externally"
+msgstr "Video on esitamisel välise rakendusega"
+
+#: data/resources/ui/video_page.blp:328 src/gui/video_item.rs:288
+#: src/gui/video_item.rs:329
+msgid "Download"
+msgstr "Laadi alla"
+
+#: data/resources/ui/video_page.blp:362 src/gui/video_item.rs:283
+#: src/gui/video_item.rs:324
+msgid "Remove Local Copy"
+msgstr "Eemalda kohalik koopia"
+
+#: data/resources/ui/video_page.blp:383
+msgid "Copy Video Link"
+msgstr "Kopeeri video link"
+
+#: data/resources/ui/window.blp:152
+msgid "Filters"
+msgstr "Filtrid"
+
+#: data/resources/ui/window.blp:168
+msgid "Feed"
+msgstr "Meediavoog"
+
+#: data/resources/ui/window.blp:201 data/resources/ui/window.blp:423
+msgid "No Subscriptions Yet"
+msgstr "Tellimusi veel pole"
+
+#: data/resources/ui/window.blp:202 data/resources/ui/window.blp:424
+msgid "Subscribe to channels or import your subscriptions"
+msgstr "Esmalt telli mõni kanal või impordi oma tellimused"
+
+#: data/resources/ui/window.blp:211 data/resources/ui/window.blp:433
+msgid "Import Subscriptions"
+msgstr "Impordi tellimusi"
+
+#: data/resources/ui/window.blp:249 data/resources/ui/window.blp:342
+#: data/resources/ui/window.blp:369
+msgid "No Videos"
+msgstr "Videoid pole"
+
+#: data/resources/ui/window.blp:250
+msgid "Try Reloading"
+msgstr "Proovi uuesti laadimist"
+
+#: data/resources/ui/window.blp:273
+msgid "Explore videos and creators"
+msgstr "Tutvu videotega ja nende loojate tegemistega"
+
+#: data/resources/ui/window.blp:300
+msgid "Searching"
+msgstr "Otsime"
+
+#: data/resources/ui/window.blp:322 src/gui/video_item.rs:259
+msgid "Watch Later"
+msgstr "Vaata hiljem"
+
+#: data/resources/ui/window.blp:343
+msgid "Add videos to your watch later list to display them here"
+msgstr "Lisa siia loendisse videod hilisemaks vaatamiseks"
+
+#: data/resources/ui/window.blp:351
+msgid "Downloads"
+msgstr "Allalaadimised"
+
+#: data/resources/ui/window.blp:370
+msgid "Download videos to display them here"
+msgstr "Allalaaditud videod saavad olema nähtavad siin"
+
+#: data/resources/ui/window.blp:378
+msgid "History"
+msgstr "Ajalugu"
+
+#: data/resources/ui/window.blp:399 data/resources/ui/window.blp:407
+msgid "No History"
+msgstr "Ajalugu puudub"
+
+#: data/resources/ui/window.blp:400
+msgid "Watched videos will be displayed here"
+msgstr "Vaadatud videod saavad olema nähtavad siin"
+
+#: data/resources/ui/window.blp:408
+msgid "You turned off your watch history in the preferences"
+msgstr "Sa oled vaatamiste ajaloo salvestamise eelistustest välja lülitanud"
+
+#: data/resources/ui/window.blp:416
+msgid "Subscriptions"
+msgstr "Tellimused"
+
+#. I don't think this will ever be shown.
+#: data/resources/ui/window.blp:454
+msgid "Sidebar"
+msgstr "Külgriba"
+
+#: data/resources/ui/window.blp:463
+msgid "Hide Sidebar"
+msgstr "Peida külgriba"
+
+#: data/resources/ui/window.blp:496
+msgid "Show"
+msgstr "Näita"
+
+#: src/backend/channel.rs:87
+msgid "Unknown Channel"
+msgstr "Tundmatu kanal"
+
+#: src/backend/search_stream.rs:100
+msgid "Error searching one platform"
+msgstr "Viga ühest teenusest otsimisel"
+
+#: src/backend/video_fetcher_stream.rs:150
+msgid "Error loading one channel"
+msgid_plural "Error loading {} channels"
+msgstr[0] "Viga ühe kanali laadimisel"
+msgstr[1] "Viga {} kanali laadimisel"
+
+#: src/gui/bottom_bar.rs:94
+msgid "Pause Video"
+msgstr "Peata video esitamine"
+
+#: src/gui/bottom_bar.rs:95
+msgid "Resume Video"
+msgstr "Jätka video esitamist"
+
+#: src/gui/bottom_bar.rs:96
+msgid "Video is Buffering"
+msgstr "Video andmed on puhverdamisel"
+
+#. Should never happen
+#: src/gui/bottom_bar.rs:98 src/gui/bottom_bar.rs:99
+msgid "Video is Stopped"
+msgstr "Video esitus on lõppenud"
+
+#: src/gui/bottom_bar.rs:114
+msgid "Expand Video \"{title}\""
+msgstr "Näita „{title}“ video teavet"
+
+#: src/gui/channel_item.rs:132 src/gui/channel_page.rs:197
+msgid "Subscribe"
+msgstr "Telli"
+
+#: src/gui/channel_page.rs:45
+msgid "Failed to load channel data"
+msgstr "Kanali andmete laadimine ei õnnestunud"
+
+#: src/gui/export_dialog.rs:61
+msgid "Export Pipeline"
+msgstr "Ekspordi Pipeline'i jaoks"
+
+#: src/gui/export_dialog.rs:76
+msgid "Error exporting pipeline subscriptions"
+msgstr "Viga Pipeline'i tellimuste eksportimisel"
+
+#: src/gui/export_dialog.rs:81
+msgid "Successfully exported data"
+msgstr "Andmete eksportimine eõnnestus"
+
+#: src/gui/export_dialog.rs:101
+msgid "Export YouTube Subscriptions"
+msgstr "Ekspordi YouTube'i tellimusi"
+
+#: src/gui/export_dialog.rs:116
+msgid "Error exporting YouTube subscriptions"
+msgstr "Viga YouTube'i tellimuste eksportimisel"
+
+#: src/gui/export_dialog.rs:121 src/gui/export_dialog.rs:162
+msgid "Successfully exported subscriptions"
+msgstr "Tellimuste eksportimine õnnestus"
+
+#: src/gui/export_dialog.rs:142
+msgid "Export NewPipe Subscriptions"
+msgstr "Ekspordi NewPipe'i tellimusi"
+
+#: src/gui/export_dialog.rs:157
+msgid "Error exporting NewPipe subscriptions"
+msgstr "Viga NewPipe'i tellimuste eksportimisel"
+
+#: src/gui/filter_dialog.rs:89
+msgid ""
+"This filter is disabled due to your preference to not save your watch "
+"history. Enable the preference to allow for enabling this filter."
+msgstr ""
+"See filter pole kasutusel, kuna sa oled otsustanud vaatamiste ajalugu mitte "
+"salvestada. Palun muuda vastavat eelistust ja saad seda filtrit kasutada."
+
+#: src/gui/filter_dialog.rs:154 src/gui/filter_similar_dialog.rs:34
+msgid "Edit Filter"
+msgstr "Muuda filtrit"
+
+#: src/gui/filter_dialog.rs:181
+msgid "Remove Filter"
+msgstr "Eemalda filter"
+
+#: src/gui/filter_similar_dialog.rs:35
+msgid "Save Filter"
+msgstr "Salvesta filter"
+
+#: src/gui/import_dialog.rs:70
+msgid "Import Pipeline Data"
+msgstr "Impordi Pipeline'i andmeid"
+
+#: src/gui/import_dialog.rs:84
+msgid "Error importing Pipeline Data"
+msgstr "Viga Pipeline'i andmete importimisel"
+
+#: src/gui/import_dialog.rs:89
+msgid ""
+"Successfully imported data. A restart of the application is recommended."
+msgstr "Andmete importimine õnnestus. Soovitame, et käivitad rakenduse uuesti."
+
+#: src/gui/import_dialog.rs:109
+msgid "Import YouTube Subscriptions"
+msgstr "Impordi YouTube'i tellimusi"
+
+#: src/gui/import_dialog.rs:123
+msgid "Error importing YouTube subscriptions"
+msgstr "Viga YouTube'i videote importimisel"
+
+#: src/gui/import_dialog.rs:128 src/gui/import_dialog.rs:166
+#: src/gui/import_dialog.rs:204
+msgid "Successfully imported subscriptions"
+msgstr "Tellimuste importimine õnnestus"
+
+#: src/gui/import_dialog.rs:147
+msgid "Import NewPipe Subscriptions"
+msgstr "Impordi NewPipe'i tellimusi"
+
+#: src/gui/import_dialog.rs:161
+msgid "Error importing NewPipe subscriptions"
+msgstr "Viga NewPipe'i videote importimisel"
+
+#: src/gui/import_dialog.rs:185
+msgid "Import Invidious Subscriptions"
+msgstr "Impordi Invidiouse tellimused"
+
+#: src/gui/import_dialog.rs:199
+msgid "Error importing Invidious subscriptions"
+msgstr "Viga Invidiouse tellimuste importimisel"
+
+#. Translators: For selecting the best video format when downloading.
+#: src/gui/preferences_dialog.rs:31
+msgid "Best"
+msgstr "Parim"
+
+#. Translators: For selecting a custom video format when downloading.
+#: src/gui/preferences_dialog.rs:33
+msgid "Custom"
+msgstr "Sinu valitud vorming"
+
+#: src/gui/preferences_dialog.rs:463
+msgid "Automatically Manage Piped Instances"
+msgstr "Halda Piped'i servereid automaatselt"
+
+#: src/gui/preferences_dialog.rs:464
+msgid "Recommended"
+msgstr "Soovitatud"
+
+#: src/gui/preferences_dialog.rs:485
+msgid "New Piped API"
+msgstr "Uus Piped'i API"
+
+#: src/gui/preferences_dialog.rs:535
+msgid ""
+"If watching too many YouTube videos, YouTube can require confirmation that "
+"you are a real person. This is done by logging into your account using "
+"cookies stored in your browser. Refer to the <a href=\"https://github.com/yt-"
+"dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp\">yt-dlp documentation</"
+"a> on how to obtain such a file. Note that this associates the videos you "
+"watch with your account. Furthermore, this may get your account deactivated "
+"due to not using offical YouTube applications. The developers of Pipeline "
+"are not responsible for your account being deactivated."
+msgstr ""
+"Kui vaatad liiga palju YouTube'i videoid, siis võib YouTube soovida sinu "
+"tuvastamist tegeliku inimesena. Seda tehakse logides sisse sinu "
+"kasutajakontoga ja kasutades veebibrauseris salvestatud küpsiseid. <a "
+"href=\"https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-"
+"dlp\">Yt-dlp juhendist</a> leiad teavet sellise faili hankimise kohta. Palun "
+"arvesta, et sel juhul sinu vaadatud videod seostuvad sinu kasutajakontoga. "
+"Lisaks võib YouTube tuvastada, et kasutad mitteametlikke kliente ja sinu "
+"kasutajakonto võidakse üldse välja lülitada. Pipeline'i arendajatel ei lasu "
+"vastutust sinu kasutajakonto keelamise eest."
+
+#: src/gui/preferences_dialog.rs:541
+msgid "Accept the Risk and Continue"
+msgstr "Nõustu riskiga ja jätka"
+
+#: src/gui/preferences_dialog.rs:562
+msgid "Select File"
+msgstr "Vali fail"
+
+#: src/gui/preferences_dialog.rs:563
+msgid "Select Cookies File"
+msgstr "Vali küpsiste fail"
+
+#: src/gui/preferences_dialog.rs:812
+msgid ""
+"To use external players with Pipeline, you will need to grant Pipeline "
+"additional permissions. See <a href=\"https://gitlab.com/schmiddi-on-mobile/"
+"pipeline/-/wikis/External-Player-for-Flatpak\">this page</a> for details."
+msgstr ""
+"Et saaksid Pipeline'iga kasutada väliseid meediapleiereid, pead Pipeline'ile "
+"andma täiendavaid õigusi. Üksikasjad leiad <a href=\"https://gitlab.com/"
+"schmiddi-on-mobile/pipeline/-/wikis/External-Player-for-Flatpak\">sellelt "
+"lehelt</a>."
+
+#: src/gui/utility.rs:62
+msgid "One Subscriber"
+msgid_plural "{} Subscribers"
+msgstr[0] "üks tellija"
+msgstr[1] "{} tellijat"
+
+#: src/gui/utility.rs:68
+msgid "No Subscribers"
+msgstr "Tellijaid pole"
+
+#: src/gui/utility.rs:84
+msgid "Remove video from Watch Later"
+msgstr "Eemalda video hilisemate vaatamiste loendist"
+
+#: src/gui/utility.rs:86
+msgid "Add video to Watch Later"
+msgstr "Lisa video hiljem vaatamiseks"
+
+#. Note to translators: Format numbers compactly. For numbers at least one billion.
+#: src/gui/utility.rs:102
+msgctxt "number-formatting"
+msgid "{}B"
+msgstr "{}mlrd"
+
+#. Note to translators: Format numbers compactly. For numbers at least one million.
+#: src/gui/utility.rs:106
+msgctxt "number-formatting"
+msgid "{}M"
+msgstr "{}mln"
+
+#. Note to translators: Format numbers compactly. For numbers at least one thousand.
+#: src/gui/utility.rs:110
+msgctxt "number-formatting"
+msgid "{}K"
+msgstr "{}tuh"
+
+#: src/gui/utility.rs:128
+msgid "{title} uploaded by {channel} on {date}"
+msgstr "{title} üleslaaditud kanalisse {channel} {date}"
+
+#. Translators: For accessibility about a channel, e.g. "Channel Name with 100 subscribers".
+#: src/gui/utility.rs:136
+msgid "{name} with {subscribers} subscribers"
+msgstr "{subscribers} tellijaga kanal: {name}"
+
+#. Translators: formatting of time of day in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+#: src/gui/utility.rs:158
+msgid "%H:%M"
+msgstr "%H:%M"
+
+#: src/gui/utility.rs:160
+msgid "Tomorrow"
+msgstr "Homme"
+
+#: src/gui/utility.rs:162
+msgid "Yesterday"
+msgstr "Eile"
+
+#. Translators: formatting of dates without year in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+#: src/gui/utility.rs:165
+msgid "%a, %d. %B"
+msgstr "%a, %d. %B"
+
+#. Translators: formatting of dates with year in a human-readable fashion, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+#: src/gui/utility.rs:168
+msgid "%Y-%m-%d"
+msgstr "%d.%m.%Y"
+
+#. Translators: Formatting for percentage labels (e.g. "50%").
+#: src/gui/utility.rs:219
+msgid "{}%"
+msgstr "{}%"
+
+#: src/gui/video_item.rs:254
+msgid "Remove from Watch Later"
+msgstr "Eemalda hilisemate vaatamiste loendist"
+
+#: src/gui/video_item.rs:266 src/gui/video_item.rs:307
+msgid "Play with Internal Player"
+msgstr "Esita sisemise meediamängijaga"
+
+#: src/gui/video_item.rs:271 src/gui/video_item.rs:312
+msgid "Play with External Player"
+msgstr "Esita välise meediamängijaga"
+
+#: src/gui/video_item.rs:277 src/gui/video_item.rs:318
+msgid "Copy Video URL"
+msgstr "Kopeeri video veebiaadress"
+
+#: src/gui/video_item.rs:295 src/gui/video_item.rs:336
+msgid "Filter out Similar Videos"
+msgstr "Eralda sarnased videod"
+
+#: src/gui/video_page.rs:111
+msgid "Configure your external player in the preferences first"
+msgstr "Esmalt seadista eelistustes väline meediapleier"
+
+#: src/gui/video_page.rs:137
+msgid "Failed to spawn video player"
+msgstr "Meediamängija protsessi käivitamine ei õnnestunud"
+
+#: src/gui/video_page.rs:190 src/gui/window.rs:918
+msgid "Downloaded video not available locally anymore"
+msgstr "Allalaaditud video pole kohalikus seadmes enam saadaval"
+
+#: src/gui/video_page.rs:347
+msgid "Failed to populate video information"
+msgstr "Video teabe lisamine ei õnnestunud"
+
+#: src/gui/video_page.rs:361
+msgid "Failed to fetch channel information"
+msgstr "Kanali teabe laadimine ei õnnestunud"
+
+#: src/gui/video_page.rs:402
+msgid "Uploaded {}"
+msgstr "Üleslaaditud {}"
+
+#: src/gui/video_page.rs:469 src/gui/video_page.rs:482
+#: src/gui/video_page.rs:506 src/gui/video_page.rs:511
+msgid "10 Seconds"
+msgstr "10 sekundit"
+
+#: src/gui/window.rs:174
+msgid "One Error"
+msgid_plural "{} Errors"
+msgstr[0] "Üks viga"
+msgstr[1] "{} viga"
+
+#: src/gui/window.rs:389
+msgid "Unpin Sidebar"
+msgstr "Lõpeta külgriba esiletõstmine"
+
+#: src/gui/window.rs:391
+msgid "Pin Sidebar"
+msgstr "Tõsta külgriba esile"
+
+#: src/gui/window.rs:495
+msgid "Switched to video page {}"
+msgstr "Lülitusin {} video lehele"
+
+#: src/gui/window.rs:626
+msgid "Switched to channel page {}"
+msgstr "Lülitusin {} kanali lehele"
+
+#: src/gui/window.rs:735
+msgid "Unsubscribed from {channel}"
+msgstr "Lõpetasin {channel} kanali tellimuse"
+
+#: src/gui/window.rs:740
+msgid "Undo"
+msgstr "Võta tegevus tagasi"
+
+#: src/gui/window.rs:835 src/gui/window.rs:875
+msgid "Switched to page {}"
+msgstr "Lülitusin {} lehele"
+
+#: src/gui/window.rs:887
+msgid "Copied URL"
+msgstr "Veebiaadress on kopeeritud"
+
+#: src/gui/window.rs:905
+msgid "Failed to remove downloaded file"
+msgstr "Allalaaditud faili kustutamine ei õnnestunud"
+
+#: src/gui/window.rs:910
+msgid "Removed downloaded copy of the video"
+msgstr "Video allalaaditud koopia on kustutatud"
+
+#: src/gui/window.rs:947
+msgid "Started Download"
+msgstr "Allalaadimine algas"
+
+#: src/gui/window.rs:956
+msgid "Error creating the directory where the video will be downloaded"
+msgstr "Viga kausta loomisel, kuhu video peaks alla laadima"
+
+#: src/gui/window.rs:997 src/gui/window.rs:1022
+msgid "Error downloading a video"
+msgstr "Viga video allalaadimisel"
+
+#: src/gui/window.rs:1016
+msgid "Finished Download"
+msgstr "Allalaadimine lõppes"
+
+#. translators: One per line: How you want to be credited as a translator, e.g. by the name you use, and optionally an email address ("Edgar Allan Poe <edgar@poe.com>")
+#: src/gui/window.rs:1276
+msgid "translator-credits"
+msgstr "Priit Jõerüüt 2024-2026"
+
+#: src/gui/window.rs:1467
+msgid "Failed to set up application"
+msgstr "Rakenduse ettevalmistamine ei õnnestunud"
+
+#: src/gui/window.rs:1492
+msgid "More Information"
+msgstr "Täiendav teave"
+
+#: src/splashes.rs:11
+msgctxt "Displayed as a splash text"
+msgid "Pipeline was once called Tubefeeder."
+msgstr "Pipeline'i varasem nimi oli Tubefeeder."
+
+#: src/splashes.rs:17
+msgctxt "Displayed as a splash text"
+msgid ""
+"Pipeline was built for mobile linux devices like the PinePhone. That it "
+"works on desktops is just a happy side effect."
+msgstr ""
+"Pipeline oli algselt loodud Linuxipõhistele nutitelefonidele, nagu "
+"PinePhone. Et tegemist on ka korraliku töölauarakendusega, oli lihtsalt "
+"pisikene kõrvamõju."
+
+#: src/splashes.rs:23
+msgctxt "Displayed as a splash text"
+msgid "The first commit of Pipeline was {} days ago."
+msgstr "Esimene sissekanne Pipeline'i lähtekoodi tehti {} päeva tagasi."
+
+#: src/splashes.rs:35
+msgctxt "Displayed as a splash text"
+msgid "You are running commit number {} of Pipeline."
+msgstr ""
+"Hetkel on sul kasutusel Pipeline'i lähtekoodi sissekandest {} kompileeritud "
+"versioon."
+
+#: src/splashes.rs:42
+msgctxt "Displayed as a splash text"
+msgid "You are running release number {} of Pipeline."
+msgstr "Hetkel on sul kasutusel Pipeline'i versioon {}."
+
+#: src/splashes.rs:49
+msgctxt "Displayed as a splash text"
+msgid "Pipeline is built from {} lines of Rust code."
+msgstr "Pipeline on kompileeritud Rustis kirjutatud lähtekoodi {}-st reast."
+
+#: src/splashes.rs:56
+msgctxt "Displayed as a splash text"
+msgid "Pipeline is built from {} lines of Blueprint UI markup."
+msgstr ""
+"Pipeline on kompileeritud Blueprint UI märgendikeele lähtekoodi {}-st reast."
+
+#: src/splashes.rs:64
+msgctxt "Displayed as a splash text"
+msgid "There are {} different splash texts which can be displayed here."
+msgstr "Kokku on siin rakenduses {} erinevat vaheteadet."
+
+#. Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+#: src/splashes.rs:74
+msgctxt "Displayed as a splash text"
+msgid ""
+"In expectation, you will need to reload {} times to have seen all splash "
+"texts at least once."
+msgstr ""
+"Olemuslikult peaksid {} korda uuesti laadima, et iga vaheteadet vähemalt ühe "
+"korra näha."
+
+#: src/splashes.rs:80
+msgctxt "Displayed as a splash text"
+msgid ""
+"Pipeline is translated in {languages} different languages by {translators} "
+"translators"
+msgstr "{translators} tõlkijat on tõlkinud Pipeline'i kokku {languages} keelde"
+
+#: src/splashes.rs:94
+msgctxt "Displayed as a splash text"
+msgid ""
+"You can help translate Pipeline using <a href=\"https://hosted.weblate.org/"
+"engage/schmiddi-on-mobile/\">Weblate</a>."
+msgstr ""
+"Sa võid osaleda Pipeline'i tõlkimisel <a href=\"https://hosted.weblate.org/"
+"engage/schmiddi-on-mobile/\">Weblate'i veebiteenuses</a>."
+
+#: src/splashes.rs:100
+msgctxt "Displayed as a splash text"
+msgid ""
+"The source code of Pipeline is hosted on <a href=\"https://gitlab.com/"
+"schmiddi-on-mobile/pipeline\">GitLab</a>."
+msgstr ""
+"Pipeline'i lähtekood leidub <a href=\"https://gitlab.com/schmiddi-on-mobile/"
+"pipeline\">GitLabis</a>."
+
+#: src/splashes.rs:106
+#, c-format
+msgctxt "Displayed as a splash text"
+msgid ""
+"We have a <a href=\"https://matrix.to/#/%23pipelineapp:matrix.org\">Matrix "
+"room</a> where you can come and talk with us."
+msgstr ""
+"Soovid meiega suhelda? Palun liitu <a href=\"https://matrix.to/#/"
+"%23pipelineapp:matrix.org\">meie Matrixi jututoaga</a>."
+
+#: src/splashes.rs:112
+msgctxt "Displayed as a splash text"
+msgid ""
+"Pipeline has a <a href=\"https://mobile.schmidhuberj.de/pipeline\">website</"
+"a>."
+msgstr ""
+"Vaata ka Pipeline'i <a href=\"https://mobile.schmidhuberj.de/"
+"pipeline\">veebisaiti</a>."
+
+#: src/splashes.rs:118
+msgctxt "Displayed as a splash text"
+msgid ""
+"You can get Pipeline on <a href=\"https://flathub.org/apps/"
+"de.schmidhuberj.tubefeeder\">Flathub</a>."
+msgstr ""
+"Pipeline'i saad paigaldada <a href=\"https://flathub.org/apps/"
+"de.schmidhuberj.tubefeeder\">Flathubist</a>."
+
+#: src/splashes.rs:124
+msgctxt "Displayed as a splash text"
+msgid ""
+"We use <a href=\"https://github.com/Rafostar/clapper\">Clapper</a> as the "
+"video player."
+msgstr ""
+"Videoesitajana on meil kasutusel <a href=\"https://github.com/Rafostar/"
+"clapper\">Clapper</a>."
+
+#: src/splashes.rs:130
+msgctxt "Displayed as a splash text"
+msgid ""
+"We use <a href=\"https://codeberg.org/ThetaDev/rustypipe/\">rustypipe</a> "
+"and <a href=\"https://piped.video/\">Piped</a> to get data from YouTube."
+msgstr ""
+"YouTube'ist andmete laadimisel on meil kasutusel <a href=\"https://"
+"codeberg.org/ThetaDev/rustypipe/\">rustypipe</a> ja <a href=\"https://"
+"piped.video/\">Piped</a>."
+
+#: src/splashes.rs:136
+msgctxt "Displayed as a splash text"
+msgid ""
+"The creator of Pipeline has also built other applications, like <a "
+"href=\"https://flathub.org/apps/de.schmidhuberj.DieBahn\">Railway</a> and <a "
+"href=\"https://flathub.org/apps/de.schmidhuberj.Flare\">Flare</a>."
+msgstr ""
+"Pipeline'i autor on teinud ka sellised head rakendused: <a href=\"https://"
+"flathub.org/apps/de.schmidhuberj.DieBahn\">Raudtee (Railway)</a> ja <a "
+"href=\"https://flathub.org/apps/de.schmidhuberj.Flare\">Flare</a>."
+
+#: src/splashes.rs:142
+msgctxt "Displayed as a splash text"
+msgid ""
+"When using Piped to fetch data, Pipeline will be able to fetch your "
+"subscriptions faster with more public Piped instances. So consider <a "
+"href=\"https://docs.piped.video/docs/self-hosting/\">hosting Piped</a> and "
+"making it available for everyone."
+msgstr ""
+"Kui andmete laadimiseks on kasutusel Piped, siis mida rohkem on Pipedi "
+"avalikke servereid, seda kiiremini suudab Pipeline sinu tellimusi sealt "
+"laadida. Seega kaalu oma <a href=\"https://docs.piped.video/docs/self-"
+"hosting/\">Pipedi serveri</a> paigaldamist ja selle avamist kõigile "
+"huvilistele."
+
+#: src/splashes.rs:148
+msgctxt "Displayed as a splash text"
+msgid ""
+"No animals were harmed while making this application. But two cats were "
+"petted."
+msgstr ""
+"Selle rakenduse tegemisel ei saanud viga ükski loom. Küll aga silitati "
+"hoolega kahte kassi."
+
+#: src/splashes.rs:155
+msgctxt "Displayed as a splash text"
+msgid ""
+"Add videos to your watch-later list by bringing up their context menu, or "
+"directly when watching videos."
+msgstr ""
+"Lisa videoid hilisema vaatamise loendisse kas video kontekstimenüüst või "
+"otse vaatamise ajal."
+
+#: src/splashes.rs:161
+msgctxt "Displayed as a splash text"
+msgid ""
+"Seeing something you don't like? You can hide videos from your feed based on "
+"the title and uploader of the video."
+msgstr ""
+"Näed midagi, mis sulle ei meeldi? Soovi korral saad pealkirja ja üleslaadija "
+"alusel videoid oma meediavoost välistada."
+
+#: src/splashes.rs:167
+msgctxt "Displayed as a splash text"
+msgid ""
+"You can hide videos you already watched. Enable this by managing your "
+"filters."
+msgstr ""
+"Võid juba vaadatud videod peita - seda saad seadistada oma filtrite "
+"haldamisega."
+
+#: src/splashes.rs:173
+msgctxt "Displayed as a splash text"
+msgid ""
+"You can quickly toggle on and off filters in the feed from the filter dialog."
+msgstr "Põhimenüüst saad meediavoo filtreid kergesti sisse-välja lülitada."
+
+#: src/splashes.rs:179
+msgctxt "Displayed as a splash text"
+msgid ""
+"Want to keep your subscriptions from YouTube or NewPipe? You can import "
+"those into Pipeline."
+msgstr ""
+"Soovid säilitada oma YouTube'i või NewPipe'i tellimusi? Sa võid neid "
+"Pipeline'i importida."
+
+#: src/splashes.rs:185
+msgctxt "Displayed as a splash text"
+msgid ""
+"Want to bring your own video player instead of the one built-in? You can "
+"manage an external video player in the settings and tell Pipeline to use it "
+"by default."
+msgstr ""
+"Soovid kasutada mõnda muud meediaesitajat, mitte Pipeline'i enda oma? "
+"Seadistustest saad hallata välise meediarakenduse tingimusi, sealhulgas tema "
+"vaikimisi kasutamist."
+
+#: src/splashes.rs:191
+msgctxt "Displayed as a splash text"
+msgid ""
+"You want to keep a video you watched? You can directly download it from the "
+"video page."
+msgstr ""
+"Soovid säilitada vaadatud videot? Saad teda otse videovaatest alla laadida."
+
+#: src/splashes.rs:197
+msgctxt "Displayed as a splash text"
+msgid ""
+"Want to share a video? You can copy its URL to the clipboard directly from "
+"the video page."
+msgstr ""
+"Soovid videot jagada? Videovaatest saad tema võrguaadressi kopeerida "
+"lõikelauale."
+
+#: src/splashes.rs:203
+msgctxt "Displayed as a splash text"
+msgid ""
+"Are you hosting your own Piped instance? You can tell Pipeline to use it in "
+"the settings."
+msgstr ""
+"Sul on oma Piped'i server? Võid ta Pipeline'i seadistustest võtta kasutusele."
+
+#: src/splashes.rs:210
+msgctxt "Displayed as a splash text"
+msgid ""
+"Not interested in those splash texts? You can disable them in the settings."
+msgstr ""
+"Sind ei huvita need infoteated? Lihtsalt lülita nad seadistusest välja."
+
+#: src/splashes.rs:216
+msgctxt "Displayed as a splash text"
+msgid ""
+"Don't like YouTube anymore? Pipeline also works with <a href=\"https://"
+"joinpeertube.org\">PeerTube</a>."
+msgstr ""
+"Sulle YouTube enam ei meeldi? Pipeline'is toimib ka <a href=\"https://"
+"joinpeertube.org\">PeerTube'is</a>."
+
+#: src/splashes.rs:222
+msgctxt "Displayed as a splash text"
+msgid ""
+"Searching for something? Pipeline can help you with that and search for "
+"channels and videos on YouTube and Peertube."
+msgstr ""
+"Otsid midagi? Pipeline oskab leida videoid ja kanaleid nii YouTube'ist, kui "
+"Peertube'ist."
+
+#: src/splashes.rs:228
+msgctxt "Displayed as a splash text"
+msgid ""
+"Pipeline has four different ways to fetch videos from YouTube. Just to be "
+"sure you don't miss any of your precious cat videos."
+msgstr ""
+"Pipeline'il on neli erinevat viisi videote laadimiseks YouTube'ist. Seda "
+"lihtsalt kindluse mõttes... et sa ikka kõik vajaliku kassivideod kätte "
+"saaksid."
+
+#: src/splashes.rs:243
+#, c-format
+msgctxt "Displayed as a splash text"
+msgid ""
+"Have ideas for further splash text? Tell us on <a href=\"https://matrix.to/#/"
+"%23pipelineapp:matrix.org\">Matrix</a>."
+msgstr ""
+"Sul on hea idee täiendava infoteate lisamiseks? Anna meile teada <a "
+"href=\"https://matrix.to/#/%23pipelineapp:matrix.org\">Matrixis</a>."
+
+#: src/splashes.rs:249
+msgctxt "Displayed as a splash text"
+msgid "Pretty sure {year} will be the year of the Linux desktop."
+msgstr ""
+"On üsna kindel, et {year}. aasta saab lõpuks olema Linuxi läbimurdeaasta "
+"töölaual."
+
+#. Translators: A reference to the "I use Arch btw" meme.
+#: src/splashes.rs:255
+msgctxt "Displayed as a splash text"
+msgid "I can be used on Arch btw."
+msgstr "Muide, see rakendus leidub ka Archis."
+
+#: src/splashes.rs:260
+msgctxt "Displayed as a splash text"
+msgid "Do you want to advertise here? You can't."
+msgstr "Kas sa tahaksid siin oma reklaame näha? See pole võimalik."
+
+#: src/splashes.rs:277
+msgctxt "Displayed as a splash text"
+msgid "🎉 Pipeline turned {} years old today. Happy Birthday! 🎉"
+msgstr "🎉 Pipeline sai täna {} aastaseks. Palju õnne sünnipäevaks! 🎉"
+
+#: src/splashes.rs:331
+msgctxt "Displayed as a splash text"
+msgid "Also try {}!"
+msgstr "Proovi ka: {}!"
+
+#~ msgid "Export to Pipeline"
+#~ msgstr "Ekspordi Pipeline'i jaoks"
+
+#~ msgid "Export to YouTube"
+#~ msgstr "Ekspordi YouTube'i vormingus"
+
+#~ msgid ""
+#~ "This will produce a JSON file which you can import into NewPipe in the "
+#~ "subscriptions tab. This will only export your subscriptions."
+#~ msgstr ""
+#~ "Tulemuseks on JSON-fail, mida saad NewPipe'i tellimuste kaardile "
+#~ "importida. Sellega eksporditakse vaid sinu tellimused."
+
+#~ msgid "Export to NewPipe"
+#~ msgstr "Ekspordi NewPipe'i jaoks"
+
+#~ msgid "Import from Pipeline"
+#~ msgstr "Impordi Pipeline'ist"
+
+#~ msgid "Import from YouTube"
+#~ msgstr "Impordi YouTube'ist"
+
+#~ msgid "Import from NewPipe"
+#~ msgstr "Impordi NewPipe'ist"
+
+#~ msgid "Import from Invidious"
+#~ msgstr "Impordi Invidiousest"
+
+#~ msgid "Welcome to Pipeline"
+#~ msgstr "Tere tulemast, see on Pipeline"
+
+#~ msgid "Start using Pipeline"
+#~ msgstr "Alusta Pipeline'i kasutamist"
+
+#~ msgid ""
+#~ "Note that Pipeline at the moment directly connects to YouTube and "
+#~ "PeerTube when playing videos. Please use a VPN or similar technology, or "
+#~ "another application, if you are not comfortable with that."
+#~ msgstr ""
+#~ "Palun arvesta, et hetkel Pipeline teeb videote esitamisel päringuid otse "
+#~ "YouTube'i ja PeerTube'i teenustele. Kui see sulle ei sobi, siis kasuta "
+#~ "VPN-i või muid sarnaseid lahendusi või hoopis muud rakendust."
+
+#~ msgid ""
+#~ "Already have a list of subscriptions from either NewPipe or YouTube? You "
+#~ "can import your subscriptions from those platforms to get started."
+#~ msgstr ""
+#~ "Sul juba on varasemast olemas NewPipe'i või YouTube'i tellimuste loend? "
+#~ "Alustuseks saad need importida."
+
+#~ msgid ""
+#~ "Do you have a very weak device like the PinePhone and Pipeline is running "
+#~ "very slowly? You can find some settings to potentially improve "
+#~ "performance on weak devices in the preferences."
+#~ msgstr ""
+#~ "Kas kasutad mõnda vähese jõudlusega seadet nagu PinePhone ning Pipeline "
+#~ "töötab väga aeglaselt? Eelistustest leiad mõned seadistused, millega saad "
+#~ "lahjema raudvaraga seadmetes jõudlust parandada."
+
+#~ msgid "Automatically Manage Instances"
+#~ msgstr "Halda servereid automaatselt"
+
+#~ msgid "Piped Preferences"
+#~ msgstr "Piped'i Eelistused"
+
+#~ msgid "Did you know?"
+#~ msgstr "Kas sa teadsid?"
+
+#~ msgid "Feature Spotlight:"
+#~ msgstr "Täna tõstame esile:"
+
+#~ msgid ""
+#~ "Filters are currently disabled. Those settings will not have an effect "
+#~ "until you enable filters again."
+#~ msgstr ""
+#~ "Filtrid pole hetkel kasutusel. Need seadistused ei kehti seni, kuni "
+#~ "filtreerimise uuesti sisse lülitad."
+
+#~ msgid "Main Page"
+#~ msgstr "Põhivaade"
+
+#~ msgid "Video"
+#~ msgstr "Video"
+
+#~ msgid "Search for Videos and Channels"
+#~ msgstr "Otsi videoid ja kanaleid"
+
+#~ msgid "Clear Watch History"
+#~ msgstr "Kustuta vaatamiste ajalugu"
+
+#~ msgctxt "Displayed as a splash text"
+#~ msgid "You can help translate Pipeline using <a href="
+#~ msgstr "Pipeline'i saad tõlkida siin: <a href="
+
+#~ msgctxt "Displayed as a splash text"
+#~ msgid "We have a <a href="
+#~ msgstr "Meil on: <a href="
+
+#~ msgctxt "Displayed as a splash text"
+#~ msgid "Pipeline has a <a href="
+#~ msgstr "Pipeline'il on <a href="
+
+#~ msgctxt "Displayed as a splash text"
+#~ msgid "You can get Pipeline on <a href="
+#~ msgstr "Pipeline on saadaval: <a href="
+
+#~ msgctxt "Displayed as a splash text"
+#~ msgid "We use <a href="
+#~ msgstr "Meil on kasutusel: <a href="
+
+#~ msgctxt "Displayed as a splash text"
+#~ msgid ""
+#~ "The creator of Pipeline has also built other applications, like <a href="
+#~ msgstr ""
+#~ "Pipeline'i autor on teinud ka teisi rakendusi, nagu näiteks <a href="
+
+#~ msgid "Channel Name"
+#~ msgstr "Kanali nimi"
+
+#~ msgid "Piped APIs"
+#~ msgstr "Piped'i APId"

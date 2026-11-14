@@ -1,0 +1,75 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $TFVideoList: Adw.BreakpointBin {
+  width-request: 1;
+  height-request: 1;
+  // Ideally, the GridView would be a FlowBox, but that has accessibility and performance problems.
+  // Hopefully this hack can be removed in the future.
+  // Dummy breakpoint that is always active, to set the default clamped-to.
+  Adw.Breakpoint {
+    condition ("min-width: 0sp")
+
+    setters {
+      template.clamped-to: 1862;
+    }
+  }
+
+  Adw.Breakpoint {
+    condition ("max-width: 1861sp")
+
+    setters {
+      template.clamped-to: 1556;
+    }
+  }
+
+  Adw.Breakpoint {
+    condition ("max-width: 1555sp")
+
+    setters {
+      template.clamped-to: 1248;
+    }
+  }
+
+  Adw.Breakpoint {
+    condition ("max-width: 1247sp")
+
+    setters {
+      template.clamped-to: 942;
+    }
+  }
+
+  Adw.Breakpoint {
+    condition ("max-width: 941sp")
+
+    setters {
+      template.clamped-to: 636;
+    }
+  }
+
+  ScrolledWindow scrolled_window {
+    hscrollbar-policy: never;
+    valign: start;
+    propagate-natural-height: true;
+    edge-reached => $edge_reached() swapped;
+
+    Adw.ClampScrollable clamp {
+      maximum-size: bind template.clamped-to;
+      tightening-threshold: 1862;
+
+      GridView feed_list {
+        styles [
+          "background-view",
+          "padded-grid",
+        ]
+
+        max-columns: 6;
+        vexpand: true;
+        valign: fill;
+        hexpand: true;
+        halign: fill;
+        tab-behavior: item;
+      }
+    }
+  }
+}

@@ -1,0 +1,542 @@
+using Gtk 4.0;
+using Adw 1;
+using ClapperGtk 0.0;
+using Gdk 4.0;
+
+template $TFVideoPage: Adw.Bin {
+  ShortcutController {
+    scope: local;
+    propagation-phase: bubble;
+
+    Shortcut {
+      trigger: "greater";
+      action: "action(video.speed-up)";
+    }
+
+    Shortcut {
+      trigger: "less";
+      action: "action(video.speed-down)";
+    }
+
+    Shortcut {
+      trigger: "Up";
+      action: "action(video.volume-up)";
+    }
+
+    Shortcut {
+      trigger: "Down";
+      action: "action(video.volume-down)";
+    }
+
+    Shortcut {
+      trigger: "m";
+      action: "action(video.toggle-mute)";
+    }
+
+    Shortcut {
+      trigger: "space";
+      action: "action(video.play-pause)";
+    }
+
+    Shortcut {
+      trigger: "Right";
+      action: "action(video.seek-forward)";
+    }
+
+    Shortcut {
+      trigger: "Left";
+      action: "action(video.seek-backward)";
+    }
+
+    // TODO: Maybe do that programmatically, instead of listing everything.
+    Shortcut {
+      trigger: "0";
+      action: "action(video.seek-percentile)";
+      arguments: "0";
+    }
+
+    Shortcut {
+      trigger: "1";
+      action: "action(video.seek-percentile)";
+      arguments: "1";
+    }
+
+    Shortcut {
+      trigger: "2";
+      action: "action(video.seek-percentile)";
+      arguments: "2";
+    }
+
+    Shortcut {
+      trigger: "3";
+      action: "action(video.seek-percentile)";
+      arguments: "3";
+    }
+
+    Shortcut {
+      trigger: "4";
+      action: "action(video.seek-percentile)";
+      arguments: "4";
+    }
+
+    Shortcut {
+      trigger: "5";
+      action: "action(video.seek-percentile)";
+      arguments: "5";
+    }
+
+    Shortcut {
+      trigger: "6";
+      action: "action(video.seek-percentile)";
+      arguments: "6";
+    }
+
+    Shortcut {
+      trigger: "7";
+      action: "action(video.seek-percentile)";
+      arguments: "7";
+    }
+
+    Shortcut {
+      trigger: "8";
+      action: "action(video.seek-percentile)";
+      arguments: "8";
+    }
+
+    Shortcut {
+      trigger: "9";
+      action: "action(video.seek-percentile)";
+      arguments: "9";
+    }
+  }
+
+  Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      visible: bind template.fullscreened inverted;
+
+      [start]
+      Gtk.ToggleButton main_toggle_sidebar {
+        visible: bind template.show-sidebar-visible;
+        tooltip-text: _("Show Sidebar");
+        action-name: "win.toggle-sidebar";
+        icon-name: "sidebar-show-symbolic";
+      }
+
+      [end]
+      MenuButton primary_menu_button {
+        accessibility {
+          label: C_("accessibility", "Primary menu");
+        }
+
+        primary: true;
+        menu-model: menubar;
+        tooltip-text: C_("tooltip", "Primary menu");
+        icon-name: 'open-menu-symbolic';
+      }
+
+      title-widget: Adw.WindowTitle main_title {};
+    }
+
+    Gtk.Box {
+      orientation: vertical;
+      valign: fill;
+      vexpand: bind template.fullscreened;
+      // The player for playing internally.
+      ClapperGtk.Video clapper {
+        focusable: true;
+        auto-inhibit: true;
+        visible: bind template.external inverted;
+        valign: fill;
+        vexpand: bind template.fullscreened;
+
+        [fading-overlay]
+        ClapperGtk.TitleHeader {
+          valign: start;
+          visible: bind template.fullscreened;
+        }
+
+        [fading-overlay]
+        ClapperGtk.SimpleControls {
+          valign: end;
+        }
+
+        [overlay]
+        ClapperGtk.Billboard billboard {}
+
+        toggle-fullscreen => $toggle_fullscreen() swapped;
+      }
+
+      // The image for playing externally
+      Overlay {
+        visible: bind template.external;
+        valign: start;
+        vexpand: false;
+
+        [overlay]
+        Label {
+          styles [
+            "osd",
+            "title-1",
+          ]
+
+          label: _("Video is Playing Externally");
+          valign: fill;
+          halign: fill;
+        }
+
+        [overlay]
+        Button {
+          valign: fill;
+          halign: fill;
+          clicked => $play_external() swapped;
+        }
+
+        Picture thumbnail {
+          halign: fill;
+          valign: start;
+          hexpand: true;
+          vexpand: true;
+          paintable: bind $pixbuf_to_paintable(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+        }
+      }
+
+      ScrolledWindow scrolled_window {
+        hscrollbar-policy: never;
+        valign: fill;
+        vexpand: true;
+        propagate-natural-height: false;
+        min-content-height: 150;
+        visible: bind template.fullscreened inverted;
+
+        Adw.Clamp {
+          maximum-size: 850;
+          margin-top: 18;
+          margin-bottom: 12;
+          margin-start: 6;
+          margin-end: 6;
+
+          Box {
+            orientation: vertical;
+            spacing: 12;
+
+            Label label_title {
+              styles [
+                "title-1",
+              ]
+
+              label: bind template.video as <$TFVideo>.title;
+              selectable: true;
+              ellipsize: end;
+              wrap: true;
+              wrap-mode: word;
+              lines: 2;
+              justify: left;
+              valign: start;
+              xalign: 0;
+            }
+
+            Adw.WrapBox box {
+              orientation: horizontal;
+              child-spacing: 6;
+              line-spacing: 6;
+
+              Gtk.Button {
+                styles [
+                  "circular",
+                ]
+
+                halign: start;
+                hexpand: true;
+                clicked => $display_channel() swapped;
+
+                Box {
+                  margin-top: 6;
+                  margin-bottom: 6;
+                  margin-start: 6;
+                  margin-end: 12;
+                  spacing: 12;
+
+                  Adw.Avatar {
+                    custom-image: bind $pixbuf_to_paintable(
+                      template.video as <$TFVideo>.uploader as <$TFChannel>.avatar
+                      ) as <Gdk.Paintable>;
+                    text: bind template.video as <$TFVideo>.uploader as <$TFChannel>.name;
+                    size: 32;
+                  }
+
+                  Box {
+                    orientation: vertical;
+
+                    Label label_author {
+                      label: bind template.video as <$TFVideo>.uploader as <$TFChannel>.name;
+                      single-line-mode: true;
+                      ellipsize: end;
+                      max-width-chars: 30;
+                      justify: left;
+                      valign: center;
+                      halign: start;
+                    }
+
+                    Box {
+                      orientation: horizontal;
+                      spacing: 6;
+
+                      Gtk.Image {
+                        styles [
+                          "dimmed",
+                        ]
+
+                        icon-name: bind $icon_name_for_platform(template.video as <$TFVideo>.platform) as <string>;
+                        height-request: 12;
+                        width-request: 12;
+                        valign: center;
+                      }
+
+                      Label label_subscribers {
+                        styles [
+                          "caption",
+                          "dim-label",
+                        ]
+
+                        label: bind $format_subscribers(
+                          template.video as <$TFVideo>.uploader as <$TFChannel>.subscribers
+                          ) as <string>;
+                        visible: bind template.video as <$TFVideo>.uploader as <$TFChannel>.has-subscribers;
+                        single-line-mode: true;
+                        justify: left;
+                        valign: start;
+                        halign: start;
+                        ellipsize: end;
+                      }
+                    }
+                  }
+                }
+              }
+
+              Box button_box {
+                valign: center;
+                hexpand: false;
+                halign: end;
+                spacing: 6;
+
+                Gtk.Button {
+                  styles [
+                    "pill",
+                  ]
+
+                  tooltip-text: _("Download");
+                  clicked => $download() swapped;
+
+                  Gtk.Box {
+                    spacing: 3;
+
+                    Gtk.Image {
+                      icon-name: "folder-download-symbolic";
+                    }
+
+                    Gtk.Label {
+                      accessibility {
+                        description: "Download progress";
+                      }
+
+                      styles [
+                        "numeric",
+                      ]
+
+                      label: bind $format_percent(template.video as <$TFVideo>.download-progress) as <string>;
+                      visible: bind template.video as <$TFVideo>.downloading;
+                    }
+                  }
+
+                  visible: bind $not(template.video as <$TFVideo>.downloaded) as <bool>;
+                  sensitive: bind $not(template.video as <$TFVideo>.downloading) as <bool>;
+                }
+
+                Gtk.Button {
+                  styles [
+                    "pill",
+                  ]
+
+                  icon-name: "edit-delete-symbolic";
+                  tooltip-text: _("Remove Local Copy");
+                  clicked => $remove_downloaded() swapped;
+                  visible: bind template.video as <$TFVideo>.downloaded;
+                }
+
+                Gtk.Button {
+                  styles [
+                    "pill",
+                  ]
+
+                  action-name: "win.watch-later";
+                  tooltip-text: bind $watch_later_tooltip_text(template.video as <$TFVideo>.watch-later) as <string>;
+                  icon-name: bind $watch_later_icon_name(template.video as <$TFVideo>.watch-later) as <string>;
+                }
+
+                Gtk.Button {
+                  styles [
+                    "pill",
+                  ]
+
+                  icon-name: "edit-copy-symbolic";
+                  tooltip-text: _("Copy Video Link");
+                  clicked => $copy_to_clipboard() swapped;
+                }
+              }
+            }
+
+            Gtk.Box {
+              orientation: vertical;
+              spacing: 5;
+
+              styles [
+                "card",
+                "video-description",
+              ]
+
+              Gtk.Box {
+                Adw.WrapBox {
+                  line-spacing: 6;
+                  child-spacing: 6;
+
+                  Label label_uploaded {
+                    label: bind $format_uploaded(template.video as <$TFVideo>.uploaded-label) as <string>;
+                    selectable: true;
+                    single-line-mode: true;
+                    justify: left;
+                    halign: start;
+                    ellipsize: start;
+                    hexpand: true;
+
+                    styles [
+                      "heading",
+                    ]
+                  }
+
+                  Box box_numbers {
+                    spacing: 12;
+                    halign: start;
+                    hexpand: false;
+
+                    Box box_views {
+                      styles [
+                        "dim-label",
+                      ]
+
+                      visible: bind template.video as <$TFVideo>.has-views;
+                      spacing: 6;
+
+                      Image {
+                        icon-name: "eye-open-negative-filled-symbolic";
+                      }
+
+                      Label label_views {
+                        label: bind $format_number_compact(template.video as <$TFVideo>.views) as <string>;
+
+                        styles [
+                          "heading",
+                        ]
+                      }
+                    }
+
+                    Box box_likes {
+                      styles [
+                        "dim-label",
+                      ]
+
+                      visible: bind template.video as <$TFVideo>.has-likes;
+                      spacing: 6;
+
+                      Image {
+                        icon-name: "thumbs-up-symbolic";
+                      }
+
+                      Label label_likes {
+                        label: bind $format_number_compact(template.video as <$TFVideo>.likes) as <string>;
+
+                        styles [
+                          "heading",
+                        ]
+                      }
+                    }
+
+                    Box box_dislikes {
+                      styles [
+                        "dim-label",
+                      ]
+
+                      visible: bind template.video as <$TFVideo>.has-dislikes;
+                      spacing: 6;
+
+                      Image {
+                        icon-name: "thumbs-down-symbolic";
+                      }
+
+                      Label label_dislikes {
+                        label: bind $format_number_compact(template.video as <$TFVideo>.dislikes) as <string>;
+
+                        styles [
+                          "heading",
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+
+              Label label_description {
+                use-markup: true;
+                label: bind $format_description(template.video as <$TFVideo>.description as <string>) as <string>;
+                selectable: true;
+                wrap: true;
+                wrap-mode: word_char;
+                halign: start;
+                justify: left;
+                valign: start;
+                xalign: 0.0;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Keep up-to-date with window.blp and channel_page.blp.
+menu menubar {
+  section {
+    item {
+      label: _("Import");
+      action: 'win.import';
+    }
+
+    item {
+      label: _("Export");
+      action: 'win.export';
+    }
+  }
+
+  section {
+    item {
+      label: _("Preferences");
+      action: 'win.settings';
+    }
+
+    item {
+      label: _("Privacy Notice");
+      action: 'win.privacy-notice';
+    }
+
+    item {
+      label: _("Keyboard Shortcuts");
+      action: 'win.show-help-overlay';
+    }
+
+    item {
+      label: _("About Pipeline");
+      action: 'win.about';
+    }
+  }
+}

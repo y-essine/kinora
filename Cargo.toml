@@ -1,0 +1,53 @@
+[package]
+name = "tubefeeder"
+description = "Follow video creators"
+homepage = "https://mobile.schmidhuberj.de/pipeline"
+repository = "https://gitlab.com/schmiddi-on-mobile/pipeline"
+version = "4.1.1"
+authors = ["Julian Schmidhuber <mobile@schmidhuberj.de>", "Alexander Frieden"]
+edition = "2024"
+license = "GPL-3.0-or-later"
+
+[profile.dev]
+debug = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+gtk = { version = "0.10.3", package = "gtk4", features = ["v4_14"] }
+gdk = { version = "0.10.3", package = "gdk4" }
+adw = { version = "0.8.1", package = "libadwaita", features = ["v1_8"] }
+glib = "0.21.5"
+
+tokio = { version = "1.48.0", features = ["full"] }
+futures = "0.3.31"
+chrono = { version = "0.4.42" }
+csv = "1.4.0"
+reqwest = "0.12.26"
+regex = "1.12.2"
+
+log = "0.4.29"
+env_logger = "0.11.8"
+
+rand = "0.9"
+url = { version = "2.5", features = ["serde"] }
+
+gettext-rs = { version = "0.8.0", features = ["gettext-system"] }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Version 0.33 is already available, but held back by `rusqlite_migration`.
+rusqlite = { version = "0.37.0", features = ["url", "chrono", "backup"] }
+rusqlite_migration = "2.3"
+
+pcore = { package = "pipeline-core", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
+papi = { package = "pipeline-api", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
+ppiped = { package = "pipeline-provider-piped", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
+prustypipe = { package = "pipeline-provider-rustypipe", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
+pytdlp = { package = "pipeline-provider-yt-dlp", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
+pyoutuberss = { package = "pipeline-provider-youtube-rss", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
+ppeertube = { package = "pipeline-provider-peertube", git = "https://gitlab.com/schmiddi-on-mobile/pipeline-backend.git", rev = "c42f29c48c828b5d75c8a7b44d28a87a246fbbfb" }
+
+clapper = { package = "clapper-player", version = "0.10", features = ["v0_10"] }
+clapper-gtk = { package = "clapper-player-gtk", version = "0.10", features = ["v0_10"]  }

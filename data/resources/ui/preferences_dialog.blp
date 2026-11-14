@@ -1,0 +1,233 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $TFPreferencesDialog: Adw.PreferencesDialog {
+  Adw.PreferencesPage {
+    title: _("General");
+    icon-name: 'preferences-system-symbolic';
+
+    Adw.PreferencesGroup {
+      title: _("General");
+
+      Adw.SwitchRow switch_reload_on_startup {
+        title: _("Reload on Startup");
+      }
+
+      Adw.SwitchRow switch_watch_history_enabled {
+        title: _("Keep Watch History");
+      }
+
+      Adw.ButtonRow btn_clear_watch_history {
+        title: "Clear Watch History";
+        start-icon-name: "user-trash-symbolic";
+        activated => $clear_watch_history() swapped;
+
+        styles [
+          "destructive-action",
+        ]
+      }
+    }
+
+    Adw.PreferencesGroup {
+      title: _("Video Downloads");
+
+      Adw.ComboRow combo_download_format {
+        // Translators: The format a video will be downloaded in.
+        title: _("Format");
+      }
+
+      Adw.EntryRow entry_custom_download_format {
+        title: _("Custom Download Format");
+        show-apply-button: true;
+        input-hints: no_spellcheck | no_emoji;
+      }
+
+      Adw.EntryRow entry_custom_yt_dlp_arguments {
+        title: _("Custom yt-dlp Arguments");
+        show-apply-button: true;
+        input-hints: no_spellcheck | no_emoji;
+      }
+    }
+
+    Adw.PreferencesGroup group_external {
+      title: _("External Programs");
+
+      Adw.SwitchRow switch_external_default {
+        title: _("Play with External Player by Default");
+      }
+
+      Adw.EntryRow entry_external_player {
+        title: _("External Video Player");
+        show-apply-button: true;
+        input-hints: no_spellcheck | no_emoji;
+        apply => $apply_external_player() swapped;
+      }
+    }
+
+    Adw.PreferencesGroup {
+      title: _("YouTube Preferences");
+
+      ListBox {
+        styles [
+          "boxed-list",
+        ]
+
+        selection-mode: none;
+
+        Adw.SwitchRow switch_source_youtube {
+          title: _("Enable YouTube");
+          subtitle: _("Allow Pipeline to fetch YouTube videos");
+        }
+
+        margin-bottom: 12;
+      }
+
+      ListBox {
+        styles [
+          "boxed-list",
+        ]
+
+        selection-mode: none;
+        sensitive: bind switch_source_youtube.active;
+
+        Adw.ActionRow {
+          title: _("Prefer Fetching Information Directly from YouTube");
+          subtitle: _("On errors, try to fetch information using Piped. Recommended.");
+
+          Gtk.CheckButton check_button_rustypipe_then_piped {
+            group: check_button_piped;
+          }
+        }
+
+        Adw.ActionRow {
+          title: _("Prefer Fetching Information Using Piped");
+          subtitle: _("On errors, try to fetch information from YouTube");
+
+          Gtk.CheckButton check_button_piped_then_rustypipe {
+            group: check_button_piped;
+          }
+        }
+
+        Adw.ActionRow {
+          title: _("Always Fetch Information Directly from YouTube");
+
+          Gtk.CheckButton check_button_rustypipe {
+            group: check_button_piped;
+          }
+        }
+
+        Adw.ActionRow {
+          title: _("Always Fetch Information Using Piped");
+
+          Gtk.CheckButton check_button_piped {}
+        }
+
+        margin-bottom: 12;
+      }
+
+      ListBox {
+        styles [
+          "boxed-list",
+        ]
+
+        selection-mode: none;
+
+        Adw.ActionRow row_youtube_cookies {
+          title: _("YouTube Cookies File");
+          subtitle: _("No cookies file used");
+
+          [suffix]
+          Gtk.Image img_youtube_cookies_choose {
+            icon-name: "document-open-symbolic";
+            tooltip-text: _("Choose a cookies file");
+          }
+
+          [suffix]
+          Gtk.Image img_youtube_cookies_remove {
+            icon-name: "user-trash-symbolic";
+            tooltip-text: _("Remove cookies file");
+          }
+        }
+
+        Adw.EntryRow entry_youtube_extractor_args {
+          title: _("Extractor Arguments for yt-dlp");
+        }
+
+        margin-bottom: 12;
+      }
+
+      Gtk.Label {
+        styles [
+          "dimmed",
+        ]
+
+        visible: bind $and(switch_source_youtube.active, $not(check_button_rustypipe.active) as <bool>) as <bool>;
+        label: _(
+          "Specify the list of instances to use. Pipeline can maintain this list automatically, which will refresh it on every startup. You can freely modify this list if you have your own Piped instances you want to use. The requests will be balanced across all listed instances. For a complete list of public APIs, see the <a href=\"https://github.com/TeamPiped/documentation/blob/main/content/docs/public-instances/index.md\">Instances page</a>."
+        );
+        xalign: 0;
+        use-markup: true;
+        margin-top: 6;
+        margin-bottom: 6;
+        wrap: true;
+      }
+
+      ListBox piped_api_urls {
+        styles [
+          "boxed-list",
+        ]
+
+        visible: bind $and(switch_source_youtube.active, $not(check_button_rustypipe.active) as <bool>) as <bool>;
+        selection-mode: none;
+      }
+    }
+
+    Adw.PreferencesGroup {
+      title: _("Peertube Preferences");
+      separate-rows: true;
+
+      Adw.SwitchRow switch_source_peertube {
+        title: _("Enable Peertube");
+        subtitle: _("Allow Pipeline to fetch Peertube videos");
+      }
+
+      Adw.EntryRow entry_peertube_search_api {
+        title: _("Search Instance");
+        show-apply-button: true;
+        input-purpose: url;
+        input-hints: no_spellcheck | lowercase | no_emoji;
+        apply => $apply_peertube_search_api() swapped;
+        sensitive: bind switch_source_peertube.active;
+      }
+    }
+
+    Adw.PreferencesGroup {
+      // Translators: Preferences section containing some fun features of the application, like showing a random splash text or seasonal styling.
+      title: _("Fun");
+
+      Adw.SwitchRow switch_show_splash {
+        // Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+        title: _("Show Splash Text");
+        // Translators: "Splash" as in the splash text from Minecraft: https://minecraft.wiki/w/Splash.
+        subtitle: _("A random splash text is shown when reloading the feed.");
+      }
+
+      Adw.SwitchRow switch_seasonal_style {
+        title: _("Seasonal Styling");
+        subtitle: _("The progress bar will be styled based on annual celebrations, for example pride month.");
+      }
+    }
+
+    Adw.PreferencesGroup {
+      title: _("Performance");
+      description: _(
+        "If Pipeline performs badly on your device, you may want to change some of those settings. In general, keeping the default settings is recommended. For older devices which do not support GLES 3.0 like the PinePhone, you may want to switch to software rendering. Changing these settings require a restart of Pipeline."
+      );
+
+      Adw.SwitchRow switch_cairo {
+        title: _("Software Rendering");
+        subtitle: _("Using the Cairo renderer");
+      }
+    }
+  }
+}

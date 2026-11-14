@@ -1,0 +1,37 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $TFErrorDialog: Adw.Dialog {
+  content-width: 460;
+  content-height: 460;
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      title-widget: Adw.WindowTitle {
+        title: _("Errors");
+      };
+    }
+
+    [bottom]
+    ActionBar {
+      [end]
+      Gtk.Button {
+        label: _("Clear Errors");
+        clicked => $clear_errors() swapped;
+      }
+    }
+
+    Adw.PreferencesPage {
+      Adw.PreferencesGroup {
+        ListBox error_box {
+          styles [
+            "boxed-list",
+          ]
+
+          selection-mode: none;
+        }
+      }
+    }
+  };
+}

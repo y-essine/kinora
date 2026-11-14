@@ -1,0 +1,21 @@
+using Gtk 4.0;
+
+template $TFSearchListItem: Box {
+  $TFVideoItem {
+    video: bind template.item as <$TFSearchItem>.video;
+    visible: bind $is_some(template.item as <$TFSearchItem>.video) as <bool>;
+    play-video => $play_video() swapped;
+    copy-video-url => $copy_video_url() swapped;
+    download => $download() swapped;
+    remove-downloaded => $remove_downloaded() swapped;
+    client: bind template.client;
+    compact: bind template.compact;
+  }
+
+  $TFChannelItem {
+    channel: bind template.item as <$TFSearchItem>.channel;
+    visible: bind $is_some(template.item as <$TFSearchItem>.channel) as <bool>;
+    client: bind template.client;
+    compact: bind template.compact;
+  }
+}

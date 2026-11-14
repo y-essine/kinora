@@ -1,0 +1,31 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $TFFilterSimilarDialog: Adw.AlertDialog {
+  heading: _("Add Filter");
+  body: _(
+    "Hide videos from the feed if they contain a specific phrase in their titles and were uploaded by a specific channel"
+  );
+  // Natural size of child is pretty small.
+  // As video titles can be quite long, made the window pretty wide.
+  follows-content-size: false;
+  content-width: 600;
+  presentation-mode: auto;
+
+  extra-child: Adw.PreferencesGroup {
+    Adw.EntryRow entry_title {
+      title: _("Phrase to Filter");
+    }
+
+    Adw.EntryRow entry_channel {
+      title: _("Channel");
+    }
+  };
+
+  default-response: "add-filter";
+
+  responses [
+    add-filter: _("Add Filter") suggested,
+    cancel: _("Cancel"),
+  ]
+}
