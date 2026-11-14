@@ -228,6 +228,28 @@ Adw.ViewStack main_stack {
     icon-name: "starred-symbolic";
 
     child: Box {
+      orientation: vertical;
+
+      // Kinora: the Home filter chips ("All", "Music", "Gaming", ...).
+      ScrolledWindow home_chips_scroll {
+        visible: false;
+        hscrollbar-policy: external;
+        vscrollbar-policy: never;
+        propagate-natural-height: true;
+
+        Adw.Clamp {
+          maximum-size: 1862;
+          tightening-threshold: 1862;
+
+          Box home_chips_box {
+            spacing: 8;
+            margin-top: 12;
+            margin-start: 12;
+            margin-end: 12;
+          }
+        }
+      }
+
       $TFFiniteVideoList home_list {
         visible: bind $not(
           template.client as <$TFClient>.home-store as <$TFFiniteVideoStore>.is-empty
@@ -239,6 +261,7 @@ Adw.ViewStack main_stack {
         copy-video-url => $copy_video_url() swapped;
         download => $download() swapped;
         remove-downloaded => $remove_downloaded() swapped;
+        scroll-end => $home_load_more() swapped;
       }
 
       Adw.StatusPage {

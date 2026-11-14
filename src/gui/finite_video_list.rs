@@ -39,6 +39,8 @@ pub mod imp {
     pub struct FiniteVideoList {
         #[template_child]
         list: TemplateChild<GridView>,
+        #[template_child]
+        scrolled: TemplateChild<gtk::ScrolledWindow>,
 
         #[property(get, set = Self::set_model)]
         model: RefCell<Option<FiniteVideoStore>>,
@@ -71,6 +73,35 @@ pub mod imp {
 
         pub(super) fn setup(&self) {
             let obj = self.obj();
+
+            // Kinora: lists that can load more (Home) append when the end is reached.
+            self.scrolled.connect_edge_reached(clone!(
+                #[weak]
+                obj,
+                move |_, position| {
+                    if position == gtk::PositionType::Bottom {
+                        obj.emit_by_name::<()>("scroll-end", &[]);
+                    }
+                }
+            ));
+
+            // A list that does not fill the window cannot be scrolled to its end.
+            self.scrolled.vadjustment().connect_changed(clone!(
+                #[weak]
+                obj,
+                move |adj| {
+                    if adj.upper() <= adj.page_size() {
+                        glib::timeout_add_local_once(
+                            std::time::Duration::from_millis(150),
+                            clone!(
+                                #[weak]
+                                obj,
+                                move || obj.emit_by_name::<()>("scroll-end", &[])
+                            ),
+                        );
+                    }
+                }
+            ));
 
             let factory = SignalListItemFactory::new();
             factory.connect_setup(clone!(
@@ -220,6 +251,8 @@ pub mod imp {
                     Signal::builder("remove-downloaded")
                         .param_types([Video::static_type()])
                         .build(),
+                    // Kinora: the list was scrolled to its end.
+                    Signal::builder("scroll-end").build(),
                 ]
             });
             SIGNALS.as_ref()

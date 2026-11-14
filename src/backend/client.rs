@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use gdk::gdk_pixbuf::Pixbuf;
-use gdk::gio::prelude::{FileExt, ListModelExtManual};
+use gdk::gio::prelude::{FileExt, ListModelExt, ListModelExtManual};
 use gdk::gio::{File, MemoryInputStream, SettingsBindFlags};
 use gdk::prelude::{SettingsExt, SettingsExtManual};
 use glib::object::ObjectExt;
@@ -121,8 +121,7 @@ impl Client {
                 s.set_account_label(account_label(settings));
                 s.set_has_account(connected);
                 if changed || connected {
-                    s.home_store().clear();
-                    s.set_home_error(String::new());
+                    s.reset_home();
                     if connected {
                         gspawn!(async move { s.refresh_home().await });
                     }
@@ -662,35 +661,123 @@ impl Client {
             .to_string()
     }
 
+    /// Forget everything Home shows, and drop loads that are still running.
+    fn reset_home(&self) {
+        let imp = self.imp();
+        imp.home_gen.set(imp.home_gen.get().wrapping_add(1));
+        imp.home_loading_more.set(false);
+        imp.home_next.take();
+        self.set_home_chips_list(&[]);
+        self.home_store().clear();
+        self.set_home_error(String::new());
+        self.set_home_loading(false);
+    }
+
+    /// Show the filter bar's chips; the first one ("All") is selected.
+    fn set_home_chips_list(&self, chips: &[super::account::HomeChip]) {
+        let imp = self.imp();
+        *imp.home_chip_tokens.borrow_mut() = chips.iter().map(|c| c.token.clone()).collect();
+        self.set_home_chip_selected(0);
+        let titles: Vec<gtk::StringObject> = chips
+            .iter()
+            .map(|c| gtk::StringObject::new(&c.title))
+            .collect();
+        let model = self.home_chips();
+        model.splice(0, model.n_items(), &titles);
+    }
+
     /// Reload the Home page from the account's YouTube home feed.
     pub async fn refresh_home(&self) {
         if self.home_loading() {
             return;
         }
         if !self.has_account() {
-            self.home_store().clear();
-            self.set_home_error(String::new());
+            self.reset_home();
             return;
         }
+        // Reloading keeps the chosen filter.
+        match self.home_chip(self.home_chip_selected()) {
+            Some((index, Some(token))) => self.load_home(Some((index, token))).await,
+            _ => self.load_home(None).await,
+        }
+    }
+
+    /// Index and continuation token of a chip ("All" has none).
+    fn home_chip(&self, index: u32) -> Option<(u32, Option<String>)> {
+        let tokens = self.imp().home_chip_tokens.borrow();
+        tokens.get(index as usize).map(|t| (index, t.clone()))
+    }
+
+    /// Show a chip's feed in Home ("All" is the first chip).
+    pub async fn select_home_chip(&self, index: u32) {
+        if index == self.home_chip_selected() || !self.has_account() {
+            return;
+        }
+        match self.home_chip(index) {
+            Some((index, Some(token))) => {
+                self.set_home_chip_selected(index);
+                self.load_home(Some((index, token))).await;
+            }
+            // "All" has no token: load the plain home page again.
+            Some((_, None)) => {
+                self.set_home_chip_selected(0);
+                self.home_store().clear();
+                self.load_home(None).await;
+            }
+            None => {}
+        }
+    }
+
+    /// Load the first page of Home: the plain home page, or a chip's feed.
+    /// A load started while another is running replaces it.
+    async fn load_home(&self, chip: Option<(u32, String)>) {
+        let imp = self.imp();
+        let generation = imp.home_gen.get().wrapping_add(1);
+        imp.home_gen.set(generation);
+        imp.home_loading_more.set(false);
         self.set_home_loading(true);
         self.set_home_error(String::new());
+        if chip.is_some() {
+            // Show the spinner instead of the previous chip's videos.
+            self.home_store().clear();
+        }
         let started = std::time::Instant::now();
 
         let command = self.account_cookies_command();
+        let token = chip.as_ref().map(|(_, token)| token.clone());
         let result = tspawn!(async move {
             let cookies = super::account::cookies_file(&command).await?.ok_or(
                 "No YouTube account is set up. Set the account cookies command in the preferences.",
             )?;
-            super::account::home_feed(&cookies).await
+            if let Some(token) = token {
+                return super::account::home_continuation(&cookies, &token).await;
+            }
+            match super::account::home_page(&cookies).await {
+                Ok(page) if !page.videos.is_empty() => Ok(page),
+                // The direct request failed or came back empty: ask yt-dlp (slower).
+                direct => {
+                    match direct {
+                        Ok(_) => log::warn!("Home: YouTube sent no videos, trying yt-dlp"),
+                        Err(e) => log::warn!("Home: direct request failed, trying yt-dlp: {e}"),
+                    }
+                    super::account::home_feed(&cookies).await.map(|videos| {
+                        super::account::HomePage {
+                            videos,
+                            ..Default::default()
+                        }
+                    })
+                }
+            }
         })
         .await
         .expect("Failed to spawn tokio");
 
-        let videos: Vec<Video> = match result {
-            Ok(videos) => videos
-                .into_iter()
-                .map(|v| self.construct_video(v))
-                .collect(),
+        // Superseded by another load (or the account changed) meanwhile.
+        if imp.home_gen.get() != generation {
+            return;
+        }
+        let page = match result {
+            Ok(page) => page,
             Err(e) => {
                 log::error!("Failed to load the home feed: {e}");
                 self.set_home_error(e.to_string());
@@ -699,25 +786,91 @@ impl Client {
             }
         };
 
+        let videos: Vec<Video> = page
+            .videos
+            .into_iter()
+            .map(|v| self.construct_video(v))
+            .collect();
         let store = self.home_store();
         store.clear();
         for video in &videos {
             store.add(video.clone());
         }
+        match &chip {
+            Some((index, _)) => self.set_home_chip_selected(*index),
+            None => self.set_home_chips_list(&page.chips),
+        }
+        *imp.home_next.borrow_mut() = page.next;
         log::info!(
             "Home: {} videos in {:.1} s",
             videos.len(),
             started.elapsed().as_secs_f64()
         );
         if videos.is_empty() {
-            self.set_home_error(
+            self.set_home_error(if chip.is_some() {
+                "YouTube has no videos for this filter.".to_owned()
+            } else {
                 "YouTube returned no recommendations. Watch a few videos on the account first."
-                    .to_owned(),
-            );
+                    .to_owned()
+            });
         }
         self.set_home_loading(false);
 
-        // The listing has no upload dates or view counts.
+        // The listing has no upload dates.
+        self.fill_in_details_later(videos);
+    }
+
+    /// Append the next page of Home (when its end is reached).
+    pub async fn load_more_home(&self) {
+        let imp = self.imp();
+        if self.home_loading() || imp.home_loading_more.get() {
+            return;
+        }
+        let Some(token) = imp.home_next.borrow().clone() else {
+            return;
+        };
+        imp.home_loading_more.set(true);
+        let generation = imp.home_gen.get();
+        let started = std::time::Instant::now();
+
+        let command = self.account_cookies_command();
+        let result = tspawn!(async move {
+            let cookies = super::account::cookies_file(&command)
+                .await?
+                .ok_or("No YouTube account is set up.")?;
+            super::account::home_continuation(&cookies, &token).await
+        })
+        .await
+        .expect("Failed to spawn tokio");
+
+        if imp.home_gen.get() != generation {
+            return;
+        }
+        imp.home_loading_more.set(false);
+        let page = match result {
+            Ok(page) => page,
+            Err(e) => {
+                log::warn!("Failed to load more of the home feed: {e}");
+                return;
+            }
+        };
+
+        let store = self.home_store();
+        let before = store.n_items();
+        let videos: Vec<Video> = page
+            .videos
+            .into_iter()
+            .map(|v| self.construct_video(v))
+            .collect();
+        for video in &videos {
+            store.add(video.clone());
+        }
+        *imp.home_next.borrow_mut() = page.next;
+        log::info!(
+            "Home: {} more videos in {:.1} s",
+            store.n_items() - before,
+            started.elapsed().as_secs_f64()
+        );
         self.fill_in_details_later(videos);
     }
 
@@ -1093,6 +1246,19 @@ mod imp {
         pub(super) has_account: Cell<bool>,
         #[property(get, set)]
         pub(super) account_label: RefCell<String>,
+        /// The Home filter chips' titles (`StringObject`s); empty without chips.
+        #[property(get)]
+        pub(super) home_chips: RefCell<gdk::gio::ListStore>,
+        /// Index of the chip whose feed Home shows.
+        #[property(get, set)]
+        pub(super) home_chip_selected: Cell<u32>,
+        /// Continuation tokens of the chips, in the same order (`None` for "All").
+        pub(super) home_chip_tokens: RefCell<Vec<Option<String>>>,
+        /// Continuation that loads the next page of Home.
+        pub(super) home_next: RefCell<Option<String>>,
+        /// Counts Home loads, so a superseded one can be ignored.
+        pub(super) home_gen: Cell<u32>,
+        pub(super) home_loading_more: Cell<bool>,
 
         pub(super) setup_finished_watch_channel: tokio::sync::watch::Sender<bool>,
 
@@ -1120,6 +1286,12 @@ mod imp {
                 home_error: Default::default(),
                 has_account: Default::default(),
                 account_label: Default::default(),
+                home_chips: RefCell::new(gdk::gio::ListStore::new::<gtk::StringObject>()),
+                home_chip_selected: Default::default(),
+                home_chip_tokens: Default::default(),
+                home_next: Default::default(),
+                home_gen: Default::default(),
+                home_loading_more: Default::default(),
                 watched_store: RefCell::new(FiniteVideoStore::with_sort(
                     crate::backend::finite_video_store::VideoSort::WatchedDescending,
                 )),

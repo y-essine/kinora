@@ -23,7 +23,7 @@ tokio = { version = "1.48.0", features = ["full"] }
 futures = "0.3.31"
 chrono = { version = "0.4.42" }
 csv = "1.4.0"
-reqwest = "0.12.26"
+reqwest = { version = "0.12.26", features = ["gzip"] } # Kinora: gzip for the 1 MB Home response
 regex = "1.12.2"
 
 log = "0.4.29"
@@ -51,6 +51,8 @@ ppeertube = { package = "pipeline-provider-peertube", git = "https://gitlab.com/
 
 # Kinora: signed-in Up next recommendations.
 rustypipe = { git = "https://gitlab.com/schmiddi-on-mobile/rustypipe.git", rev = "a5c9ca89f26651419a53ca73e81ffdd572c80011" }
+# Kinora: the SAPISIDHASH header of the direct Home feed request.
+sha1 = "0.10"
 
 clapper = { package = "clapper-player", version = "0.10", features = ["v0_10"] }
 clapper-gtk = { package = "clapper-player-gtk", version = "0.10", features = ["v0_10"]  }

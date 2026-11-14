@@ -288,6 +288,12 @@ pub mod imp {
         #[template_child]
         progress_feed: TemplateChild<ProgressBar>,
 
+        // Kinora: the Home filter chips.
+        #[template_child]
+        home_chips_scroll: TemplateChild<gtk::ScrolledWindow>,
+        #[template_child]
+        home_chips_box: TemplateChild<gtk::Box>,
+
         pub(super) errors: RefCell<Vec<(String, Box<dyn std::error::Error>)>>,
 
         #[property(get)]
@@ -334,6 +340,8 @@ pub mod imp {
                 bottom_bar: Default::default(),
                 menubar: Default::default(),
                 progress_feed: Default::default(),
+                home_chips_scroll: Default::default(),
+                home_chips_box: Default::default(),
 
                 errors: Default::default(),
 
@@ -461,6 +469,86 @@ pub mod imp {
                 .and_dynamic_cast_ref::<VideoPage>()
             {
                 page.play_pause();
+            }
+        }
+
+        /// Kinora: the end of Home was reached; load its next page.
+        #[template_callback]
+        fn home_load_more(&self) {
+            let client = self.obj().client();
+            gspawn!(async move { client.load_more_home().await });
+        }
+
+        /// Kinora: show the Home filter chips as a row of pill toggle buttons.
+        fn setup_home_chips(&self) {
+            let obj = self.obj();
+            let client = obj.client();
+            let model = client.home_chips();
+            model.connect_items_changed(clone!(
+                #[weak(rename_to = s)]
+                self,
+                move |_, _, _, _| s.rebuild_home_chips()
+            ));
+            client.connect_home_chip_selected_notify(clone!(
+                #[weak(rename_to = s)]
+                self,
+                move |_| s.sync_home_chip_selection()
+            ));
+        }
+
+        fn rebuild_home_chips(&self) {
+            let client = self.obj().client();
+            let model = client.home_chips();
+            while let Some(child) = self.home_chips_box.first_child() {
+                self.home_chips_box.remove(&child);
+            }
+
+            let selected = client.home_chip_selected();
+            let mut group: Option<gtk::ToggleButton> = None;
+            for index in 0..model.n_items() {
+                let Some(title) = model
+                    .item(index)
+                    .and_downcast::<gtk::StringObject>()
+                    .map(|t| t.string())
+                else {
+                    continue;
+                };
+                let button = gtk::ToggleButton::builder()
+                    .label(title)
+                    .css_classes(["home-chip"])
+                    .active(index == selected)
+                    .build();
+                match &group {
+                    Some(group) => button.set_group(Some(group)),
+                    None => group = Some(button.clone()),
+                }
+                button.connect_toggled(clone!(
+                    #[weak]
+                    client,
+                    move |button| {
+                        if button.is_active() {
+                            gspawn!(async move { client.select_home_chip(index).await });
+                        }
+                    }
+                ));
+                self.home_chips_box.append(&button);
+            }
+            self.home_chips_scroll.set_visible(model.n_items() > 0);
+        }
+
+        /// Make the active chip follow the client (e.g. a reload goes back to "All").
+        fn sync_home_chip_selection(&self) {
+            let selected = self.obj().client().home_chip_selected();
+            let mut index = 0;
+            let mut child = self.home_chips_box.first_child();
+            while let Some(button) = child {
+                if let Some(button) = button.downcast_ref::<gtk::ToggleButton>() {
+                    if index == selected && !button.is_active() {
+                        button.set_active(true);
+                    }
+                }
+                index += 1;
+                child = button.next_sibling();
             }
         }
 
@@ -1552,6 +1640,8 @@ pub mod imp {
                 log::error!("Error setting up the client: {e}");
                 obj.display_error(gettextrs::gettext("Failed to set up application"), e);
             }
+
+            self.setup_home_chips();
 
             gspawn!(clone!(
                 #[weak(rename_to = s)]
