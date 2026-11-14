@@ -30,7 +30,7 @@ pub struct MenuItem {
 pub enum MenuTarget {
     None,
     /// The video of a [`MenuLocation::Video`] menu.
-    Video(Video),
+    Video(Box<Video>),
 }
 
 /// What the frontend should do after an action.
@@ -43,5 +43,5 @@ pub enum ActionOutcome {
     /// Subscribe to these channels (the frontend owns the subscriptions).
     Subscribe(Vec<Channel>),
     /// Play this video.
-    Play(Video),
+    Play(Box<Video>),
 }
