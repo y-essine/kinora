@@ -21,7 +21,7 @@ use rustypipe::model::{AudioCodec, AudioStream, VideoCodec, VideoPlayer, VideoSt
 use std::collections::HashSet;
 use std::sync::Mutex;
 
-use crate::account::{self, Error};
+use crate::{Error, youtube};
 
 /// Prepared playback URIs, reused until shortly before YouTube's links expire.
 static PREPARED: Mutex<Option<HashMap<String, (String, Instant)>>> = Mutex::new(None);
@@ -42,7 +42,7 @@ pub async fn playback_uri(
     if let Some(uri) = prepared(&video_id) {
         return Ok(uri);
     }
-    let rp = account::rusty_pipe(storage_dir).await?;
+    let rp = youtube::rusty_pipe(storage_dir).await?;
     // Anonymous on purpose: YouTube refuses signed-in stream requests that lack
     // an extra anti-bot token.
     let player = rp.query().unauthenticated().player(&video_id).await?;
