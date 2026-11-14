@@ -195,6 +195,29 @@ pub async fn up_next(
         .collect())
 }
 
+/// Every channel the account is subscribed to on YouTube, in YouTube's order.
+pub async fn subscriptions(storage_dir: PathBuf, cookies: PathBuf) -> Result<Vec<Channel>, Error> {
+    let rp = rusty_pipe(storage_dir).await?;
+    sign_in(&rp, &cookies)
+        .await
+        .map_err(|e| format!("Signing in to YouTube failed: {e}"))?;
+
+    let query = rp.query().authenticated();
+    let mut channels = query.subscriptions().await?;
+    channels.extend_all(&query).await?;
+
+    Ok(channels
+        .items
+        .iter()
+        .map(|c| {
+            let mut channel = channel(&c.id, &c.name);
+            channel.avatar = c.avatar.iter().rev().find_map(|t| Url::parse(&t.url).ok());
+            channel.subscribers = c.subscriber_count;
+            channel
+        })
+        .collect())
+}
+
 /// Mark a video as watched on the account, so its recommendations learn from it.
 pub async fn mark_watched(cookies: &Path, video_id: &str) -> Result<(), Error> {
     let out = Command::new("yt-dlp")

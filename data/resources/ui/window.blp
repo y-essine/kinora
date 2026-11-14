@@ -340,14 +340,34 @@ Adw.ViewStack main_stack {
           description: _("Subscribe to channels or import your subscriptions");
           icon-name: "library-artists-symbolic";
 
-          child: Button {
-            styles [
-              "pill",
-            ]
-
+          child: Box {
+            orientation: vertical;
+            spacing: 12;
             halign: center;
-            label: _("Import Subscriptions");
-            action-name: "win.import";
+
+            // Kinora: one-click import from the connected YouTube account.
+            Button {
+              styles [
+                "pill",
+                "suggested-action",
+              ]
+
+              visible: bind template.client as <$TFClient>.has-account;
+              sensitive: bind $not(template.client as <$TFClient>.importing-subscriptions) as <bool>;
+              halign: center;
+              label: _("Import from YouTube Account");
+              action-name: "win.import-account";
+            }
+
+            Button {
+              styles [
+                "pill",
+              ]
+
+              halign: center;
+              label: _("Import Subscriptions");
+              action-name: "win.import";
+            }
           };
         }
 
@@ -562,14 +582,34 @@ Adw.ViewStack main_stack {
         description: _("Subscribe to channels or import your subscriptions");
         icon-name: "library-artists-symbolic";
 
-        child: Button {
-          styles [
-            "pill",
-          ]
-
+        child: Box {
+          orientation: vertical;
+          spacing: 12;
           halign: center;
-          label: _("Import Subscriptions");
-          action-name: "win.import";
+
+          // Kinora: one-click import from the connected YouTube account.
+          Button {
+            styles [
+              "pill",
+              "suggested-action",
+            ]
+
+            visible: bind template.client as <$TFClient>.has-account;
+            sensitive: bind $not(template.client as <$TFClient>.importing-subscriptions) as <bool>;
+            halign: center;
+            label: _("Import from YouTube Account");
+            action-name: "win.import-account";
+          }
+
+          Button {
+            styles [
+              "pill",
+            ]
+
+            halign: center;
+            label: _("Import Subscriptions");
+            action-name: "win.import";
+          }
         };
       }
 

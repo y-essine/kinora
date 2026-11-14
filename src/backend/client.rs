@@ -746,6 +746,53 @@ impl Client {
         ));
     }
 
+    /// Subscribe to every channel the connected YouTube account is subscribed
+    /// to. Channels already subscribed to are kept, and nothing is unsubscribed.
+    /// Returns how many channels were added and how many the account has.
+    pub async fn import_account_subscriptions(&self) -> Result<(usize, usize), String> {
+        if !self.has_account() {
+            return Err("No YouTube account is connected.".to_owned());
+        }
+        if self.importing_subscriptions() {
+            return Err("Subscriptions are already being imported.".to_owned());
+        }
+        self.set_importing_subscriptions(true);
+
+        let command = self.account_cookies_command();
+        let mut storage_dir = glib::user_cache_dir();
+        storage_dir.push(crate::migrate::DIR);
+        storage_dir.push("account");
+        let result = tspawn!(async move {
+            let cookies = super::account::cookies_file(&command).await?.ok_or(
+                "No YouTube account is set up. Set the account cookies command in the preferences.",
+            )?;
+            super::account::subscriptions(storage_dir, cookies).await
+        })
+        .await
+        .expect("Failed to spawn tokio");
+        self.set_importing_subscriptions(false);
+
+        let channels = result.map_err(|e| {
+            log::error!("Failed to load the account's subscriptions: {e}");
+            e.to_string()
+        })?;
+        let total = channels.len();
+        let known: std::collections::HashSet<pcore::ChannelId> = self
+            .subscriptions()
+            .iter()
+            .map(|c| c.channel().id)
+            .collect();
+        let mut seen = std::collections::HashSet::new();
+        let new: Vec<pcore::Channel> = channels
+            .into_iter()
+            .filter(|c| !c.id.id.is_empty() && !known.contains(&c.id) && seen.insert(c.id.clone()))
+            .collect();
+        let added = new.len();
+        self.import_channels(new);
+        log::info!("Imported {added} of {total} subscriptions from the YouTube account");
+        Ok((added, total))
+    }
+
     /// YouTube's "Up next" for a video, personalised when an account is set up.
     pub async fn up_next(&self, video: &Video) -> Vec<Video> {
         if video.platform() != "youtube" {
@@ -1093,6 +1140,8 @@ mod imp {
         pub(super) has_account: Cell<bool>,
         #[property(get, set)]
         pub(super) account_label: RefCell<String>,
+        #[property(get, set)]
+        pub(super) importing_subscriptions: Cell<bool>,
 
         pub(super) setup_finished_watch_channel: tokio::sync::watch::Sender<bool>,
 
@@ -1120,6 +1169,7 @@ mod imp {
                 home_error: Default::default(),
                 has_account: Default::default(),
                 account_label: Default::default(),
+                importing_subscriptions: Default::default(),
                 watched_store: RefCell::new(FiniteVideoStore::with_sort(
                     crate::backend::finite_video_store::VideoSort::WatchedDescending,
                 )),
