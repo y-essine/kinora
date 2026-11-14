@@ -39,6 +39,7 @@ impl PreferencesDialog {
         let s: Self = Object::builder().property("client", client).build();
         // Requires client to be set up, therefore cannot be done in construction.
         s.imp().init_watch_button_and_switch();
+        s.imp().init_extensions();
         s
     }
 
@@ -124,6 +125,8 @@ pub mod imp {
         #[template_child]
         button_account_disconnect: TemplateChild<gtk::Button>,
 
+        #[template_child]
+        page_extensions: TemplateChild<adw::PreferencesPage>,
         #[template_child]
         group_external: TemplateChild<PreferencesGroup>,
 
@@ -763,6 +766,15 @@ pub mod imp {
             }
         }
 
+        /// Kinora: the Extensions page (needs the client, like the above).
+        pub(super) fn init_extensions(&self) {
+            crate::gui::extension_settings::populate(
+                &self.page_extensions,
+                &self.client.borrow(),
+                &self.settings,
+            );
+        }
+
         pub(super) fn init_watch_button_and_switch(&self) {
             let client = self.client.borrow();
             let obj = self.obj();
@@ -876,6 +888,7 @@ pub mod imp {
                 row_account: Default::default(),
                 button_account_connect: Default::default(),
                 button_account_disconnect: Default::default(),
+                page_extensions: Default::default(),
                 group_external: Default::default(),
                 switch_external_default: Default::default(),
                 switch_show_splash: Default::default(),

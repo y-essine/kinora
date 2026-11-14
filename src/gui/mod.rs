@@ -4,6 +4,7 @@ mod channel_item;
 mod channel_page;
 mod error_dialog;
 mod export_dialog;
+mod extension_settings;
 mod featured_banner;
 mod filter_dialog;
 mod filter_similar_dialog;

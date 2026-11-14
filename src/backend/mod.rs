@@ -1,6 +1,7 @@
 pub use kinora_core::account;
 mod channel;
 mod client;
+pub mod extension_values;
 mod filter;
 mod filter_store;
 mod finite_video_store;
