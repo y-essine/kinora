@@ -10,8 +10,11 @@ this in the background for the video you're most likely to watch next (the
 first "Up next"); playing the prepared file then skips the several seconds of
 extraction. The stream links in it stay valid for hours.
 """
+import copy
 import os
 import sys
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 ENHANCER = "/usr/lib/clapper-0.0/enhancers/yt-dlp"
 sys.path.insert(0, ENHANCER)
@@ -25,6 +28,34 @@ from yt_dlp.extractor import gen_extractor_classes  # noqa: E402
 
 # Clapper's default "codecs-order" setting.
 CODECS_ORDER = "avc1,av01,hev1,vp09"
+
+# YouTube sometimes serves HLS playlists that answer 404 for a whole codec
+# family (seen: every H.264 rendition of a video with dubbed audio, while VP9
+# worked). Such a manifest plays nothing, so check its playlists and pick again
+# without the dead ones.
+MAX_ROUNDS = 4
+
+
+def alive(url):
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            r.read(16)
+            return True
+    except Exception:
+        return False
+
+
+def checked_uris(manifest):
+    """Playlists the player will load: every variant and the default audio."""
+    lines = manifest.splitlines()
+    uris = []
+    for i, line in enumerate(lines):
+        if line.startswith("#EXT-X-STREAM-INF") and i + 1 < len(lines):
+            uris.append(lines[i + 1].strip())
+        elif line.startswith("#EXT-X-MEDIA") and "DEFAULT=YES" in line and 'URI="' in line:
+            uris.append(line.split('URI="', 1)[1].split('"', 1)[0])
+    return [u for u in uris if u.startswith("http")]
 
 
 def main():
@@ -42,14 +73,39 @@ def main():
     for ie in gen_extractor_classes():
         if ie._ENABLED and ie.ie_key() not in BLACKLIST:
             ytdl.add_info_extractor(ie)
-    info = ytdl.extract_info(url, download=False)
+    raw = ytdl.extract_info(url, download=False, process=False)
 
-    if manifest := hls.generate_manifest(info):
-        path = out + ".m3u8"
-    elif manifest := dash.generate_manifest(info):
-        path = out + ".mpd"
+    for _ in range(MAX_ROUNDS):
+        info = ytdl.process_ie_result(copy.deepcopy(raw), download=False)
+        if manifest := hls.generate_manifest(info):
+            path = out + ".m3u8"
+        elif manifest := dash.generate_manifest(info):
+            path = out + ".mpd"
+            break  # DASH links are media files, not playlists: not checked
+        else:
+            sys.exit("kinora-prepare: no playable manifest")
+        uris = checked_uris(manifest)
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            dead = {u for u, ok in zip(uris, pool.map(alive, uris)) if not ok}
+        if not dead:
+            break
+        print(f"kinora-prepare: {len(dead)} of {len(uris)} playlists dead, picking again",
+              file=sys.stderr)
+        before = len(raw.get("formats") or [])
+        formats = raw.get("formats") or []
+        # A dead video rendition takes its codec family with it (they fail
+        # together, and the generator would otherwise fall to tiny ones).
+        families = {(f.get("vcodec") or "")[:4] for f in formats
+                    if f.get("url") in dead and (f.get("vcodec") or "none") != "none"}
+        raw["formats"] = [
+            f for f in formats
+            if f.get("url") not in dead
+            and not (f.get("protocol") == "m3u8_native"
+                     and (f.get("vcodec") or "none")[:4] in families)]
+        if len(raw["formats"]) == before:
+            sys.exit("kinora-prepare: dead playlists, no formats left to drop")
     else:
-        sys.exit("kinora-prepare: no playable manifest")
+        sys.exit("kinora-prepare: no working playlists")
 
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     tmp = path + ".part"
