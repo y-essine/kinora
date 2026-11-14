@@ -81,6 +81,10 @@ pub mod imp {
         #[property(get, set = Self::set_feed_model, nullable)]
         feed_model: RefCell<Option<gio::ListModel>>,
 
+        /// The DJ can be started (its extension is on): show its strip.
+        #[property(get, set)]
+        dj_available: Cell<bool>,
+
         built: Cell<bool>,
         row_subscriptions: RefCell<Option<VideoRow>>,
         topics: RefCell<Vec<TopicRow>>,

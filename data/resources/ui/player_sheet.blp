@@ -65,14 +65,29 @@ template $TFPlayerSheet: Gtk.Widget {
             label: bind template.video-page as <$TFVideoPage>.video as <$TFVideo>.title;
           }
 
-          Label {
-            styles [
-              "k-mini-channel",
-            ]
+          Box {
+            spacing: 6;
 
-            xalign: 0;
-            ellipsize: end;
-            label: bind template.video-page as <$TFVideoPage>.video as <$TFVideo>.uploader as <$TFChannel>.name;
+            // The DJ is on (see gui/dj.rs): it stays visible down here.
+            Label {
+              styles [
+                "k-dj-tag",
+              ]
+
+              label: _("DJ");
+              valign: center;
+              visible: bind template.video-page as <$TFVideoPage>.dj;
+            }
+
+            Label {
+              styles [
+                "k-mini-channel",
+              ]
+
+              xalign: 0;
+              ellipsize: end;
+              label: bind template.video-page as <$TFVideoPage>.video as <$TFVideo>.uploader as <$TFChannel>.name;
+            }
           }
         }
 

@@ -1,6 +1,7 @@
 mod account_dialog;
 mod channel_item;
 mod channel_page;
+mod dj;
 mod error_dialog;
 mod export_dialog;
 mod extension_settings;

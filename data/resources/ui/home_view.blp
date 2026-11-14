@@ -22,6 +22,65 @@ template $TFHomeView: Adw.Bin {
         play-video => $forward_play() swapped;
       }
 
+      // The DJ: endless music from the account's mix (see gui/dj.rs).
+      Box {
+        styles [
+          "k-dj-strip",
+        ]
+
+        spacing: 16;
+        visible: bind template.dj-available;
+
+        Image {
+          styles [
+            "k-dj-strip-icon",
+          ]
+
+          icon-name: "audio-headphones-symbolic";
+          pixel-size: 20;
+          valign: center;
+          accessible-role: presentation;
+        }
+
+        Box {
+          orientation: vertical;
+          valign: center;
+          hexpand: true;
+          spacing: 2;
+
+          Label {
+            styles [
+              "k-card-title",
+            ]
+
+            label: _("Your mix, endlessly");
+            xalign: 0;
+            ellipsize: end;
+          }
+
+          Label {
+            styles [
+              "k-card-meta",
+            ]
+
+            label: _("The DJ plays music picked for you, one track fading into the next");
+            xalign: 0;
+            ellipsize: end;
+          }
+        }
+
+        Button {
+          styles [
+            "pill",
+            "suggested-action",
+          ]
+
+          label: _("Start DJ");
+          valign: center;
+          action-name: "win.dj-start-mix";
+        }
+      }
+
       // The built-in rows ("For you", "Watch again", ...).
       Box rows {
         styles [

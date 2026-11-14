@@ -441,6 +441,30 @@ template $TFVideoPage: Adw.Bin {
                 halign: end;
                 spacing: 6;
 
+                // Kinora: endless music from this video (see gui/dj.rs).
+                Gtk.Button {
+                  styles [
+                    "pill",
+                    "k-dj-start",
+                  ]
+
+                  action-name: "win.dj-start";
+                  tooltip-text: _("Play music like this, endlessly");
+                  visible: bind $dj_offered(template.dj-available, template.dj, template.video as <$TFVideo>.platform) as <bool>;
+
+                  Gtk.Box {
+                    spacing: 6;
+
+                    Gtk.Image {
+                      icon-name: "audio-headphones-symbolic";
+                    }
+
+                    Gtk.Label {
+                      label: _("Start DJ");
+                    }
+                  }
+                }
+
                 Gtk.Button {
                   styles [
                     "pill",
@@ -641,53 +665,64 @@ template $TFVideoPage: Adw.Bin {
               tightening-threshold: 10000;
               valign: start;
 
-              Gtk.Box up_next_box {
-                styles [
-                  "k-upnext",
-                ]
-
+              Gtk.Box {
                 orientation: vertical;
-                spacing: 6;
-                visible: false;
                 valign: start;
 
-                Gtk.Box {
-                  spacing: 8;
-
-                  Label {
-                    label: _("Up next");
-                    accessible-role: heading;
-                    halign: start;
-                    hexpand: true;
-
-                    styles [
-                      "k-row-title",
-                    ]
-                  }
-
-                  Label {
-                    label: _("Autoplay");
-
-                    styles [
-                      "dim-label",
-                    ]
-                  }
-
-                  Switch autoplay_switch {
-                    valign: center;
-                    tooltip-text: _("Play the first Up next video when this one ends");
-                  }
+                // The DJ's queue takes the place of Up next (see gui/dj.rs).
+                Gtk.Box dj_slot {
+                  orientation: vertical;
+                  visible: false;
                 }
 
-                // A plain list, laid out in full inside the page's scrolling.
-                Gtk.ListBox up_next_list {
-                  selection-mode: none;
-                  activate-on-single-click: true;
-                  row-activated => $up_next_row_activated() swapped;
-
+                Gtk.Box up_next_box {
                   styles [
-                    "k-upnext-list",
+                    "k-upnext",
                   ]
+
+                  orientation: vertical;
+                  spacing: 6;
+                  visible: false;
+                  valign: start;
+
+                  Gtk.Box {
+                    spacing: 8;
+
+                    Label {
+                      label: _("Up next");
+                      accessible-role: heading;
+                      halign: start;
+                      hexpand: true;
+
+                      styles [
+                        "k-row-title",
+                      ]
+                    }
+
+                    Label {
+                      label: _("Autoplay");
+
+                      styles [
+                        "dim-label",
+                      ]
+                    }
+
+                    Switch autoplay_switch {
+                      valign: center;
+                      tooltip-text: _("Play the first Up next video when this one ends");
+                    }
+                  }
+
+                  // A plain list, laid out in full inside the page's scrolling.
+                  Gtk.ListBox up_next_list {
+                    selection-mode: none;
+                    activate-on-single-click: true;
+                    row-activated => $up_next_row_activated() swapped;
+
+                    styles [
+                      "k-upnext-list",
+                    ]
+                  }
                 }
               }
             }

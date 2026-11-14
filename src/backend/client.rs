@@ -1095,6 +1095,67 @@ impl Client {
         self.core().prepared_uri(&video.id())
     }
 
+    // ---- Kinora: the DJ (see `gui/dj.rs` and docs/architecture.md, "The DJ") ----
+
+    /// Whether the DJ extension is switched on.
+    pub fn dj_enabled(&self) -> bool {
+        self.core()
+            .extensions()
+            .is_enabled(kinora_core::extension::builtin::dj::ID)
+    }
+
+    /// Where a DJ session starts: the given video's radio, or "my mix",
+    /// following the DJ's "start from" setting.
+    pub fn dj_seed(&self, video: Option<&Video>) -> kinora_core::dj::DjSeed {
+        let id = video.map(|v| v.id());
+        self.core().dj_seed(&self.account_config(), id.as_ref())
+    }
+
+    /// Start a DJ session (one request to YouTube Music).
+    pub async fn dj_start(
+        &self,
+        seed: kinora_core::dj::DjSeed,
+    ) -> Result<kinora_core::dj::DjSession, String> {
+        let (core, account) = (self.core(), self.account_config());
+        tspawn!(async move {
+            core.dj_start(&account, seed)
+                .await
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .expect("Failed to spawn tokio")
+    }
+
+    /// Fetch more tracks for a session: the answer to its `refill_request()`.
+    pub async fn dj_more(
+        &self,
+        request: kinora_core::dj::RadioRequest,
+    ) -> Result<kinora_core::dj::RadioPage, String> {
+        let (core, account) = (self.core(), self.account_config());
+        tspawn!(async move {
+            core.dj_more(&account, &request)
+                .await
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .expect("Failed to spawn tokio")
+    }
+
+    /// How the track that plays (its real length and position) gives way to `next`.
+    pub fn dj_transition(
+        &self,
+        duration: Option<std::time::Duration>,
+        position: std::time::Duration,
+        next: &kinora_core::dj::Track,
+    ) -> kinora_core::dj::TransitionPlan {
+        self.core().dj_transition(duration, position, next)
+    }
+
+    /// The video model of a DJ track (shared with the rest of the app).
+    pub fn dj_video(&self, track: &kinora_core::dj::Track) -> Video {
+        self.construct_video(track.to_video())
+    }
+
     /// The video has really been watched: tell the extensions (in the
     /// background). The account extension marks it watched on YouTube.
     pub fn mark_watched_on_account(&self, video: &Video) {

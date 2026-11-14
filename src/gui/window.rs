@@ -320,6 +320,15 @@ pub mod imp {
         #[property(get, set)]
         watch_history_enabled: Cell<bool>,
 
+        // Kinora: the DJ (see `gui/dj.rs`).
+        dj: std::cell::OnceCell<crate::gui::dj::Dj>,
+        /// A DJ session is running.
+        #[property(get, set)]
+        dj_on: Cell<bool>,
+        /// The DJ extension is switched on.
+        #[property(get, set)]
+        dj_available: Cell<bool>,
+
         pub settings: gtk::gio::Settings,
     }
 
@@ -359,6 +368,9 @@ pub mod imp {
                 sidebar_pinned: Default::default(),
                 main_show_sidebar_visible: Default::default(),
                 watch_history_enabled: Default::default(),
+                dj: Default::default(),
+                dj_on: Default::default(),
+                dj_available: Default::default(),
 
                 client: Default::default(),
             }
@@ -413,6 +425,7 @@ pub mod imp {
                 self.obj().client().watched(video, Utc::now());
             }
             self.player_history.borrow_mut().clear();
+            self.dj().leave();
         }
 
         /// Kinora: the next video (the first of "Up next") or the one before.
@@ -421,6 +434,13 @@ pub mod imp {
             let Some(page) = self.player_sheet.video_page() else {
                 return;
             };
+            // With the DJ on, "next" skips the track; there is no way back.
+            if self.dj().is_on() {
+                if forward {
+                    self.dj().skip();
+                }
+                return;
+            }
             if forward {
                 if let Some(next) = page.next_video() {
                     self.open_video(next, PlayType::Default, true, true);
@@ -477,70 +497,18 @@ pub mod imp {
             found
         }
 
-        #[template_callback]
-        fn play_video(&self, video: Video, play_type: PlayType) {
-            self.open_video(video, play_type, false, true);
-        }
-
-        /// Kinora: play a video in the player sheet (see docs/design.md, "Player").
-        /// There is one player: a new video takes the place of the current one.
-        ///
-        /// `from_player`: asked for by the player itself (Up next, autoplay,
-        /// next or previous), so a minimized player stays minimized.
-        /// `remember`: the current video becomes the "previous" one.
-        fn open_video(&self, video: Video, play_type: PlayType, from_player: bool, remember: bool) {
+        /// Kinora: a page for `video`, wired to the window. `dj`: a DJ track's
+        /// page (see `gui/dj.rs`).
+        fn new_video_page(&self, video: &Video, dj: bool) -> VideoPage {
             let obj = self.obj();
-            let sheet = self.player_sheet.get();
-
-            let play_is_default = play_type == PlayType::Default;
-            let play_external_default = self.settings.boolean("play-external-default");
-            let play_internal = play_is_default ^ play_external_default;
-
-            let current = sheet.video_page();
-
-            // If the same video is already playing, bring it back instead of starting it again.
-            if let Some(page) = &current
-                && page.video().as_ref() == Some(&video)
-                && play_internal
-                && !page.external()
-                && !page.finished()
-            {
-                sheet.expand();
-                return;
-            }
-
-            // The old one counts as watched.
-            let mut carry_fullscreen = None;
-            if let Some(old) = &current {
-                if let Some(old_video) = old.video() {
-                    obj.client().watched(old_video.clone(), Utc::now());
-                    if from_player && remember {
-                        self.player_history.borrow_mut().push(old_video);
-                    }
-                }
-                if old.fullscreened() {
-                    carry_fullscreen = Some(old.window_mode());
-                }
-            }
-            if !from_player {
-                self.player_history.borrow_mut().clear();
-            }
-
-            let was_minimized = current.is_some() && !sheet.expanded();
-            let expand = !(from_player && was_minimized);
-            let origin = if expand && !from_player {
-                self.card_rect(&video)
+            let video_page = if dj {
+                VideoPage::new_dj(video, &obj.client())
             } else {
-                None
+                VideoPage::new(video, &obj.client())
             };
-
-            log::debug!(
-                "Player: opening {} (expand: {expand}, out of a card: {})",
-                video.id().id,
-                origin.is_some()
-            );
-
-            let video_page = VideoPage::new(&video, &obj.client());
+            obj.bind_property("dj-available", &video_page, "dj-available")
+                .sync_create()
+                .build();
 
             obj.announce(
                 &gettextrs::gettext("Switched to video page {}").replace("{}", &video.title()),
@@ -675,6 +643,129 @@ pub mod imp {
                     }
                 }
             ));
+
+            video_page
+        }
+
+        /// Kinora: the DJ's next track takes the player (see `gui/dj.rs`). The
+        /// sheet stays as it is, expanded or minimized. With `over`, the page
+        /// it replaces keeps playing and is returned, for the DJ to fade out.
+        pub(crate) fn open_dj_track(
+            &self,
+            video: &Video,
+            over: bool,
+        ) -> (VideoPage, Option<VideoPage>) {
+            let obj = self.obj();
+            let sheet = self.player_sheet.get();
+            let current = sheet.video_page();
+            let mut carry_fullscreen = None;
+            if let Some(old) = &current {
+                if let Some(old_video) = old.video() {
+                    obj.client().watched(old_video, Utc::now());
+                }
+                if old.fullscreened() {
+                    carry_fullscreen = Some(old.window_mode());
+                }
+            }
+            let expand = current.is_none() || sheet.expanded();
+            let page = self.new_video_page(video, true);
+            let outgoing = if over {
+                sheet.open_over(&page, expand)
+            } else {
+                sheet.open(&page, None, expand);
+                None
+            };
+            drop(current);
+            if let Some(window_mode) = carry_fullscreen {
+                page.set_window_mode(window_mode);
+                page.set_fullscreened(true);
+            }
+            if expand {
+                page.grab_focus();
+            }
+            page.play();
+            (page, outgoing)
+        }
+
+        pub(crate) fn current_video_page(&self) -> Option<VideoPage> {
+            self.player_sheet.video_page()
+        }
+
+        pub(crate) fn expand_player(&self) {
+            self.player_sheet.expand();
+        }
+
+        fn dj(&self) -> &crate::gui::dj::Dj {
+            self.dj.get().expect("The DJ to be set up")
+        }
+
+        #[template_callback]
+        fn play_video(&self, video: Video, play_type: PlayType) {
+            self.open_video(video, play_type, false, true);
+        }
+
+        /// Kinora: play a video in the player sheet (see docs/design.md, "Player").
+        /// There is one player: a new video takes the place of the current one.
+        ///
+        /// `from_player`: asked for by the player itself (Up next, autoplay,
+        /// next or previous), so a minimized player stays minimized.
+        /// `remember`: the current video becomes the "previous" one.
+        fn open_video(&self, video: Video, play_type: PlayType, from_player: bool, remember: bool) {
+            let obj = self.obj();
+            let sheet = self.player_sheet.get();
+
+            let play_is_default = play_type == PlayType::Default;
+            let play_external_default = self.settings.boolean("play-external-default");
+            let play_internal = play_is_default ^ play_external_default;
+
+            let current = sheet.video_page();
+
+            // If the same video is already playing, bring it back instead of starting it again.
+            if let Some(page) = &current
+                && page.video().as_ref() == Some(&video)
+                && play_internal
+                && !page.external()
+                && !page.finished()
+            {
+                sheet.expand();
+                return;
+            }
+
+            // Anything else that is opened ends the DJ: back to ordinary playing.
+            self.dj().leave();
+
+            // The old one counts as watched.
+            let mut carry_fullscreen = None;
+            if let Some(old) = &current {
+                if let Some(old_video) = old.video() {
+                    obj.client().watched(old_video.clone(), Utc::now());
+                    if from_player && remember {
+                        self.player_history.borrow_mut().push(old_video);
+                    }
+                }
+                if old.fullscreened() {
+                    carry_fullscreen = Some(old.window_mode());
+                }
+            }
+            if !from_player {
+                self.player_history.borrow_mut().clear();
+            }
+
+            let was_minimized = current.is_some() && !sheet.expanded();
+            let expand = !(from_player && was_minimized);
+            let origin = if expand && !from_player {
+                self.card_rect(&video)
+            } else {
+                None
+            };
+
+            log::debug!(
+                "Player: opening {} (expand: {expand}, out of a card: {})",
+                video.id().id,
+                origin.is_some()
+            );
+
+            let video_page = self.new_video_page(&video, false);
 
             // The old page is paused and let go, and has to be gone before the
             // new player starts: an old player ending while a new one starts
@@ -1692,7 +1783,12 @@ pub mod imp {
             obj.insert_action_group("win", Some(&actions));
 
             // Kinora: the player sheet (see docs/design.md, "Player").
-            let player_actions: [(&str, fn(&Self)); 6] = [
+            let player_actions: [(&str, fn(&Self)); 10] = [
+                // The DJ (see `gui/dj.rs`).
+                ("dj-start", |s| s.dj().start(false)),
+                ("dj-start-mix", |s| s.dj().start(true)),
+                ("dj-skip", |s| s.dj().skip()),
+                ("dj-leave", |s| s.dj().leave()),
                 ("minimize-player", |s| s.player_sheet.minimize()),
                 ("expand-player", |s| s.player_sheet.expand()),
                 ("toggle-player", |s| s.player_sheet.toggle()),
@@ -1708,6 +1804,36 @@ pub mod imp {
                     move |_, _| activate(obj.imp())
                 ));
                 actions.add_action(&action);
+            }
+            // Test hooks for the DJ: what the session holds (to the log), and
+            // the queue's buttons applied to its third track.
+            #[cfg(feature = "dev-hooks")]
+            {
+                let dev_actions: [(&str, fn(&Self)); 6] = [
+                    ("dj-show-queue", |s| {
+                        if let Some(page) = s.current_video_page() {
+                            page.dev_scroll_to(430.0);
+                        }
+                    }),
+                    ("dj-near-end", |s| {
+                        if let Some(page) = s.current_video_page() {
+                            page.dev_seek_near_end(14.0);
+                        }
+                    }),
+                    ("dj-log", |s| s.dj().dev_log()),
+                    ("dj-queue-play-next", |s| s.dj().dev_queue("play-next")),
+                    ("dj-queue-remove", |s| s.dj().dev_queue("remove")),
+                    ("dj-queue-play-now", |s| s.dj().dev_queue("play-now")),
+                ];
+                for (name, activate) in dev_actions {
+                    let action = SimpleAction::new(name, None);
+                    action.connect_activate(clone!(
+                        #[weak]
+                        obj,
+                        move |_, _| activate(obj.imp())
+                    ));
+                    actions.add_action(&action);
+                }
             }
             actions.add_action(&action_settings);
             actions.add_action(&action_toggle_filter);
@@ -1853,6 +1979,31 @@ pub mod imp {
             });
         }
 
+        /// Kinora: the DJ, and whether it is offered (its extension is on).
+        fn setup_dj(&self) {
+            let obj = self.obj();
+            let _ = self.dj.set(crate::gui::dj::Dj::new(&obj));
+            let update = clone!(
+                #[weak]
+                obj,
+                move |settings: &gtk::gio::Settings| {
+                    let off = settings
+                        .strv("disabled-extensions")
+                        .iter()
+                        .any(|id| id.as_str() == kinora_core::extension::builtin::dj::ID);
+                    obj.set_dj_available(!off);
+                    if off {
+                        obj.imp().dj().leave();
+                    }
+                }
+            );
+            update(&self.settings);
+            self.settings
+                .connect_changed(Some("disabled-extensions"), move |settings, _| {
+                    update(settings)
+                });
+        }
+
         fn allow_all_clapper_enhancers(&self) {
             for proxy in clapper::global_enhancer_proxies()
                 .iter()
@@ -1914,6 +2065,7 @@ pub mod imp {
             self.setup_search_source();
             self.setup_fullscreen();
             self.setup_player_sheet();
+            self.setup_dj();
             self.allow_all_clapper_enhancers();
 
             self.setup_client();
