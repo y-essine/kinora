@@ -1046,6 +1046,17 @@ pub mod imp {
             if let Ok(side) = std::env::var("KH_MINI_DOCK") {
                 self.player_sheet.dev_set_dock_right(side != "left");
             }
+            // `KH_DJ_PLAYLIST=ID@secs`: the DJ plays a playlist, album or mix.
+            if let Ok(spec) = std::env::var("KH_DJ_PLAYLIST") {
+                let (id, secs) = spec.rsplit_once('@').unwrap_or((&spec, "1"));
+                let (id, secs) = (id.to_owned(), secs.parse().unwrap_or(1));
+                let o = obj.clone();
+                glib::timeout_add_local_once(std::time::Duration::from_secs(secs), move || {
+                    log::info!("DEV: DJ playlist {id}");
+                    let target = (id.as_str(), "").to_variant();
+                    let _ = gtk::prelude::WidgetExt::activate_action(&o, "win.dj-playlist", Some(&target));
+                });
+            }
             if let Ok(list) = std::env::var("KH_ACTION") {
                 for item in list.split(',') {
                     let (name, secs) = item.split_once('@').unwrap_or((item, "1"));

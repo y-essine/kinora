@@ -680,10 +680,9 @@ impl Dj {
     }
 }
 
-/// The seed that plays a playlist. The engine's playlist seed is on its way
-/// (kinora-core); until it is merged there is none.
-fn playlist_seed(_id: &str, _title: &str) -> Option<DjSeed> {
-    None
+/// The seed that plays a playlist, an album or a mix (by id or link).
+fn playlist_seed(id: &str, title: &str) -> Option<DjSeed> {
+    DjSeed::playlist(id, Some(title.to_owned()).filter(|t| !t.is_empty()))
 }
 
 /// The video a seed takes over (it is already playing), if it is one.

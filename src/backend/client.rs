@@ -803,6 +803,71 @@ impl Client {
         }
     }
 
+    /// Kinora: the mixes and playlists Home shows on its shelves, for the DJ:
+    /// those that came with the Home page, the "Mixes" and "Playlists" chip
+    /// feeds, and the account's own playlists (first). Empty without an account.
+    pub async fn home_playlists(
+        &self,
+    ) -> (Vec<kinora_core::PlaylistCard>, Vec<kinora_core::PlaylistCard>) {
+        use kinora_core::extension::builtin::home_chips::PLAYLIST_ONLY_CHIPS;
+        use kinora_core::PlaylistKind;
+        if !self.has_account() {
+            return Default::default();
+        }
+        let imp = self.imp();
+        let chips = self.home_chips();
+        let tokens: Vec<String> = {
+            let tokens = imp.home_chip_tokens.borrow();
+            (0..chips.n_items())
+                .filter(|&i| {
+                    chips
+                        .item(i)
+                        .and_then(|o| glib::object::Cast::downcast::<gtk::StringObject>(o).ok())
+                        .is_some_and(|t| PLAYLIST_ONLY_CHIPS.contains(&t.string().as_str()))
+                })
+                .filter_map(|i| tokens.get(i as usize).cloned().flatten())
+                .collect()
+        };
+        let from_home = imp.home_playlists.borrow().clone();
+        let (core, account) = (self.core(), self.account_config());
+        let started = std::time::Instant::now();
+        let (from_chips, mine) = tspawn!(async move {
+            let mut cards = Vec::new();
+            for token in tokens {
+                match core.home_with_playlists(&account, Some(&token)).await {
+                    Ok(page) => cards.extend(page.playlists),
+                    Err(e) => log::warn!("Home playlists: a chip feed failed: {e}"),
+                }
+            }
+            let mine = core.account_playlists(&account).await.unwrap_or_else(|e| {
+                log::warn!("Home playlists: the account's playlists failed: {e}");
+                Vec::new()
+            });
+            (cards, mine)
+        })
+        .await
+        .expect("Failed to spawn tokio");
+
+        let mut seen = std::collections::HashSet::new();
+        let (mut mixes, mut playlists) = (Vec::new(), Vec::new());
+        for card in mine.into_iter().chain(from_home).chain(from_chips) {
+            if !seen.insert(card.id.clone()) {
+                continue;
+            }
+            match card.kind {
+                PlaylistKind::Mix => mixes.push(card),
+                _ => playlists.push(card),
+            }
+        }
+        log::info!(
+            "Home: {} mixes and {} playlists in {:.1} s",
+            mixes.len(),
+            playlists.len(),
+            started.elapsed().as_secs_f64()
+        );
+        (mixes, playlists)
+    }
+
     /// Kinora: the first videos of a chip's feed, without showing them in Home
     /// (Home's topic rows). Empty for "All", an unknown chip, or on an error.
     pub async fn home_chip_videos(&self, index: u32) -> Vec<Video> {
@@ -871,6 +936,9 @@ impl Client {
         store.clear();
         for video in &videos {
             store.add(video.clone());
+        }
+        if chip.is_none() {
+            *imp.home_playlists.borrow_mut() = page.playlists;
         }
         match &chip {
             Some((index, _)) => self.set_home_chip_selected(*index),
@@ -1474,6 +1542,8 @@ mod imp {
         pub(super) home_chip_selected: Cell<u32>,
         /// Continuation tokens of the chips, in the same order (`None` for "All").
         pub(super) home_chip_tokens: RefCell<Vec<Option<String>>>,
+        /// Kinora: playlist and mix cards that came with the Home page.
+        pub(super) home_playlists: RefCell<Vec<kinora_core::PlaylistCard>>,
         /// Continuation that loads the next page of Home.
         pub(super) home_next: RefCell<Option<String>>,
         /// Counts Home loads, so a superseded one can be ignored.
@@ -1511,6 +1581,7 @@ mod imp {
                 home_chips: RefCell::new(gdk::gio::ListStore::new::<gtk::StringObject>()),
                 home_chip_selected: Default::default(),
                 home_chip_tokens: Default::default(),
+                home_playlists: Default::default(),
                 home_next: Default::default(),
                 home_gen: Default::default(),
                 home_loading_more: Default::default(),

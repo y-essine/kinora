@@ -311,6 +311,27 @@ pub mod imp {
             }
         }
 
+        /// Fill the Mixes and Your playlists shelves (after Home's chips
+        /// changed, i.e. after Home loaded).
+        fn load_playlists(&self) {
+            let generation = self.topics_generation.get();
+            let client = self.obj().client();
+            gspawn!(clone!(
+                #[weak(rename_to = s)]
+                self,
+                async move {
+                    let (mixes, playlists) = client.home_playlists().await;
+                    if s.topics_generation.get() != generation {
+                        return;
+                    }
+                    let info = |cards: Vec<kinora_core::PlaylistCard>| {
+                        cards.into_iter().map(super::playlist_info).collect::<Vec<_>>()
+                    };
+                    s.obj().set_playlists(info(mixes), info(playlists));
+                }
+            ));
+        }
+
         fn rebuild_topic_rows(&self) {
             self.topics_generation
                 .set(self.topics_generation.get().wrapping_add(1));
@@ -328,6 +349,12 @@ pub mod imp {
                 else {
                     continue;
                 };
+                // Mixes and Playlists hold no videos: they fill the shelves.
+                if kinora_core::extension::builtin::home_chips::PLAYLIST_ONLY_CHIPS
+                    .contains(&title.as_str())
+                {
+                    continue;
+                }
                 let store = gio::ListStore::new::<Video>();
                 let row = self.new_row(&title, Some(store.clone().upcast()));
                 row.set_loading(true);
@@ -340,6 +367,7 @@ pub mod imp {
                 });
             }
             self.topics.replace(topics);
+            self.load_playlists();
             // Rows are placed on the next layout; look then.
             glib::idle_add_local_once(clone!(
                 #[weak(rename_to = s)]
@@ -439,4 +467,21 @@ pub mod imp {
         }
     }
     impl BinImpl for HomeView {}
+}
+
+/// A core playlist card as the shelf shows it.
+fn playlist_info(card: kinora_core::PlaylistCard) -> crate::gui::playlist_shelf::PlaylistInfo {
+    use crate::gui::playlist_shelf::{PlaylistInfo, PlaylistKind};
+    PlaylistInfo {
+        id: card.id,
+        title: card.title,
+        owner: card.owner,
+        count: card.video_count,
+        kind: match card.kind {
+            kinora_core::PlaylistKind::Mix => PlaylistKind::Mix,
+            kinora_core::PlaylistKind::Playlist => PlaylistKind::Playlist,
+            kinora_core::PlaylistKind::Album => PlaylistKind::Album,
+        },
+        thumbnail: card.thumbnail,
+    }
 }
