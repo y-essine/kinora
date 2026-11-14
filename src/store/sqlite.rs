@@ -468,7 +468,7 @@ impl Store {
     pub fn trim_unused(&mut self) -> Result<(), Error> {
         let transaction = self.connection.transaction()?;
         transaction.execute(
-            "DELETE FROM videos WHERE (platform, id) NOT IN ((SELECT platform, video_id AS id FROM watch_later UNION SELECT platform, video_id AS id FROM watch_history UNION SELECT platform, video_id AS id FROM downloaded);",
+            "DELETE FROM videos WHERE (platform, id) NOT IN (SELECT platform, video_id AS id FROM watch_later UNION SELECT platform, video_id AS id FROM watch_history UNION SELECT platform, video_id AS id FROM downloaded);",
             [],
         )?;
         transaction.execute("DELETE FROM channels WHERE (platform, id) NOT IN (SELECT platform, channel_id AS id FROM subscriptions UNION SELECT platform, uploader_id AS id FROM videos);", [])?;
