@@ -19,6 +19,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
+use clapper_gtk::prelude::AvExt;
 use gtk::gdk::prelude::*;
 use gtk::gsk::prelude::*;
 use gtk::prelude::*;
