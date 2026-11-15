@@ -74,11 +74,9 @@ jobs:
         run: |
           git clone --depth 1 --branch "$CLAPPER_VERSION" https://github.com/Rafostar/clapper.git /tmp/clapper
           cd /tmp/clapper
-          # 0.10.0 forgets to export ClapperHarvest's type (harmless on Linux,
-          # an undefined clapper_harvest_get_type when g-ir-scanner links on Windows).
-          grep -q '^CLAPPER_API$' <(grep -B1 'G_DECLARE_FINAL_TYPE (ClapperHarvest' src/lib/clapper/clapper-harvest.h) ||
-            sed -i 's/^G_DECLARE_FINAL_TYPE (ClapperHarvest/CLAPPER_API\n&/' src/lib/clapper/clapper-harvest.h
-          meson setup build --prefix=/ucrt64 -Dclapper-app=disabled -Dvapi=disabled -Ddoc=false
+          # Exports 0.10.0 forgets on Windows, and MPRIS there (see the script).
+          sh "$GITHUB_WORKSPACE/build-aux/windows/patch-clapper.sh"
+          meson setup build --prefix=/ucrt64 -Dclapper-app=disabled -Dvapi=disabled -Ddoc=false -Dmpris=enabled
           meson compile -C build
           meson install -C build
 
