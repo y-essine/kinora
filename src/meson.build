@@ -46,11 +46,14 @@ endif
 
 cargo_env = [ 'CARGO_HOME=' + meson.project_build_root() / 'cargo-home' ]
 
+# Kinora: the Windows build makes kinora.exe.
+exe_suffix = host_machine.system() == 'windows' ? '.exe' : ''
+
 cargo_build = custom_target(
   'cargo-build',
   build_by_default: true,
   build_always_stale: true,
-  output: meson.project_name(),
+  output: meson.project_name() + exe_suffix,
   console: true,
   install: true,
   install_dir: bindir,
@@ -61,6 +64,6 @@ cargo_build = custom_target(
     cargo, 'build',
     cargo_options,
     '&&',
-    'cp', 'target' / rust_target / meson.project_name(), '@OUTPUT@',
+    'cp', 'target' / rust_target / meson.project_name() + exe_suffix, '@OUTPUT@',
   ]
 )

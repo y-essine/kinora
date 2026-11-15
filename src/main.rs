@@ -1,3 +1,6 @@
+// Kinora: on Windows a GUI app, without a console window (logs go to a file).
+#![cfg_attr(windows, windows_subsystem = "windows")]
+
 use gdk::{
     Display,
     gio::prelude::SettingsExt,
@@ -147,8 +150,56 @@ fn init_css() {
     );
 }
 
-fn main() {
+/// Kinora: logs. On Windows there is no console: they go to
+/// `%LOCALAPPDATA%\\kinora\\kinora.log` (info and up unless RUST_LOG says).
+fn init_logging() {
+    #[cfg(windows)]
+    {
+        let dir = std::env::var_os("LOCALAPPDATA")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(std::env::temp_dir)
+            .join("kinora");
+        let _ = std::fs::create_dir_all(&dir);
+        if let Ok(file) = std::fs::File::create(dir.join("kinora.log")) {
+            env_logger::Builder::from_env(
+                env_logger::Env::default().default_filter_or("kinora=info,kinora_core=info"),
+            )
+            .target(env_logger::Target::Pipe(Box::new(file)))
+            .init();
+            return;
+        }
+    }
     env_logger::init();
+}
+
+/// Kinora: the Windows build is one folder (bin, lib, share). Point Clapper's
+/// enhancers (yt-dlp, PeerTube), the Python they run in and GObject
+/// introspection at it, unless set already.
+#[cfg(windows)]
+fn windows_environment() {
+    let Some(root) = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent()?.parent().map(|p| p.to_path_buf()))
+    else {
+        return;
+    };
+    let vars = [
+        ("CLAPPER_ENHANCERS_PATH", root.join("lib/clapper-0.0/enhancers")),
+        ("PYTHONHOME", root.clone()),
+        ("GI_TYPELIB_PATH", root.join("lib/girepository-1.0")),
+    ];
+    for (name, value) in vars {
+        if std::env::var_os(name).is_none() {
+            // SAFETY: first thing in main, before any other thread exists.
+            unsafe { std::env::set_var(name, value) };
+        }
+    }
+}
+
+fn main() {
+    #[cfg(windows)]
+    windows_environment();
+    init_logging();
     // Kinora: bring over the library and settings from Pipeline, once.
     migrate::from_pipeline();
 

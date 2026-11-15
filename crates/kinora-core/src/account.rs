@@ -15,7 +15,6 @@ use std::time::{Duration, Instant};
 use chrono::TimeDelta;
 use pcore::{Channel, Video, VideoId};
 use rustypipe::client::RustyPipe;
-use tokio::process::Command;
 use tokio::sync::Mutex;
 use url::Url;
 
@@ -41,7 +40,7 @@ pub async fn cookies_file(command: &str) -> Result<Option<PathBuf>, Error> {
         }
     }
 
-    let out = Command::new("sh").arg("-c").arg(command).output().await?;
+    let out = crate::helper::shell(command).output().await?;
     if !out.status.success() {
         return Err(format!(
             "The account cookies command failed: {}",
@@ -93,7 +92,7 @@ impl BrowserProfile {
 
 /// Browser profiles signed in to YouTube.
 pub async fn browser_profiles() -> Result<Vec<BrowserProfile>, Error> {
-    let out = Command::new("kinora-account")
+    let out = crate::helper::command("kinora-account")
         .arg("--list")
         .output()
         .await
@@ -251,7 +250,7 @@ fn with_special_playlists(cards: &mut Vec<PlaylistCard>) {
 
 /// Mark a video as watched on the account, so its recommendations learn from it.
 pub async fn mark_watched(cookies: &Path, video_id: &str) -> Result<(), Error> {
-    let out = Command::new("yt-dlp")
+    let out = crate::helper::command("yt-dlp")
         .arg("--cookies")
         .arg(cookies)
         .args(["--mark-watched", "--simulate", "--quiet", "--no-warnings"])

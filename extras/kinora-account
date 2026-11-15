@@ -31,6 +31,12 @@ HOME = os.path.expanduser("~")
 CONFIG = os.environ.get("KINORA_BROWSER_CONFIG") or os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
 CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")), "kinora")
 
+WINDOWS = os.name == "nt"
+if WINDOWS:
+    LOCAL = os.environ.get("LOCALAPPDATA", os.path.join(HOME, "AppData", "Local"))
+    ROAMING = os.environ.get("APPDATA", os.path.join(HOME, "AppData", "Roaming"))
+    CACHE = os.path.join(LOCAL, "kinora", "cache")
+
 # id: (display name, yt-dlp browser name, user data dir, keyring application attribute)
 CHROMIUM_FAMILY = {
     "chromium": ("Chromium", "chromium", os.path.join(CONFIG, "chromium"), "chromium"),
@@ -44,6 +50,18 @@ FIREFOX_FAMILY = {
     "firefox": ("Firefox", "firefox", os.path.join(HOME, ".mozilla", "firefox")),
     "librewolf": ("LibreWolf", "firefox", os.path.join(HOME, ".librewolf")),
 }
+if WINDOWS:
+    CHROMIUM_FAMILY = {
+        "chrome": ("Google Chrome", "chrome", os.path.join(LOCAL, "Google", "Chrome", "User Data"), "chrome"),
+        "edge": ("Microsoft Edge", "edge", os.path.join(LOCAL, "Microsoft", "Edge", "User Data"), "edge"),
+        "brave": ("Brave", "brave", os.path.join(LOCAL, "BraveSoftware", "Brave-Browser", "User Data"), "brave"),
+        "vivaldi": ("Vivaldi", "vivaldi", os.path.join(LOCAL, "Vivaldi", "User Data"), "vivaldi"),
+        "chromium": ("Chromium", "chromium", os.path.join(LOCAL, "Chromium", "User Data"), "chromium"),
+    }
+    FIREFOX_FAMILY = {
+        "firefox": ("Firefox", "firefox", os.path.join(ROAMING, "Mozilla", "Firefox")),
+        "librewolf": ("LibreWolf", "firefox", os.path.join(ROAMING, "librewolf")),
+    }
 
 
 def has_youtube_login(db_path, table, host_col):
@@ -52,7 +70,10 @@ def has_youtube_login(db_path, table, host_col):
         return False
     with tempfile.TemporaryDirectory() as tmp:
         copy = os.path.join(tmp, "cookies.sqlite")
-        shutil.copy(db_path, copy)  # the browser may hold a lock on the original
+        try:
+            shutil.copy(db_path, copy)  # the browser may hold a lock on the original
+        except OSError:
+            return False  # locked (Windows, browser open) or unreadable
         try:
             con = sqlite3.connect(copy)
             row = con.execute(

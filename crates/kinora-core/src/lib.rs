@@ -14,6 +14,7 @@ pub mod account;
 pub mod config;
 pub mod dj;
 pub mod extension;
+pub mod helper;
 pub mod home;
 pub mod player;
 pub mod playlist;

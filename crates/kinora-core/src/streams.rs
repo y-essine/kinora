@@ -123,7 +123,7 @@ async fn prepare_ytdlp(cache_dir: PathBuf, video_id: String, audio: bool) -> Res
     let result = async {
         std::fs::create_dir_all(&cache_dir)?;
         let started = Instant::now();
-        let mut command = tokio::process::Command::new("kinora-prepare");
+        let mut command = crate::helper::command("kinora-prepare");
         if audio {
             command.arg("--audio");
         }

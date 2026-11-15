@@ -1,0 +1,180 @@
+# Kinora for Windows: build Clapper and its yt-dlp/PeerTube enhancers from
+# source (MSYS2 has no Clapper), then Kinora, and pack one folder with
+# everything it needs (GTK, GStreamer, Python with yt-dlp) into a zip.
+# On a version tag the zip is attached to a GitHub release.
+name: Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  CLAPPER_VERSION: '0.10.0'
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # config.rs counts commits and tags
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git zip
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-meson
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-rust
+            mingw-w64-ucrt-x86_64-gettext
+            mingw-w64-ucrt-x86_64-glib2
+            mingw-w64-ucrt-x86_64-glib-networking
+            mingw-w64-ucrt-x86_64-gobject-introspection
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-libadwaita
+            mingw-w64-ucrt-x86_64-blueprint-compiler
+            mingw-w64-ucrt-x86_64-adwaita-icon-theme
+            mingw-w64-ucrt-x86_64-hicolor-icon-theme
+            mingw-w64-ucrt-x86_64-gstreamer
+            mingw-w64-ucrt-x86_64-gst-plugins-base
+            mingw-w64-ucrt-x86_64-gst-plugins-good
+            mingw-w64-ucrt-x86_64-gst-plugins-bad
+            mingw-w64-ucrt-x86_64-gst-plugins-ugly
+            mingw-w64-ucrt-x86_64-gst-libav
+            mingw-w64-ucrt-x86_64-libpeas2
+            mingw-w64-ucrt-x86_64-libsoup3
+            mingw-w64-ucrt-x86_64-libmicrodns
+            mingw-w64-ucrt-x86_64-sqlite3
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-gobject
+            mingw-w64-ucrt-x86_64-yt-dlp
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            _build/cargo-home/registry
+            _build/cargo-home/git
+            _build/target
+          key: cargo-ucrt64-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-ucrt64-
+
+      - name: Build Clapper
+        run: |
+          git clone --depth 1 --branch "$CLAPPER_VERSION" https://github.com/Rafostar/clapper.git /tmp/clapper
+          cd /tmp/clapper
+          meson setup build --prefix=/ucrt64 -Dclapper-app=disabled -Dvapi=disabled -Ddoc=false
+          meson compile -C build
+          meson install -C build
+
+      - name: Build Clapper's enhancers (yt-dlp, PeerTube)
+        run: |
+          git clone --depth 1 --branch "$CLAPPER_VERSION" https://github.com/Rafostar/clapper-enhancers.git /tmp/enhancers
+          cd /tmp/enhancers
+          meson setup build --prefix=/ucrt64 \
+            -Dyt-dlp=enabled -Dpeertube=enabled \
+            -Dcontrol-hub=disabled -Dlbry=disabled -Dmedia-scanner=disabled \
+            -Dmpris=disabled -Dparser-m3u=disabled -Drecall=disabled
+          meson compile -C build
+          meson install -C build
+
+      - name: Build Kinora
+        run: |
+          STAGE="$GITHUB_WORKSPACE/kinora-win"
+          meson setup _build --prefix="$STAGE" -Dprofile=default
+          meson compile -C _build
+          meson install -C _build
+          cp extras/kinora-account extras/kinora-prepare "$STAGE/bin/"
+
+      - name: Bundle runtime
+        run: |
+          STAGE="$GITHUB_WORKSPACE/kinora-win"
+          mkdir -p "$STAGE/lib" "$STAGE/share/glib-2.0/schemas" "$STAGE/libexec"
+
+          # Python (for yt-dlp, kinora-prepare, kinora-account and the enhancers)
+          cp /ucrt64/bin/python.exe /ucrt64/bin/python3.exe "$STAGE/bin/"
+          PYLIB=$(ls -d /ucrt64/lib/python3.* | head -1)
+          cp -r "$PYLIB" "$STAGE/lib/"
+          rm -rf "$STAGE/lib/$(basename $PYLIB)/test" "$STAGE/lib/$(basename $PYLIB)"/*/tests \
+                 "$STAGE/lib/$(basename $PYLIB)/idlelib" "$STAGE/lib/$(basename $PYLIB)/tkinter" \
+                 "$STAGE/lib/$(basename $PYLIB)/turtledemo"
+          find "$STAGE/lib/$(basename $PYLIB)" -name __pycache__ -type d -prune -exec rm -rf {} +
+
+          # GStreamer, GIO modules (TLS), image loaders, Clapper, libpeas loaders, typelibs
+          cp -r /ucrt64/lib/gstreamer-1.0 /ucrt64/lib/gio /ucrt64/lib/gdk-pixbuf-2.0 \
+                /ucrt64/lib/clapper-0.0 /ucrt64/lib/girepository-1.0 "$STAGE/lib/"
+          [ -d /ucrt64/lib/libpeas-2 ] && cp -r /ucrt64/lib/libpeas-2 "$STAGE/lib/"
+          cp -r /ucrt64/libexec/gstreamer-1.0 "$STAGE/libexec/"
+          # Drop encoders and muxers Kinora never uses (as Clapper's own build does).
+          (cd "$STAGE/lib/gstreamer-1.0" && rm -f libgstx264.dll libgstx265.dll libgstsvtav1.dll \
+             libgstsvthevcenc.dll libgstlame.dll libgsttwolame.dll libgstmpeg2enc.dll libgstmplex.dll \
+             libgstfrei0r.dll libgstzbar.dll libgstvoamrwbenc.dll libgsty4menc.dll)
+
+          # Settings schemas, icons
+          cp /ucrt64/share/glib-2.0/schemas/*.xml "$STAGE/share/glib-2.0/schemas/"
+          glib-compile-schemas "$STAGE/share/glib-2.0/schemas"
+          cp -r /ucrt64/share/icons/Adwaita "$STAGE/share/icons/" 2>/dev/null || cp -r /ucrt64/share/icons "$STAGE/share/"
+          cp -rn /ucrt64/share/icons/hicolor "$STAGE/share/icons/" || true
+          mkdir -p "$STAGE/share/xml/iso-codes"
+          cp /ucrt64/share/xml/iso-codes/iso_639.xml "$STAGE/share/xml/iso-codes/" 2>/dev/null || true
+
+          # Every DLL any of it links to
+          deps() { ldd "$@" 2>/dev/null | grep -o '/ucrt64/bin/[^ ]*\.dll' ; }
+          {
+            deps "$STAGE"/bin/*.exe
+            find "$STAGE/lib" "$STAGE/libexec" \( -name '*.dll' -o -name '*.pyd' -o -name '*.exe' \) \
+              -type f -print0 | xargs -0 -n 20 ldd 2>/dev/null | grep -o '/ucrt64/bin/[^ ]*\.dll'
+          } | sort -u | xargs -I{} cp -n {} "$STAGE/bin/"
+          ls "$STAGE/bin" | wc -l
+          du -sh "$STAGE"
+
+      - name: Smoke test
+        run: |
+          STAGE="$GITHUB_WORKSPACE/kinora-win"
+          # Only the bundle on the PATH: does Python find yt-dlp and Clapper's typelib?
+          PATH="$STAGE/bin" PYTHONHOME="$STAGE" GI_TYPELIB_PATH="$STAGE/lib/girepository-1.0" \
+            "$STAGE/bin/python.exe" -c "import yt_dlp, gi; gi.require_version('Clapper', '0.0'); from gi.repository import Clapper; print('python ok', yt_dlp.version.__version__)"
+          PATH="$STAGE/bin" "$STAGE/libexec/gstreamer-1.0/gst-plugin-scanner.exe" --help >/dev/null 2>&1 || true
+          PATH="$STAGE/bin" GST_PLUGIN_PATH="$STAGE/lib/gstreamer-1.0" \
+            "$STAGE/bin/gst-inspect-1.0.exe" hlsdemux2 >/dev/null 2>&1 && echo "gst ok" || echo "gst-inspect not bundled"
+
+      - name: Zip
+        run: |
+          VERSION=$(git describe --tags --always)
+          echo "ZIP=Kinora-$VERSION-windows-x86_64.zip" >> $GITHUB_ENV
+          mv kinora-win "Kinora-$VERSION"
+          cat > "Kinora-$VERSION/README.txt" <<'EOF'
+          Kinora for Windows (beta)
+
+          Unzip anywhere and run bin\kinora.exe. Keep the folder together: kinora.exe
+          uses the GTK, GStreamer and Python next to it.
+
+          Logs: %LOCALAPPDATA%\kinora\kinora.log
+          EOF
+          zip -qr "Kinora-$VERSION-windows-x86_64.zip" "Kinora-$VERSION"
+          ls -la *.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kinora-windows
+          path: ${{ env.ZIP }}
+          if-no-files-found: error
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP }}
+          prerelease: true
+          generate_release_notes: true

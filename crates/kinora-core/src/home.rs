@@ -15,7 +15,6 @@ use std::time::Duration;
 use chrono::TimeDelta;
 use pcore::{Channel, Video, VideoId};
 use serde_json::{Value, json};
-use tokio::process::Command;
 use tokio::sync::OnceCell;
 use url::Url;
 
@@ -75,7 +74,7 @@ pub async fn ytdlp_feed(cookies: &Path) -> Result<Vec<Video>, Error> {
 
 /// [`ytdlp_feed`] with the listing's playlists and mixes.
 async fn ytdlp_page(cookies: &Path) -> Result<HomePage, Error> {
-    let out = Command::new("yt-dlp")
+    let out = crate::helper::command("yt-dlp")
         .arg("--cookies")
         .arg(cookies)
         .args(["--flat-playlist", "--no-warnings", "-J", "--playlist-end"])

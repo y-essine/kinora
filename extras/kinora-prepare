@@ -20,7 +20,15 @@ import sys
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-ENHANCER = "/usr/lib/clapper-0.0/enhancers/yt-dlp"
+# Clapper's yt-dlp enhancer: the system's on Linux; the Windows build ships it
+# next to this script's folder (lib/clapper-0.0/enhancers/yt-dlp).
+ENHANCER = os.environ.get("KINORA_CLAPPER_ENHANCER") or next(
+    (p for p in (
+        "/usr/lib/clapper-0.0/enhancers/yt-dlp",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib",
+                     "clapper-0.0", "enhancers", "yt-dlp"),
+    ) if os.path.isdir(p)),
+    "/usr/lib/clapper-0.0/enhancers/yt-dlp")
 sys.path.insert(0, ENHANCER)
 
 import clapper_yt_dlp as clapper  # noqa: E402  (options, as Clapper uses them)
