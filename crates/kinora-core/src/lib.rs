@@ -426,4 +426,22 @@ impl Core {
         }
         streams::prepared(&video.id)
     }
+
+    /// Like [`Self::prepare`], audio only, in the original language (the DJ
+    /// plays music this way): starts in about half the time and decodes no
+    /// video. Afterwards [`Self::prepared_audio_uri`] has it.
+    pub async fn prepare_audio(&self, video: &VideoId) -> Result<(), Error> {
+        if !youtube::is_youtube(video) {
+            return Ok(());
+        }
+        streams::prepare_audio_with_ytdlp(self.paths.streams_dir(), video.id.clone()).await
+    }
+
+    /// A prepared audio-only playback URI for this video, if there is a fresh one.
+    pub fn prepared_audio_uri(&self, video: &VideoId) -> Option<String> {
+        if !youtube::is_youtube(video) {
+            return None;
+        }
+        streams::prepared_audio(&video.id)
+    }
 }

@@ -87,7 +87,28 @@ fn remember(video_id: String, uri: String, lifetime: Duration) {
 /// Prepare a YouTube video in the background with `kinora-prepare` (see the
 /// module docs). Does nothing if it is already prepared or being prepared.
 pub async fn prepare_with_ytdlp(cache_dir: PathBuf, video_id: String) -> Result<(), Error> {
-    if prepared(&video_id).is_some() {
+    prepare_ytdlp(cache_dir, video_id, false).await
+}
+
+/// Like [`prepare_with_ytdlp`], audio only (original language): starts in
+/// about half the time and decodes no video. [`prepared_audio`] has it.
+pub async fn prepare_audio_with_ytdlp(cache_dir: PathBuf, video_id: String) -> Result<(), Error> {
+    prepare_ytdlp(cache_dir, video_id, true).await
+}
+
+/// A prepared audio-only playback URI for this video, if there is a fresh one.
+pub fn prepared_audio(video_id: &str) -> Option<String> {
+    prepared(&audio_key(video_id))
+}
+
+/// Audio-only preparations share the map under their own key.
+fn audio_key(video_id: &str) -> String {
+    format!("{video_id}#audio")
+}
+
+async fn prepare_ytdlp(cache_dir: PathBuf, video_id: String, audio: bool) -> Result<(), Error> {
+    let key = if audio { audio_key(&video_id) } else { video_id.clone() };
+    if prepared(&key).is_some() {
         return Ok(());
     }
     {
@@ -95,14 +116,18 @@ pub async fn prepare_with_ytdlp(cache_dir: PathBuf, video_id: String) -> Result<
         let preparing = guard.get_or_insert_with(HashSet::new);
         // At most two at a time: sweeping the pointer over a grid shouldn't
         // start a yt-dlp run per video.
-        if preparing.len() >= MAX_PREPARING || !preparing.insert(video_id.clone()) {
+        if preparing.len() >= MAX_PREPARING || !preparing.insert(key.clone()) {
             return Ok(());
         }
     }
     let result = async {
         std::fs::create_dir_all(&cache_dir)?;
         let started = Instant::now();
-        let out = tokio::process::Command::new("kinora-prepare")
+        let mut command = tokio::process::Command::new("kinora-prepare");
+        if audio {
+            command.arg("--audio");
+        }
+        let out = command
             .arg(format!("https://www.youtube.com/watch?v={video_id}"))
             .arg(cache_dir.join(&video_id))
             .output()
@@ -122,15 +147,16 @@ pub async fn prepare_with_ytdlp(cache_dir: PathBuf, video_id: String) -> Result<
             .map_err(|_| format!("not an absolute path: {path}"))?
             .to_string();
         log::info!(
-            "Prepared {video_id} in {:.1} s",
+            "Prepared {video_id}{} in {:.1} s",
+            if audio { " (audio)" } else { "" },
             started.elapsed().as_secs_f64()
         );
-        remember(video_id.clone(), uri, PREPARED_TTL);
+        remember(key.clone(), uri, PREPARED_TTL);
         Ok(())
     }
     .await;
     if let Some(set) = PREPARING.lock().unwrap().as_mut() {
-        set.remove(&video_id);
+        set.remove(&key);
     }
     result
 }
@@ -270,4 +296,16 @@ fn xml_escape(s: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+#[cfg(test)]
+mod audio_key_tests {
+    #[test]
+    fn audio_and_video_are_kept_apart() {
+        super::remember("abc".into(), "file:///v.m3u8".into(), std::time::Duration::from_secs(60));
+        assert_eq!(super::prepared_audio("abc"), None);
+        super::remember(super::audio_key("abc"), "file:///a.m3u8".into(), std::time::Duration::from_secs(60));
+        assert_eq!(super::prepared_audio("abc").as_deref(), Some("file:///a.m3u8"));
+        assert_eq!(super::prepared("abc").as_deref(), Some("file:///v.m3u8"));
+    }
 }
