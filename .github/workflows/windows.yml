@@ -111,7 +111,9 @@ jobs:
           cp -r "$PYLIB" "$STAGE/lib/"
           rm -rf "$STAGE/lib/$(basename $PYLIB)/test" "$STAGE/lib/$(basename $PYLIB)"/*/tests \
                  "$STAGE/lib/$(basename $PYLIB)/idlelib" "$STAGE/lib/$(basename $PYLIB)/tkinter" \
-                 "$STAGE/lib/$(basename $PYLIB)/turtledemo"
+                 "$STAGE/lib/$(basename $PYLIB)/turtledemo" \
+                 "$STAGE/lib/$(basename $PYLIB)"/lib-dynload/_tkinter* \
+                 "$STAGE/lib/$(basename $PYLIB)"/site-packages/imath*
           find "$STAGE/lib/$(basename $PYLIB)" -name __pycache__ -type d -prune -exec rm -rf {} +
 
           # GStreamer, GIO modules (TLS), image loaders, Clapper, libpeas loaders, typelibs
@@ -132,16 +134,9 @@ jobs:
           mkdir -p "$STAGE/share/xml/iso-codes"
           cp /ucrt64/share/xml/iso-codes/iso_639.xml "$STAGE/share/xml/iso-codes/" 2>/dev/null || true
 
-          # Every DLL any of it links to
-          # (ldd fails on the odd file; that must not fail the step.)
-          deps() { ldd "$@" 2>/dev/null | grep -o '/ucrt64/bin/[^ ]*\.dll' || true; }
-          {
-            deps "$STAGE"/bin/*.exe
-            find "$STAGE/lib" "$STAGE/libexec" \( -name '*.dll' -o -name '*.pyd' -o -name '*.exe' \) \
-              -type f -print0 | { xargs -0 -n 20 ldd 2>/dev/null || true; } | grep -o '/ucrt64/bin/[^ ]*\.dll' || true
-          } | sort -u | while read -r dll; do
-            [ -e "$STAGE/bin/$(basename "$dll")" ] || cp "$dll" "$STAGE/bin/"
-          done
+          # Every DLL any of it imports, read from the import tables (ldd
+          # missed libgirepository-2.0, which PyGObject needs).
+          bash "$GITHUB_WORKSPACE/build-aux/windows/check-bundle.sh" "$(cygpath -u "$STAGE")" --copy /ucrt64/bin || true
           ls "$STAGE/bin" | wc -l
           du -sh "$STAGE"
 
@@ -165,7 +160,8 @@ jobs:
         if: ${{ !cancelled() && steps.bundle.outcome == 'success' }}
         run: |
           STAGE="$GITHUB_WORKSPACE/kinora-win"
-          OUT="$GITHUB_WORKSPACE/self-test"
+          # D:/a/... : gst-launch reads backslashes in location= as escapes.
+          OUT="$(cygpath -m "$GITHUB_WORKSPACE")/self-test"
           mkdir -p "$OUT"
           # Two short clips, made with the build machine's GStreamer: VP8/Opus
           # (WebM) and H.264/AAC (MP4), YouTube's usual codecs aside.
