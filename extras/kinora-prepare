@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Prepare a video for instant playback, ahead of time.
 
-    kinora-prepare URL OUT_PATH_WITHOUT_EXTENSION
+    kinora-prepare [--audio] URL OUT_PATH_WITHOUT_EXTENSION
 
 Runs the same extraction as Clapper's yt-dlp enhancer (same options, its
 YouTube extractor override and its manifest generators), writes the resulting
@@ -9,6 +9,10 @@ HLS or DASH manifest next to OUT_PATH and prints the written path. Kinora runs
 this in the background for the video you're most likely to watch next (the
 first "Up next"); playing the prepared file then skips the several seconds of
 extraction. The stream links in it stay valid for hours.
+
+With --audio the manifest holds only the audio, in the original language (the
+DJ plays music that way): it starts in about half the time and costs no video
+decoding.
 """
 import copy
 import os
@@ -46,6 +50,17 @@ def alive(url):
         return False
 
 
+def audio_manifest(info):
+    """A master playlist with the one chosen audio rendition."""
+    url = info.get("url")
+    if not url:
+        return None
+    bandwidth = int((info.get("tbr") or info.get("abr") or 128) * 1000)
+    codec = info.get("acodec") or "mp4a.40.2"
+    return (f'#EXTM3U\n#EXT-X-INDEPENDENT-SEGMENTS\n'
+            f'#EXT-X-STREAM-INF:BANDWIDTH={bandwidth},CODECS="{codec}"\n{url}\n')
+
+
 def checked_uris(manifest):
     """Playlists the player will load: every variant and the default audio."""
     lines = manifest.splitlines()
@@ -59,14 +74,21 @@ def checked_uris(manifest):
 
 
 def main():
-    if len(sys.argv) != 3:
+    args = sys.argv[1:]
+    audio = "--audio" in args
+    args = [a for a in args if a != "--audio"]
+    if len(args) != 2:
         sys.exit(__doc__)
-    url, out = sys.argv[1], sys.argv[2]
+    url, out = args
 
     opts = dict(clapper.YTDL_OPTS)
     opts.update(quiet=True, verbose=False, noprogress=True)
     opts["format_sort"] = ["vcodec:" + c for c in CODECS_ORDER.split(",")] + [
         "acodec:mp4a", "acodec:opus", "acodec:vorbis", "acodec:*"]
+
+    if audio:
+        # The best HLS audio; yt-dlp ranks the original language first.
+        opts["format"] = "bestaudio[protocol=m3u8_native]"
 
     ytdl = YoutubeDL(opts, auto_init=False)
     ytdl.add_info_extractor(ClapperYoutubeIE())
@@ -77,7 +99,12 @@ def main():
 
     for _ in range(MAX_ROUNDS):
         info = ytdl.process_ie_result(copy.deepcopy(raw), download=False)
-        if manifest := hls.generate_manifest(info):
+        if audio:
+            manifest = audio_manifest(info)
+            if not manifest:
+                sys.exit("kinora-prepare: no HLS audio")
+            path = out + ".audio.m3u8"
+        elif manifest := hls.generate_manifest(info):
             path = out + ".m3u8"
         elif manifest := dash.generate_manifest(info):
             path = out + ".mpd"
