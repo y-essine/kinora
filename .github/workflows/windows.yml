@@ -59,6 +59,7 @@ jobs:
             mingw-w64-ucrt-x86_64-python
             mingw-w64-ucrt-x86_64-python-gobject
             mingw-w64-ucrt-x86_64-yt-dlp
+            mingw-w64-ucrt-x86_64-mesa
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -176,12 +177,21 @@ jobs:
             [ -s "$clip" ] && MEDIA+=(--media "file:///$(cygpath -m "$clip")")
           done
           # Only what a user's Windows has: the bundle, no MSYS2 on the PATH or in XDG_*.
-          BIN="$(cygpath -u "$STAGE")/bin"
+          # The runner has no GPU (Windows' own OpenGL is 1.1: "No GL shader
+          # support"). Test a copy of the bundle with Mesa's software OpenGL
+          # beside kinora.exe; the zip stays as users get it.
+          TEST="$(cygpath -u "$GITHUB_WORKSPACE")/kinora-test"
+          rm -rf "$TEST" && cp -r "$(cygpath -u "$STAGE")" "$TEST"
+          cp /ucrt64/bin/opengl32.dll "$TEST/bin/"
+          cp /ucrt64/bin/libgallium_wgl.dll "$TEST/bin/" 2>/dev/null || true
+          bash "$GITHUB_WORKSPACE/build-aux/windows/check-bundle.sh" "$TEST" --copy /ucrt64/bin || true
+          BIN="$TEST/bin"
           set +e
           /usr/bin/timeout 600 /usr/bin/env -i SYSTEMROOT="$SYSTEMROOT" WINDIR="$WINDIR" TEMP="$TEMP" TMP="$TMP" \
             USERPROFILE="$USERPROFILE" APPDATA="$APPDATA" LOCALAPPDATA="$LOCALAPPDATA" \
             USERNAME="$USERNAME" COMPUTERNAME="$COMPUTERNAME" \
             PATH="$BIN:/c/Windows/System32:/c/Windows" RUST_LOG="kinora=debug,kinora_core=debug" \
+            GALLIUM_DRIVER=llvmpipe \
             "$BIN/kinora.exe" --self-test --out "$(cygpath -w "$OUT")" "${MEDIA[@]}" \
               --online "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
           status=$?

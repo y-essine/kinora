@@ -259,9 +259,11 @@ async fn play(uri: &str, out: &Path, name: &str, timeout: Duration) -> Result<St
     }
     player.set_mute(true);
 
-    let error: Rc<RefCell<Option<String>>> = Rc::default();
+    // Send + Sync: the player may drop its handlers on its own thread (a
+    // `connect_local` closure dropped there aborts).
+    let error: std::sync::Arc<std::sync::Mutex<Option<String>>> = Default::default();
     let e = error.clone();
-    player.connect_local("error", false, move |values| {
+    player.connect("error", false, move |values| {
         let message = values
             .get(1)
             .and_then(|v| v.get::<glib::Error>().ok())
@@ -272,7 +274,9 @@ async fn play(uri: &str, out: &Path, name: &str, timeout: Duration) -> Result<St
             .and_then(|v| v.get::<Option<String>>().ok())
             .flatten()
             .unwrap_or_default();
-        *e.borrow_mut() = Some(format!("{message} ({debug})"));
+        if let Ok(mut slot) = e.lock() {
+            *slot = Some(format!("{message} ({debug})"));
+        }
         None
     });
 
@@ -291,7 +295,7 @@ async fn play(uri: &str, out: &Path, name: &str, timeout: Duration) -> Result<St
     let started = Instant::now();
     let result = loop {
         glib::timeout_future(Duration::from_millis(250)).await;
-        if let Some(e) = error.borrow().clone() {
+        if let Some(e) = error.lock().ok().and_then(|slot| slot.clone()) {
             break Err(e);
         }
         let position = player.position();

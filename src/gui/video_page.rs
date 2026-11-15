@@ -1573,37 +1573,35 @@ pub mod imp {
             ));
 
             // Kinora: if a fast-start stream fails to play, retry with yt-dlp.
-            player.connect_local(
-                "error",
-                false,
-                clone!(
-                    #[weak]
-                    obj,
-                    #[upgrade_or_default]
-                    move |args| {
-                        let imp = obj.imp();
-                        if !imp.fast_start_active.replace(false) {
-                            obj.set_loading(false);
-                            return None;
-                        }
-                        let error = args
-                            .get(1)
-                            .and_then(|v| v.get::<glib::Error>().ok())
-                            .map(|e| e.to_string())
-                            .unwrap_or_default();
-                        log::warn!("Fast start stream failed ({error}); retrying with yt-dlp");
-                        if let (Some(video), Some(player)) = (obj.video(), imp.clapper.player()) {
-                            let queue = player.queue().expect("Clapper does not have a queue");
-                            queue.clear();
-                            queue.add_item(&clapper::MediaItem::new(
-                                &obj.convert_to_clapper_playable_url(&video),
-                            ));
-                            obj.start_player(&player);
-                        }
-                        None
-                    }
-                ),
-            );
+            // The handler must be droppable on any thread: Clapper's player
+            // can let go of it on its own thread, and a `connect_local`
+            // closure dropped there aborts the app ("Value dropped on a
+            // different thread", seen on Windows). The page is only reached
+            // when the signal comes, on the main thread.
+            let page: glib::SendWeakRef<super::VideoPage> = obj.downgrade().into();
+            player.connect("error", false, move |args| {
+                let obj = page.upgrade()?;
+                let imp = obj.imp();
+                if !imp.fast_start_active.replace(false) {
+                    obj.set_loading(false);
+                    return None;
+                }
+                let error = args
+                    .get(1)
+                    .and_then(|v| v.get::<glib::Error>().ok())
+                    .map(|e| e.to_string())
+                    .unwrap_or_default();
+                log::warn!("Fast start stream failed ({error}); retrying with yt-dlp");
+                if let (Some(video), Some(player)) = (obj.video(), imp.clapper.player()) {
+                    let queue = player.queue().expect("Clapper does not have a queue");
+                    queue.clear();
+                    queue.add_item(&clapper::MediaItem::new(
+                        &obj.convert_to_clapper_playable_url(&video),
+                    ));
+                    obj.start_player(&player);
+                }
+                None
+            });
 
             // Kinora: "Up next" list and autoplay.
             self.up_next_list.bind_model(
