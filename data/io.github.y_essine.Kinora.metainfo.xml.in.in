@@ -13,6 +13,11 @@
   <translation type="gettext">@gettext-package@</translation>
 
   <releases>
+    <release version="0.1.0-beta.5" date="2026-11-15" type="development">
+      <description translate="no">
+        <p>Previous and Next, and a DJ that mixes on every change.</p> <ul> <li>Previous and Next on the player, in fullscreen and on the mini-player.</li> <li>DJ: Next, Previous and picking a song in the queue all crossfade.</li> <li>The DJ plays audio with the album art by default (Show Video brings the videos back), and loads the next song ahead so it starts at once; resting the pointer on a queued song loads it too.</li> </ul>
+      </description>
+    </release>
     <release version="0.1.0-beta.4" date="2026-11-14" type="development">
       <description translate="no">
         <p>A new look, a player you can put down, and a DJ.</p> <ul> <li>A new design: a featured video and rows on Home, an ambient glow around the player.</li> <li>The player rises over the window and shrinks into a mini-player, so you can keep browsing while it plays.</li> <li>DJ: endless music from a song, your mix, a playlist or a mix, each track fading into the next.</li> <li>Mixes and your playlists on Home.</li> <li>The seek bar shows how much of the video is loaded.</li> <li>Extensions in the preferences, and a first-run choice of how you want to watch.</li> </ul>
