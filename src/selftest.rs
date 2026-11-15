@@ -304,6 +304,12 @@ async fn play(uri: &str, out: &Path, name: &str, timeout: Duration) -> Result<St
                 started.elapsed().as_secs_f64()
             ));
         }
+        // Never left Stopped: nothing could open it (no enhancer, say).
+        if started.elapsed() > Duration::from_secs(30)
+            && player.state() == clapper::PlayerState::Stopped
+        {
+            break Err("never started in 30 s (state Stopped, no error)".into());
+        }
         if started.elapsed() > timeout {
             break Err(format!(
                 "only {position:.1} s played in {} s (state {:?})",

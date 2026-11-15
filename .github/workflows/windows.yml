@@ -199,7 +199,10 @@ jobs:
           path: self-test/
           if-no-files-found: ignore
 
+      # The zip is made whenever the bundle is, tests passed or not, to try by
+      # hand; a release (below) still needs every step green.
       - name: Zip
+        if: ${{ !cancelled() && steps.bundle.outcome == 'success' }}
         run: |
           VERSION=$(git describe --tags --always)
           echo "ZIP=Kinora-$VERSION-windows-x86_64.zip" >> $GITHUB_ENV
@@ -216,6 +219,7 @@ jobs:
           ls -la *.zip
 
       - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.bundle.outcome == 'success' }}
         with:
           name: kinora-windows
           path: ${{ env.ZIP }}
