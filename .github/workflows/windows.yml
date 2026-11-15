@@ -138,7 +138,9 @@ jobs:
             deps "$STAGE"/bin/*.exe
             find "$STAGE/lib" "$STAGE/libexec" \( -name '*.dll' -o -name '*.pyd' -o -name '*.exe' \) \
               -type f -print0 | { xargs -0 -n 20 ldd 2>/dev/null || true; } | grep -o '/ucrt64/bin/[^ ]*\.dll' || true
-          } | sort -u | xargs -r -I{} cp --update=none {} "$STAGE/bin/"
+          } | sort -u | while read -r dll; do
+            [ -e "$STAGE/bin/$(basename "$dll")" ] || cp "$dll" "$STAGE/bin/"
+          done
           ls "$STAGE/bin" | wc -l
           du -sh "$STAGE"
 
