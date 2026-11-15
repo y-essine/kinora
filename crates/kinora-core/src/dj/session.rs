@@ -187,6 +187,25 @@ impl DjSession {
         self.move_on(true)
     }
 
+    /// Go back one: the track that played before becomes current again (and
+    /// is returned), and the current one waits at the front of the queue, so
+    /// "next" returns to it. `None`: nothing played before.
+    pub fn back(&mut self) -> Option<&Track> {
+        let previous = self.history.pop()?.track;
+        if let Some(current) = self.current.take() {
+            self.upcoming.retain(|t| t.id != current.id);
+            self.upcoming.insert(0, current);
+        }
+        self.upcoming.retain(|t| t.id != previous.id);
+        self.make_current(previous);
+        self.current.as_ref()
+    }
+
+    /// Whether [`Self::back`] has somewhere to go.
+    pub fn can_go_back(&self) -> bool {
+        !self.history.is_empty()
+    }
+
     fn move_on(&mut self, skipped: bool) -> Option<&Track> {
         if let Some(track) = self.current.take() {
             self.history.push(HistoryEntry { track, skipped });
@@ -420,6 +439,23 @@ mod tests {
         assert_eq!(s.peek_next().unwrap().id, "b");
         assert!(s.needs_refill());
         assert!(matches!(s.refill_request(), Some(RadioRequest::More(_))));
+    }
+
+    #[test]
+    fn going_back_returns_to_what_played_and_keeps_the_way_forward() {
+        let mut s = session(true);
+        assert!(!s.can_go_back());
+        assert_eq!(s.back(), None);
+        assert_eq!(s.current().unwrap().id, "seed");
+
+        s.advance();
+        assert_eq!(s.back().unwrap().id, "seed");
+        // "b" waits at the front; nothing is lost or doubled.
+        assert_eq!(ids(s.upcoming()), ["b", "d"]);
+        assert!(s.history().is_empty());
+        assert_eq!(s.skip().unwrap().id, "b");
+        assert_eq!(ids(s.upcoming()), ["d"]);
+        assert_eq!(s.history().len(), 1);
     }
 
     #[test]

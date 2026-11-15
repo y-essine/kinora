@@ -17,6 +17,8 @@ pub const ID: &str = "dj";
 pub const CROSSFADE_SECONDS: &str = "crossfade-seconds";
 /// Setting (toggle): never play a song twice in a session.
 pub const AVOID_REPEATS: &str = "avoid-repeats";
+/// Setting (toggle): play the tracks' videos instead of audio only.
+pub const SHOW_VIDEO: &str = "show-video";
 /// Setting (choice): where "DJ" starts, [`CURRENT_VIDEO`] or [`MY_MIX`].
 pub const START_FROM: &str = "start-from";
 pub const CURRENT_VIDEO: &str = "current-video";
@@ -83,6 +85,12 @@ impl DjExtension {
                         Some("Never play a song twice in a session, in any version"),
                         true,
                     ),
+                    Setting::toggle(
+                        SHOW_VIDEO,
+                        "Show Video",
+                        Some("Off, the DJ plays audio only: tracks start faster and use less data"),
+                        false,
+                    ),
                     choice(
                         START_FROM,
                         "Start From",
@@ -115,6 +123,7 @@ pub fn settings(ctx: &Context) -> DjSettings {
     DjSettings {
         crossfade: seconds.min(MAX_CROSSFADE),
         avoid_repeats: ctx.flag(AVOID_REPEATS),
+        show_video: ctx.flag(SHOW_VIDEO),
         start_from: match ctx.text(START_FROM) {
             MY_MIX => StartFrom::MyMix,
             _ => StartFrom::CurrentVideo,

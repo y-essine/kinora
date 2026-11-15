@@ -106,6 +106,9 @@ pub struct DjSettings {
     pub crossfade: Duration,
     pub avoid_repeats: bool,
     pub start_from: StartFrom,
+    /// Play the tracks' videos. Off (the default), the DJ is audio only:
+    /// tracks start in about half the time and no video is decoded.
+    pub show_video: bool,
 }
 
 impl Default for DjSettings {
@@ -114,6 +117,7 @@ impl Default for DjSettings {
             crossfade: DEFAULT_CROSSFADE,
             avoid_repeats: true,
             start_from: StartFrom::CurrentVideo,
+            show_video: false,
         }
     }
 }

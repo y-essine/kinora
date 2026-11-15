@@ -108,7 +108,7 @@ There is one player. Whatever is opened next plays in it.
 |---|---|
 | **Closed** | Nothing. |
 | **Expanded** | The video page (stage, title, description, Up next) over everything but the sidebar. |
-| **Minimized** | The mini-player. Wide windows: a card in a bottom corner (336 px: the live video, under it title, channel, play/pause, next, close). Narrow windows: a bar across the bottom, above the tab bar, with the video on its left. A 3 px line in the accent shows how far the video is. The card carries the video's ambient colours, like the stage. |
+| **Minimized** | The mini-player. Wide windows: a card in a bottom corner (336 px: the live video, under it title, channel, previous, play/pause, next, close). Narrow windows: a bar across the bottom, above the tab bar, with the video on its left. A 3 px line in the accent shows how far the video is. The card carries the video's ambient colours, like the stage. |
 | **Fullscreen** | As before (F: screen, T: window); only from expanded. |
 
 Opening a video grows the player out of the picture that was clicked (card or
@@ -138,8 +138,24 @@ what you asked for, the video comes along. A video opened from a card expands
 the player; one started by the player itself (Up next, autoplay, next) keeps
 it as it is, so a minimized player plays on as a playlist.
 
-"Previous" is the video played before in this sitting. "Next" is the first of
-Up next.
+### Previous and Next
+
+**Previous** and **Next** sit either side of the play button on the player
+(also in fullscreen), in the mini-player, and in the DJ's panel. They are one
+pair of actions (`win.player-previous`, `win.player-next`; Shift+P, Shift+N;
+two fingers sideways on the stage), so every button and key does the same, and
+all are greyed out together when there is nowhere to go.
+
+- **Next** is the first of Up next: what autoplay would pick. Greyed out until
+  Up next has arrived.
+- **Previous**, more than 3 s into a video, starts it over; within the first
+  3 s it goes to the video played before in this sitting. Greyed out when
+  neither applies.
+- With the DJ on they move through its tracks, crossfading (see *DJ*).
+
+The buttons are put into Clapper's own control bar and take the look of its
+play button: one bar, no second row of controls. Media keys are not wired:
+Clapper's MPRIS only walks its own queue, which holds one video here.
 
 ### Not built yet
 
@@ -188,16 +204,47 @@ narrow ones). One panel moves from page to page with the music.
 - **Card** (`.k-panel`): the kicker *DJ on* with an amber dot, a faint note
   for where the music comes from (*Picked for you* with an account, *From
   YouTube* when YouTube Music's radio failed and the plain mix stands in), and
-  *Leave*. Under it what plays: 64 px artwork, title (15/600), artists,
-  "album · year" for songs, and Skip.
+  a *Show Video* toggle, and *Leave*. Under it what plays: 64 px artwork,
+  title (15/600), artists, "album · year" for songs, then Previous and Next
+  (the player's own). A small spinner stands beside them while a track that
+  was asked for is starting.
 - **Queue**: "Up next" with the number queued, then up to 30 rows: 40 px
-  artwork, title, artists, length. Click a row to play it now. *Play next* and
+  artwork, title, artists, length. Click a row to mix into it now. *Play next* and
   *Remove* appear on a row with the pointer or the focus (opacity only). Drag
   a row onto another to move it there; the target shows an amber line.
 
-In the mini-player a small amber **DJ** tag sits before the artist, and its
-Next button skips the track. Shift+N skips too; there is no "previous" in a DJ
-session.
+In the mini-player a small amber **DJ** tag sits before the artist.
+
+### Audio first
+
+The DJ plays **audio only** unless *Show Video* is on (the toggle in the panel;
+also in Preferences → Extensions). The stage then shows the track's artwork,
+in its own shape, on its ambient colours, where the video would be; the
+controls are the same. Audio starts in about half the time, and a crossfade
+does not decode two videos. Switched to video, tracks play as videos again
+from the next track on (the one that plays was loaded without its picture and
+keeps its artwork).
+
+### Changing track
+
+Every change of track the user asks for sounds the same: **Next**,
+**Previous**, clicking a row of the queue, and opening a card of a song that
+is in the queue all crossfade over the *Crossfade* setting, exactly like the
+change at the end of a track.
+
+- The other track's page takes the stage at once; the fade begins the moment
+  it plays. Until then the current track plays on at full volume, Previous and
+  Next are greyed out, and the panel shows its spinner.
+- **Previous** follows the player's rule: more than 3 s in, the track starts
+  over; within 3 s, the DJ goes back to the track before (which leaves the
+  current one first in the queue, so Next returns to it).
+- A change asked for during a fade ends that fade and starts the new one.
+
+To make the wait disappear, tracks are **got ready ahead of time**: once a
+track is under way the next one is prepared and its player loaded and held
+silent at its start ("warm"); the queue row the pointer rests on for 0.4 s
+gets the same. At most two players are kept warm (the next track and the
+hovered one). A warm track starts in about 0.1 s.
 
 ### Sound and motion
 
@@ -208,10 +255,8 @@ session.
 - The picture **cuts**: the next track's page takes the stage about 2 s
   before the fade is due (its artwork and a spinner while it starts), and the
   old track plays on unseen until it has faded out. No visual crossfade.
-- **Skip** does not wait: the old track fades out in under half a second and
-  the next one starts at full volume as soon as it can.
-- The next track is prepared while the current one plays, so it starts in
-  about a second. If it does not (a prepared stream can fail and fall back to
+- With the next track warm, its page opens 0.3 s before the fade instead. If
+  it is not ready (a prepared stream can fail and fall back to
   the slow path), the current track simply plays to its end and the next one
   comes in when it is ready; nothing is cut off.
 
@@ -226,9 +271,10 @@ playlists*), which hide while empty.
 
 ### Not built yet
 
-- **Playlists play**: the shelves and the card are there; the engine's
-  playlist seed and the feeds that fill the shelves arrive with kinora-core.
-- **Previous track** and a visible history.
+- **A visible history** (Previous walks it, nothing lists it).
+- **Media keys**: see *Previous and Next*.
+- **Video for the track that plays** when *Show Video* is switched on: it
+  comes with the next track.
 - **Adding to the queue from elsewhere** ("Play next" on any video card): the
   engine has `play_next`/`enqueue`; no menu item uses them yet.
 - **One volume during a fade**: changing the volume while two tracks cross

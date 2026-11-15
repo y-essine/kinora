@@ -1169,6 +1169,26 @@ impl Client {
         });
     }
 
+    /// Kinora: like `prepare_playback`, audio only (the DJ plays music this
+    /// way: it starts in about half the time).
+    pub fn prepare_audio_playback(&self, video: &Video) {
+        if video.platform() != "youtube" {
+            return;
+        }
+        let core = self.core();
+        let id = video.id();
+        tspawn!(async move {
+            if let Err(e) = core.prepare_audio(&id).await {
+                log::warn!("Could not prepare the audio of {}: {e}", id.id);
+            }
+        });
+    }
+
+    /// Kinora: a prepared audio-only playback URI (see `prepare_audio_playback`).
+    pub fn prepared_audio_playback_uri(&self, video: &Video) -> Option<String> {
+        self.core().prepared_audio_uri(&video.id())
+    }
+
     /// Kinora: a prepared playback URI for this video (see `prepare_playback`).
     pub fn prepared_playback_uri(&self, video: &Video) -> Option<String> {
         self.core().prepared_uri(&video.id())
