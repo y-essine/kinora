@@ -548,7 +548,8 @@ pub mod imp {
                 move |_: &VideoPage| obj.imp().update_transport()
             );
             let video_page = if dj {
-                VideoPage::new_dj(video, &obj.client())
+                let audio_only = !obj.client().core().dj_settings().show_video;
+                VideoPage::new_dj(video, &obj.client(), audio_only)
             } else {
                 VideoPage::new(video, &obj.client())
             };
@@ -698,10 +699,14 @@ pub mod imp {
         /// Kinora: the DJ's next track takes the player (see `gui/dj.rs`). The
         /// sheet stays as it is, expanded or minimized. With `over`, the page
         /// it replaces keeps playing and is returned, for the DJ to fade out.
+        ///
+        /// `warmed`: the track's page, loaded ahead of time by the DJ; it
+        /// starts at once.
         pub(crate) fn open_dj_track(
             &self,
             video: &Video,
             over: bool,
+            warmed: Option<VideoPage>,
         ) -> (VideoPage, Option<VideoPage>) {
             let obj = self.obj();
             let sheet = self.player_sheet.get();
@@ -716,7 +721,8 @@ pub mod imp {
                 }
             }
             let expand = current.is_none() || sheet.expanded();
-            let page = self.new_video_page(video, true);
+            let was_warmed = warmed.is_some();
+            let page = warmed.unwrap_or_else(|| self.new_video_page(video, true));
             let outgoing = if over {
                 sheet.open_over(&page, expand)
             } else {
@@ -731,8 +737,17 @@ pub mod imp {
             if expand {
                 page.grab_focus();
             }
-            page.play();
+            if was_warmed {
+                page.start_warm();
+            } else {
+                page.play();
+            }
             (page, outgoing)
+        }
+
+        /// A page for a DJ track that is not shown yet (to load it ahead).
+        pub(crate) fn new_dj_page(&self, video: &Video) -> VideoPage {
+            self.new_video_page(video, true)
         }
 
         pub(crate) fn current_video_page(&self) -> Option<VideoPage> {
@@ -1958,7 +1973,9 @@ pub mod imp {
             // the queue's buttons applied to its third track.
             #[cfg(feature = "dev-hooks")]
             {
-                let dev_actions: [(&str, fn(&Self)); 7] = [
+                let dev_actions: [(&str, fn(&Self)); 9] = [
+                    ("dj-queue-hover", |s| s.dj().dev_queue("hover")),
+                    ("dj-show-video", |s| s.dj().dev_toggle_video()),
                     ("dj-show-queue", |s| {
                         if let Some(page) = s.current_video_page() {
                             page.dev_scroll_to(430.0);

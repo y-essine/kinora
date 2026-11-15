@@ -16,6 +16,12 @@
 //!   soon as the other track plays, over the crossfade setting;
 //! - the queue is topped up in the background.
 //!
+//! The DJ is audio first: unless "Show video" is on, a track is prepared and
+//! played as audio only, and its page shows the artwork. To make changing
+//! track immediate, the next track (and the queue row the pointer rests on)
+//! is *warmed*: its page is built ahead of time and its player loaded and
+//! held paused at the start, at most [`MAX_WARM`] of them.
+//!
 //! Why this is not a `kinora_core::player::Player` adapter with
 //! `crossfade_to`: a track here is a whole page (its own Clapper player with
 //! prepared-stream fallbacks, title, details), and the crossfade is between
@@ -49,6 +55,13 @@ const RESTART_AFTER: f64 = 3.0;
 const START_TIMEOUT: Duration = Duration::from_secs(40);
 /// After a failed request for more tracks, wait before asking again.
 const REFILL_PAUSE: Duration = Duration::from_secs(15);
+/// With the next player warm, it starts at once: open it this long ahead.
+const WARM_LEAD: Duration = Duration::from_millis(300);
+/// How many players are kept loaded ahead: the next track, and the one the
+/// pointer rests on in the queue. (Preparing is capped at two at a time too.)
+const MAX_WARM: usize = 2;
+/// The pointer rests this long on a queue row before the row is got ready.
+const HOVER_DELAY: Duration = Duration::from_millis(400);
 /// How many queued tracks the panel lists.
 const SHOWN: usize = 30;
 
@@ -65,6 +78,17 @@ struct Fade {
     running: Option<(TransitionPlan, Instant)>,
     steps: u32,
     timer: glib::SourceId,
+    /// How ready the incoming track was: "warm", "prepared" or "cold".
+    readiness: &'static str,
+}
+
+/// A track loaded ahead of time: its page, with the player paused at the start.
+struct Warm {
+    id: String,
+    page: VideoPage,
+    began: Instant,
+    /// Loaded (and said so in the log).
+    ready: bool,
 }
 
 struct Inner {
@@ -75,8 +99,12 @@ struct Inner {
     page: RefCell<Option<VideoPage>>,
     fade: RefCell<Option<Fade>>,
     tick: RefCell<Option<glib::SourceId>>,
-    /// The id of the track that was prepared ahead.
-    prepared: RefCell<Option<String>>,
+    /// The ids of the tracks whose streams were asked for ahead of time.
+    prepared: RefCell<Vec<String>>,
+    /// Players loaded ahead (see [`Warm`]), oldest first.
+    warm: RefCell<Vec<Warm>>,
+    /// The queued track the pointer rested on last.
+    hovered: RefCell<Option<String>>,
     starting: Cell<bool>,
     refilling: Cell<bool>,
     refill_after: Cell<Option<Instant>>,
@@ -98,6 +126,8 @@ impl Dj {
             fade: RefCell::default(),
             tick: RefCell::default(),
             prepared: RefCell::default(),
+            warm: RefCell::default(),
+            hovered: RefCell::default(),
             starting: Cell::default(),
             refilling: Cell::default(),
             refill_after: Cell::default(),
@@ -241,7 +271,7 @@ impl Dj {
             };
             self.0.session.replace(Some(session));
             let video = window.client().dj_video(&track);
-            let (page, _) = window.imp().open_dj_track(&video, false);
+            let (page, _) = window.imp().open_dj_track(&video, false, None);
             self.adopt(&page);
         }
         window.set_dj_on(true);
@@ -273,7 +303,7 @@ impl Dj {
         if let Some(tick) = inner.tick.take() {
             tick.remove();
         }
-        inner.prepared.take();
+        self.forget_ahead();
         inner.refilling.set(false);
         inner.refill_after.set(None);
         if let Some(page) = inner.page.take() {
@@ -391,12 +421,17 @@ impl Dj {
             track.title,
             wanted.as_secs_f64()
         );
-        let (page, old) = window.imp().open_dj_track(&client.dj_video(&track), true);
+        let (warmed, readiness) = self.take_ahead(&client, &track);
+        let (page, old) = window
+            .imp()
+            .open_dj_track(&client.dj_video(&track), true, warmed);
         self.adopt(&page);
         if let Some(outgoing) = old {
             // Silent until it really plays; then the curve takes over.
             page.set_fade_gain(Some(0.0));
-            self.start_fade(outgoing, page, wanted);
+            self.start_fade(outgoing, page, wanted, readiness);
+        } else {
+            page.set_fade_gain(None);
         }
     }
 
@@ -425,7 +460,6 @@ impl Dj {
     /// `page` is the current track's page from now on.
     fn adopt(&self, page: &VideoPage) {
         self.0.page.replace(Some(page.clone()));
-        self.0.prepared.take();
         page.set_dj_panel(Some(self.0.panel.widget()));
         self.refresh_panel();
     }
@@ -468,15 +502,7 @@ impl Dj {
             .and_then(|s| s.peek_next().cloned());
 
         // Get the next track ready once this one is under way.
-        if let Some(next) = &next
-            && playing
-            && position > 3.0
-            && inner.prepared.borrow().as_deref() != Some(next.id.as_str())
-        {
-            log::info!("DJ: preparing {} ({})", next.id, next.title);
-            inner.prepared.replace(Some(next.id.clone()));
-            client.prepare_playback(&client.dj_video(next));
-        }
+        self.warm_up(&client, next.as_ref().filter(|_| playing && position > 3.0));
         self.refill();
 
         // The track ended by itself (a cut, or nothing was ready to fade to).
@@ -492,9 +518,14 @@ impl Dj {
         if let (true, Some(duration), Some(next)) = (playing, duration, &next) {
             let at = Duration::from_secs_f64(position.max(0.0));
             let plan = client.dj_transition(Some(Duration::from_secs_f64(duration)), at, next);
+            let lead = if self.is_warm(&next.id) {
+                WARM_LEAD
+            } else {
+                LEAD
+            };
             if let Some(start) = plan.start_at
                 && !plan.is_cut()
-                && at + LEAD >= start
+                && at + lead >= start
             {
                 self.crossfade(plan.fade);
             }
@@ -516,8 +547,13 @@ impl Dj {
             return self.out_of_music();
         };
         log::info!("DJ: cut to {} ({})", track.id, track.title);
-        let video = window.client().dj_video(&track);
-        let (page, _) = window.imp().open_dj_track(&video, false);
+        let client = window.client();
+        let (warmed, readiness) = self.take_ahead(&client, &track);
+        log::info!("DJ: {} starts {readiness}", track.id);
+        let (page, _) = window
+            .imp()
+            .open_dj_track(&client.dj_video(&track), false, warmed);
+        page.set_fade_gain(None);
         self.adopt(&page);
     }
 
@@ -541,20 +577,29 @@ impl Dj {
             track.title,
             fade.as_secs_f64()
         );
-        let video = window.client().dj_video(&track);
-        let (page, old) = window.imp().open_dj_track(&video, true);
+        let client = window.client();
+        let (warmed, readiness) = self.take_ahead(&client, &track);
+        let (page, old) = window
+            .imp()
+            .open_dj_track(&client.dj_video(&track), true, warmed);
         self.adopt(&page);
         match old {
             Some(outgoing) => {
                 // Silent until it really plays; then the curve takes over.
                 page.set_fade_gain(Some(0.0));
-                self.start_fade(outgoing, page, fade);
+                self.start_fade(outgoing, page, fade, readiness);
             }
             None => page.set_fade_gain(None),
         }
     }
 
-    fn start_fade(&self, outgoing: VideoPage, incoming: VideoPage, wanted: Duration) {
+    fn start_fade(
+        &self,
+        outgoing: VideoPage,
+        incoming: VideoPage,
+        wanted: Duration,
+        readiness: &'static str,
+    ) {
         let dj = Rc::downgrade(&self.0);
         let timer = glib::timeout_add_local(FADE_STEP, move || match dj.upgrade() {
             Some(inner) => Dj(inner).fade_step(),
@@ -568,6 +613,7 @@ impl Dj {
             running: None,
             steps: 0,
             timer,
+            readiness,
         }));
         self.changed();
     }
@@ -590,9 +636,10 @@ impl Dj {
                 };
                 let over = fade.wanted.min(left);
                 log::info!(
-                    "DJ: fading over {:.1} s ({:.1} s after opening the next player)",
-                    over.as_secs_f64(),
-                    fade.began.elapsed().as_secs_f64()
+                    "DJ: started after {:.1} s ({}); fading over {:.1} s",
+                    fade.began.elapsed().as_secs_f64(),
+                    fade.readiness,
+                    over.as_secs_f64()
                 );
                 fade.running = Some((fade_plan(over), Instant::now()));
                 drop(slot);
@@ -650,13 +697,163 @@ impl Dj {
         }
         fade.incoming.set_fade_gain(None);
         log::info!("DJ: fade done; releasing the old player");
-        // Pause only, and drop it a moment later: stopping a Clapper player,
-        // or ending one while another starts, has crashed (VideoPage::stop).
-        let outgoing = fade.outgoing;
-        outgoing.set_fade_gain(Some(0.0));
-        outgoing.stop();
-        glib::timeout_add_local_once(Duration::from_millis(1500), move || drop(outgoing));
+        fade.outgoing.set_fade_gain(Some(0.0));
+        release(fade.outgoing);
         self.changed();
+    }
+
+    // ---- Getting tracks ready ahead of time ----
+
+    fn audio_only(client: &Client) -> bool {
+        !client.core().dj_settings().show_video
+    }
+
+    /// The track's stream has been looked up (audio or video, as the DJ plays).
+    fn is_prepared(client: &Client, video: &Video) -> bool {
+        if Self::audio_only(client) {
+            client.prepared_audio_playback_uri(video).is_some()
+        } else {
+            client.prepared_playback_uri(video).is_some()
+        }
+    }
+
+    fn is_warm(&self, id: &str) -> bool {
+        self.0.warm.borrow().iter().any(|w| w.id == id && w.ready)
+    }
+
+    /// Prepare the next track (`next`, once the current one is under way)
+    /// and the queue row the pointer rests on, then load their players and
+    /// hold them paused at the start. Called from the loop.
+    fn warm_up(&self, client: &Client, next: Option<&Track>) {
+        let inner = &self.0;
+        let Some(window) = inner.window.upgrade() else {
+            return;
+        };
+        let hovered = inner.hovered.borrow().clone().and_then(|id| {
+            let session = inner.session.borrow();
+            session
+                .as_ref()?
+                .upcoming()
+                .iter()
+                .find(|t| t.id == id)
+                .cloned()
+        });
+        let mut wanted: Vec<Track> = next.cloned().into_iter().collect();
+        if let Some(hovered) = hovered.filter(|h| wanted.iter().all(|t| t.id != h.id)) {
+            wanted.push(hovered);
+        }
+
+        // What is no longer queued is let go; what finished loading says so.
+        let queued: Vec<String> = inner
+            .session
+            .borrow()
+            .as_ref()
+            .map(|s| s.upcoming().iter().map(|t| t.id.clone()).collect())
+            .unwrap_or_default();
+        let mut warm = inner.warm.borrow_mut();
+        let (keep, gone): (Vec<Warm>, Vec<Warm>) =
+            warm.drain(..).partition(|w| queued.contains(&w.id));
+        *warm = keep;
+        gone.into_iter().for_each(|w| release(w.page));
+        for w in warm.iter_mut().filter(|w| !w.ready) {
+            if w.page.is_warm() {
+                w.ready = true;
+                log::info!(
+                    "DJ: warm {} ready in {:.1} s",
+                    w.id,
+                    w.began.elapsed().as_secs_f64()
+                );
+            }
+        }
+
+        for track in &wanted {
+            if warm.iter().any(|w| w.id == track.id) {
+                continue;
+            }
+            let video = client.dj_video(track);
+            if !Self::is_prepared(client, &video) {
+                let mut asked = inner.prepared.borrow_mut();
+                if !asked.contains(&track.id) {
+                    log::info!("DJ: preparing {} ({})", track.id, track.title);
+                    asked.push(track.id.clone());
+                    if Self::audio_only(client) {
+                        client.prepare_audio_playback(&video);
+                    } else {
+                        client.prepare_playback(&video);
+                    }
+                }
+                continue;
+            }
+            // Room for it: the least recent one nobody waits for goes.
+            if warm.len() >= MAX_WARM {
+                let Some(index) = warm
+                    .iter()
+                    .position(|w| wanted.iter().all(|t| t.id != w.id))
+                else {
+                    continue;
+                };
+                release(warm.remove(index).page);
+            }
+            log::info!("DJ: warming {} ({})", track.id, track.title);
+            let page = window.imp().new_dj_page(&video);
+            page.warm();
+            warm.push(Warm {
+                id: track.id.clone(),
+                page,
+                began: Instant::now(),
+                ready: false,
+            });
+        }
+    }
+
+    /// The track is about to play: its warmed page, if there is one, and how
+    /// ready it is (for the log).
+    fn take_ahead(&self, client: &Client, track: &Track) -> (Option<VideoPage>, &'static str) {
+        let mut warm = self.0.warm.borrow_mut();
+        match warm.iter().position(|w| w.id == track.id) {
+            Some(index) => {
+                let w = warm.remove(index);
+                let readiness = if w.ready || w.page.is_warm() {
+                    "warm"
+                } else {
+                    "warming"
+                };
+                (Some(w.page), readiness)
+            }
+            None if Self::is_prepared(client, &client.dj_video(track)) => (None, "prepared"),
+            None => (None, "cold"),
+        }
+    }
+
+    /// Let go of everything that was got ready (the DJ is left, or changes
+    /// between audio and video).
+    fn forget_ahead(&self) {
+        self.0.prepared.borrow_mut().clear();
+        self.0.hovered.take();
+        let warm: Vec<Warm> = self.0.warm.borrow_mut().drain(..).collect();
+        warm.into_iter().for_each(|w| release(w.page));
+    }
+
+    /// The panel's "Show video" was switched.
+    fn set_show_video(&self, show: bool) {
+        let Some(window) = self.0.window.upgrade() else {
+            return;
+        };
+        if window.client().core().dj_settings().show_video == show {
+            return;
+        }
+        log::info!("DJ: {}", if show { "with video" } else { "audio only" });
+        crate::gui::extension_settings::store(
+            &window.imp().settings,
+            kinora_core::extension::builtin::dj::ID,
+            kinora_core::extension::builtin::dj::SHOW_VIDEO,
+            kinora_core::extension::SettingValue::Bool(show),
+        );
+        // What was got ready is of the other kind now.
+        self.forget_ahead();
+        if let Some(page) = self.0.page.borrow().as_ref() {
+            page.set_audio_only(!show);
+        }
     }
 
     // ---- The queue ----
@@ -718,6 +915,11 @@ impl Dj {
     fn panel_action(&self, action: PanelAction) {
         match action {
             PanelAction::Leave => return self.leave(),
+            PanelAction::ShowVideo(show) => return self.set_show_video(show),
+            PanelAction::Hover(id) => {
+                self.0.hovered.replace(Some(id));
+                return;
+            }
             PanelAction::PlayNow(id) => {
                 if let Some(session) = self.0.session.borrow_mut().as_mut() {
                     session.move_to(&id, 0);
@@ -763,6 +965,15 @@ impl Dj {
         }
     }
 
+    /// Test hook: switch "Show video".
+    #[cfg(feature = "dev-hooks")]
+    pub fn dev_toggle_video(&self) {
+        if let Some(client) = self.client() {
+            self.set_show_video(!client.core().dj_settings().show_video);
+            self.refresh_panel();
+        }
+    }
+
     /// Test hook: act on the queue as the panel's buttons would. `what` is
     /// `play-next`, `remove` or `play-now`, applied to the queue's third track.
     #[cfg(feature = "dev-hooks")]
@@ -776,6 +987,7 @@ impl Dj {
         let Some(id) = id else { return };
         self.panel_action(match what {
             "play-next" => PanelAction::PlayNext(id),
+            "hover" => PanelAction::Hover(id),
             "remove" => PanelAction::Remove(id),
             _ => PanelAction::PlayNow(id),
         });
@@ -794,6 +1006,14 @@ fn seed_video(seed: &DjSeed) -> Option<&str> {
         DjSeed::Video(id) => Some(id),
         _ => None,
     }
+}
+
+/// Let a page go whose player may still run: pause only, and drop it a
+/// moment later. Stopping a Clapper player, or ending one while another
+/// starts, has crashed (see `VideoPage::stop`).
+fn release(page: VideoPage) {
+    page.stop();
+    glib::timeout_add_local_once(Duration::from_millis(1500), move || drop(page));
 }
 
 /// A fade of `over` that starts now (a cut when there is nothing to fade).
@@ -834,6 +1054,9 @@ fn album_line(track: &Track) -> String {
 // ---- The panel ------------------------------------------------------------
 
 enum PanelAction {
+    ShowVideo(bool),
+    /// The pointer rests on a queue row.
+    Hover(String),
     Leave,
     PlayNow(String),
     PlayNext(String),
@@ -854,6 +1077,7 @@ struct Panel {
     album: gtk::Label,
     count: gtk::Label,
     pending: adw::Spinner,
+    show_video: gtk::ToggleButton,
     list: gtk::ListBox,
     more: gtk::Label,
     /// What is shown, to leave the widgets alone when nothing changed.
@@ -967,8 +1191,23 @@ impl Panel {
             handler,
             move |_| emit(&handler, PanelAction::Leave)
         ));
+        // Audio first; the video is one switch away.
+        let show_video = gtk::ToggleButton::builder()
+            .icon_name("camera-video-symbolic")
+            .tooltip_text(gettextrs::gettext(
+                "Show Video (off: audio only, tracks start faster)",
+            ))
+            .valign(gtk::Align::Center)
+            .css_classes(["flat", "circular", "k-dj-video"])
+            .build();
+        show_video.connect_toggled(glib::clone!(
+            #[strong]
+            handler,
+            move |button| emit(&handler, PanelAction::ShowVideo(button.is_active()))
+        ));
         header.append(&on);
         header.append(&note);
+        header.append(&show_video);
         header.append(&leave);
 
         // What plays.
@@ -1072,6 +1311,7 @@ impl Panel {
             album,
             count,
             pending,
+            show_video,
             list,
             more,
             shown_now: RefCell::default(),
@@ -1103,6 +1343,10 @@ impl Panel {
     }
 
     fn show(&self, session: &DjSession, client: &Client) {
+        let show_video = client.core().dj_settings().show_video;
+        if self.show_video.is_active() != show_video {
+            self.show_video.set_active(show_video);
+        }
         self.note
             .set_label(&match (session.source(), session.personal()) {
                 (RadioSource::YouTube, _) => gettextrs::gettext("From YouTube"),
@@ -1215,6 +1459,35 @@ impl Panel {
             track.title,
             track.artists_line()
         ))]);
+
+        // The pointer resting on a row gets its track ready, so that picking
+        // it mixes in at once.
+        let motion = gtk::EventControllerMotion::new();
+        let resting: Rc<RefCell<Option<glib::SourceId>>> = Rc::default();
+        motion.connect_enter(glib::clone!(
+            #[strong]
+            handler,
+            #[strong]
+            id,
+            #[strong]
+            resting,
+            move |_, _, _| {
+                let (handler, id, slot) = (handler.clone(), id.clone(), resting.clone());
+                let source = glib::timeout_add_local_once(HOVER_DELAY, move || {
+                    slot.take();
+                    emit(&handler, PanelAction::Hover(id));
+                });
+                if let Some(old) = resting.replace(Some(source)) {
+                    old.remove();
+                }
+            }
+        ));
+        motion.connect_leave(move |_| {
+            if let Some(source) = resting.take() {
+                source.remove();
+            }
+        });
+        row.add_controller(motion);
 
         // Reorder by dragging a row onto another: it takes that one's place.
         let drag = gtk::DragSource::builder()

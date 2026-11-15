@@ -37,10 +37,11 @@ impl VideoPage {
 
     /// Kinora: the page of a DJ track (see `gui/dj.rs`): no Up next and no
     /// autoplay of its own, the DJ's queue is shown instead.
-    pub fn new_dj(video: &Video, client: &Client) -> Self {
+    pub fn new_dj(video: &Video, client: &Client, audio_only: bool) -> Self {
         Object::builder()
             .property("client", client)
             .property("dj", true)
+            .property("audio-only", audio_only)
             .property("video", video)
             .build()
     }
@@ -58,17 +59,24 @@ impl VideoPage {
             queue.clear();
             self.imp().play_started.set(Some(std::time::Instant::now()));
             self.set_loading(true);
+            // Kinora: audio only decodes no video, whatever the stream holds.
+            player.set_video_enabled(!self.audio_only());
             let fallback = self.convert_to_clapper_playable_url(&video);
+            let audio = Some(self.audio_only())
+                .filter(|audio_only| *audio_only)
+                .and_then(|_| self.client().prepared_audio_playback_uri(&video));
             if self.try_get_downloaded(&video).is_some() {
                 imp.fast_start_active.set(false);
                 queue.add_item(&MediaItem::new(&fallback));
-                player.play();
-            } else if let Some(prepared) = self.client().prepared_playback_uri(&video) {
+                self.start_player(&player);
+            } else if let Some(prepared) =
+                audio.or_else(|| self.client().prepared_playback_uri(&video))
+            {
                 // Kinora: prepared in the background; starts in a second or two.
                 log::info!("Playing prepared {}", video.id().id);
                 imp.fast_start_active.set(true);
                 queue.add_item(&MediaItem::new(&prepared));
-                player.play();
+                self.start_player(&player);
                 self.fall_back_if_stuck(&video);
             } else {
                 // Kinora: fast start (streams in ~0.2 s instead of ~9 s); the
@@ -84,16 +92,59 @@ impl VideoPage {
                     page.imp().fast_start_active.set(fast.is_some());
                     let watchdog = fast.is_some();
                     queue.add_item(&MediaItem::new(&fast.unwrap_or(fallback)));
-                    player.play();
+                    page.start_player(&player);
                     if watchdog {
                         page.fall_back_if_stuck(&video);
                     }
                 });
             }
             // Kinora: count it on the YouTube account once it was really watched.
-            self.mark_watched_on_account_later(&video);
+            if !imp.warming.get() {
+                self.mark_watched_on_account_later(&video);
+            }
         } else {
             self.pause();
+        }
+    }
+
+    /// Start the player: playing, or, for a page that is being warmed
+    /// ([`Self::warm`]), paused with its first seconds buffered.
+    fn start_player(&self, player: &clapper::Player) {
+        if self.imp().warming.get() {
+            player.pause();
+        } else {
+            player.play();
+        }
+    }
+
+    /// Kinora: get the page ready ahead of time (the DJ's next track): load
+    /// the stream and hold it paused and silent at its start, so
+    /// [`Self::start_warm`] plays at once.
+    pub fn warm(&self) {
+        self.imp().warming.set(true);
+        self.set_fade_gain(Some(0.0));
+        self.play();
+    }
+
+    /// A warmed page has its stream loaded and waits at the start.
+    pub fn is_warm(&self) -> bool {
+        self.imp().warming.get()
+            && self.player_state() == clapper::PlayerState::Paused
+            && self.duration_secs().is_some()
+    }
+
+    /// Play a page that was warmed (or is still warming).
+    pub fn start_warm(&self) {
+        let imp = self.imp();
+        if !imp.warming.replace(false) {
+            return;
+        }
+        imp.play_started.set(Some(std::time::Instant::now()));
+        if let Some(player) = imp.clapper.player() {
+            player.play();
+        }
+        if let Some(video) = self.video() {
+            self.mark_watched_on_account_later(&video);
         }
     }
 
@@ -227,7 +278,11 @@ impl VideoPage {
             let Some(player) = imp.clapper.player() else {
                 return;
             };
-            if matches!(player.state(), clapper::PlayerState::Playing) || player.position() > 0.0 {
+            // (A page that is being warmed waits paused: that is not stuck.)
+            if matches!(player.state(), clapper::PlayerState::Playing)
+                || player.position() > 0.0
+                || (imp.warming.get() && page.duration_secs().is_some())
+            {
                 return;
             }
             log::warn!(
@@ -590,6 +645,12 @@ pub mod imp {
         pub(super) up_next_store: FiniteVideoStore,
         #[template_child]
         pub(super) dj_slot: TemplateChild<gtk::Box>,
+        /// Kinora: the DJ's audio-only way: the stage shows the track's artwork
+        /// and no video is decoded.
+        #[property(get, set = Self::set_audio_only)]
+        audio_only: Cell<bool>,
+        /// The page is loaded ahead of time, paused (see `warm`).
+        pub(super) warming: Cell<bool>,
         /// Kinora: "Up next" has arrived, so there is a next video.
         #[property(get)]
         has_next: Cell<bool>,
@@ -655,6 +716,8 @@ pub mod imp {
                 stage_scrim: Default::default(),
                 details_box: Default::default(),
                 dj_slot: Default::default(),
+                audio_only: Default::default(),
+                warming: Default::default(),
                 has_next: Default::default(),
                 dj: Default::default(),
                 dj_available: Default::default(),
@@ -791,6 +854,18 @@ pub mod imp {
                     }
                 }
             ));
+        }
+
+        /// Kinora: audio only, or with the video (the DJ's "Show video").
+        /// A track that was loaded without its video keeps its artwork: the
+        /// video comes with the next one.
+        fn set_audio_only(&self, audio_only: bool) {
+            if self.audio_only.replace(audio_only) == audio_only {
+                return;
+            }
+            if let Some(player) = self.clapper.player() {
+                player.set_video_enabled(!audio_only);
+            }
         }
 
         /// Kinora: the DJ took this page over, or gave it back.
@@ -1499,7 +1574,7 @@ pub mod imp {
                             queue.add_item(&clapper::MediaItem::new(
                                 &obj.convert_to_clapper_playable_url(&video),
                             ));
-                            player.play();
+                            obj.start_player(&player);
                         }
                         None
                     }

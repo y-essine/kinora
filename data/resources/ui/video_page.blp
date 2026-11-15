@@ -221,6 +221,51 @@ template $TFVideoPage: Adw.Bin {
                   valign: fill;
                   vexpand: bind template.fullscreened;
 
+                  // Kinora: audio only (the DJ): the artwork on its own colours
+                  // takes the video's place.
+                  [overlay]
+                  Overlay {
+                    styles [
+                      "k-artwork-stage",
+                    ]
+
+                    visible: bind template.audio-only;
+                    can-target: false;
+
+                    Picture {
+                      styles [
+                        "k-glow",
+                      ]
+
+                      content-fit: fill;
+                      can-shrink: true;
+                      accessible-role: presentation;
+                      paintable: bind $pixbuf_to_ambient(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+                    }
+
+                    // (The frame takes the picture's own shape, square or wide.)
+                    [overlay]
+                    AspectFrame {
+                      styles [
+                        "k-artwork-frame",
+                      ]
+
+                      obey-child: true;
+
+                      Picture {
+                        styles [
+                          "k-artwork",
+                        ]
+
+                        overflow: hidden;
+                        content-fit: cover;
+                        can-shrink: true;
+                        accessible-role: presentation;
+                        paintable: bind $pixbuf_to_paintable(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+                      }
+                    }
+                  }
+
                   // Kinora: while the video starts, its thumbnail and a spinner instead
                   // of a black player.
                   [overlay]
@@ -237,6 +282,8 @@ template $TFVideoPage: Adw.Bin {
                     }
 
                     Picture {
+                      // (Audio only: the artwork is there already.)
+                      visible: bind template.audio-only inverted;
                       content-fit: contain;
                       opacity: 0.6;
                       paintable: bind $pixbuf_to_paintable(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;

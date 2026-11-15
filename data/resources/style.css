@@ -741,6 +741,20 @@ button.k-glass:hover {
   opacity: 1;
 }
 
+/* Audio only: the artwork on its ambient colours, where the video would be. */
+.k-artwork-stage {
+  background-color: var(--k-bg);
+}
+
+.k-artwork-frame {
+  margin: 28px;
+}
+
+.k-artwork {
+  border-radius: var(--k-radius-m);
+  box-shadow: var(--k-shadow-2);
+}
+
 /* The mini-player's "DJ". */
 .k-dj-tag {
   font-size: 10px;

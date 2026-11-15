@@ -112,7 +112,7 @@ fn extension_group(
 }
 
 /// Store one setting value in `extension-settings`.
-fn store(settings: &Settings, extension: &str, key: &str, value: SettingValue) {
+pub(crate) fn store(settings: &Settings, extension: &str, key: &str, value: SettingValue) {
     let dict = with_value(&settings.value(VALUES), &value_key(extension, key), &value);
     if let Err(e) = settings.set_value(VALUES, &dict) {
         log::warn!("Could not store {VALUES}: {e}");
