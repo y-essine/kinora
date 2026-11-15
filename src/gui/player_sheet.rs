@@ -700,6 +700,7 @@ pub mod imp {
                 page.stop();
             }
             page.unparent();
+            page.retire();
         }
 
         pub(super) fn finish_close(&self) {

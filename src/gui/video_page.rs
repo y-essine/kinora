@@ -250,6 +250,19 @@ impl VideoPage {
         player.pause();
     }
 
+    /// Kinora: keep a page that is let go alive a little longer: at least 3 s
+    /// after now and 10 s after it was made. A Clapper player ended while its
+    /// threads are still starting crashed the app (SIGSEGV in
+    /// `g_main_context_unref` on Clapper's reactables thread, once right after
+    /// the DJ built its first pages); players never end that young this way.
+    pub fn retire(&self) {
+        use std::time::Duration;
+        let wait = Duration::from_secs(3)
+            .max(Duration::from_secs(10).saturating_sub(self.imp().born.elapsed()));
+        let page = self.clone();
+        glib::timeout_add_local_once(wait, move || drop(page));
+    }
+
     /// Kinora: stop for good (another video replaces this page): pause and
     /// unload the video, so it no longer plays or streams.
     pub fn stop(&self) {
@@ -432,6 +445,9 @@ impl VideoPage {
         let Some(player) = imp.clapper.player() else {
             return;
         };
+        imp.quiet_volume_until.set(Some(
+            std::time::Instant::now() + std::time::Duration::from_secs(1),
+        ));
         match gain {
             Some(gain) => {
                 if imp.fade_base.get().is_none() {
@@ -598,6 +614,12 @@ pub mod imp {
     #[template(resource = "/ui/video_page.ui")]
     #[properties(wrapper_type = super::VideoPage)]
     pub struct VideoPage {
+        /// Kinora: when the page (and its Clapper player) was made; see
+        /// [`super::retire`].
+        pub(super) born: std::time::Instant,
+        /// Kinora: no volume bubble until then (the DJ set the volume, not the
+        /// user; Clapper may report it a moment later).
+        pub(super) quiet_volume_until: std::cell::Cell<Option<std::time::Instant>>,
         #[template_child]
         pub(super) clapper: TemplateChild<clapper_gtk::Video>,
         #[property(get, set = Self::set_video, nullable)]
@@ -705,6 +727,8 @@ pub mod imp {
     impl Default for VideoPage {
         fn default() -> Self {
             Self {
+                born: std::time::Instant::now(),
+                quiet_volume_until: Default::default(),
                 clapper: Default::default(),
                 video: Default::default(),
                 billboard: Default::default(),
@@ -1645,8 +1669,13 @@ pub mod imp {
                 #[weak]
                 obj,
                 move |_| {
-                    // Not while the DJ fades it.
-                    if obj.imp().fade_base.get().is_none() {
+                    // Not while the DJ fades it, nor just after.
+                    let imp = obj.imp();
+                    let quiet = imp
+                        .quiet_volume_until
+                        .get()
+                        .is_some_and(|until| std::time::Instant::now() < until);
+                    if imp.fade_base.get().is_none() && !quiet {
                         billboard.announce_volume();
                     }
                 }

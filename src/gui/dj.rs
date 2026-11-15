@@ -1013,7 +1013,7 @@ fn seed_video(seed: &DjSeed) -> Option<&str> {
 /// starts, has crashed (see `VideoPage::stop`).
 fn release(page: VideoPage) {
     page.stop();
-    glib::timeout_add_local_once(Duration::from_millis(1500), move || drop(page));
+    page.retire();
 }
 
 /// A fade of `over` that starts now (a cut when there is nothing to fade).
