@@ -150,7 +150,7 @@ list to store. Labels in manifests are English; translate them in the frontend.
 |---|---|---|---|
 | `account` (Network, Account) | `youtube-home` main feed source; `on_watched` marks the video watched on YouTube; menu item `import-subscriptions` (Home) | `personal-up-next`, `mark-watched` (both on) | Fully anonymous: no Home, anonymous Up next, nothing sent to the account. `Core::account_active` and the Client's `has-account` are false |
 | `home-chips` | a feed filter that, when asked, hides the playlist-only Mixes/Playlists chips and the playlist cards | `hide-playlist-chips` ("Hide Mixes and Playlists", off: they are kept so the DJ can play them) | Home is one feed without a chip bar |
-| `dj` (Network, Account, PlayerControl) | nothing to the fixed points: frontends call `Core::dj_*` (see *The DJ*) | `crossfade-seconds` (number 0..12, 6; stored as text), `avoid-repeats` (on), `start-from` (`current-video` \| `my-mix`) | `Core::dj_*` fail; nothing is fetched |
+| `dj` (Network, Account, PlayerControl) | nothing to the fixed points: frontends call `Core::dj_*` (see *The DJ*) | `crossfade-seconds` (number 0..12, 6; stored as text), `avoid-repeats` (on), `show-video` (off: the DJ plays audio only), `start-from` (`current-video` \| `my-mix`) | `Core::dj_*` fail; nothing is fetched |
 
 What stays in the core on purpose: anonymous Up next (it works without an account; the account
 extension only personalises it), prepared/fast-start playback, and connecting an account (the
@@ -180,7 +180,7 @@ I/O except `dj::radio::fetch`; the frontend draws the session and plays the audi
   continued by asking for the mix from its last video). Parsed into `dj::Track` (id, title,
   artists with channel ids, album and year for songs, duration, thumbnail, kind
   Song/MusicVideo/Video). `Track::to_video()` gives the `pcore::Video` to prepare and play.
-- **Session** (`DjSession`): `current`, `upcoming`, `history` (with `skipped`); `advance`, `skip`,
+- **Session** (`DjSession`): `current`, `upcoming`, `history` (with `skipped`); `advance`, `skip`, `back` (the track before becomes current again, the current one waits first in the queue),
   `play_next`, `enqueue`, `remove`, `move_to`. Dedupe keeps out the same video and the same song
   by the same main artist in another upload (`dj::track_key`: brackets and " - " version notes
   like "(Official Video)", "(Lyrics)", "(2022 Remaster)", "Live" dropped; remixes, covers and
