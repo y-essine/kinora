@@ -100,6 +100,7 @@ jobs:
           cp extras/kinora-account extras/kinora-prepare "$STAGE/bin/"
 
       - name: Bundle runtime
+        id: bundle
         run: |
           STAGE="$GITHUB_WORKSPACE/kinora-win"
           mkdir -p "$STAGE/lib" "$STAGE/share/glib-2.0/schemas" "$STAGE/libexec"
@@ -148,14 +149,20 @@ jobs:
         run: |
           # (Unix form: a "D:" in PATH would split there.)
           STAGE="$(cygpath -u "$GITHUB_WORKSPACE")/kinora-win"
+          # Does everything find its DLLs in the bundle? (Reports, then the
+          # Python check below says what that means in practice.)
+          bash "$GITHUB_WORKSPACE/build-aux/windows/check-bundle.sh" "$STAGE" || BUNDLE_INCOMPLETE=1
           # Only the bundle on the PATH: does Python find yt-dlp and Clapper's typelib?
           PATH="$STAGE/bin" PYTHONHOME="$STAGE" GI_TYPELIB_PATH="$STAGE/lib/girepository-1.0" \
             "$STAGE/bin/python.exe" -c "import yt_dlp, gi; gi.require_version('Clapper', '0.0'); from gi.repository import Clapper; print('python ok', yt_dlp.version.__version__)"
           PATH="$STAGE/bin" "$STAGE/libexec/gstreamer-1.0/gst-plugin-scanner.exe" --help >/dev/null 2>&1 || true
           PATH="$STAGE/bin" GST_PLUGIN_PATH="$STAGE/lib/gstreamer-1.0" \
             "$STAGE/bin/gst-inspect-1.0.exe" hlsdemux2 >/dev/null 2>&1 && echo "gst ok" || echo "gst-inspect not bundled"
+          [ -z "$BUNDLE_INCOMPLETE" ]
 
+      # Runs after a failed smoke test too: one CI round says as much as it can.
       - name: Self-test (kinora.exe --self-test)
+        if: ${{ !cancelled() && steps.bundle.outcome == 'success' }}
         run: |
           STAGE="$GITHUB_WORKSPACE/kinora-win"
           OUT="$GITHUB_WORKSPACE/self-test"
