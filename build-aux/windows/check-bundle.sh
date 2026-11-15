@@ -20,20 +20,35 @@ bin="$stage/bin"
 system="$(cygpath -u "${SYSTEMROOT:-C:\\Windows}")/System32"
 lower() { tr 'A-Z' 'a-z'; }
 
-# "file<TAB>dll" for every import not found in bin, System32 or beside the file.
+# "file<TAB>dll" for every import not found in bin, System32 or beside the
+# file. One awk over everything: a process per import is minutes on Windows.
 missing() {
-  local known
-  known=$( { ls "$bin"; ls "$system"; } 2>/dev/null | lower | sort -u)
-  find "$stage" \( -iname '*.dll' -o -iname '*.pyd' -o -iname '*.exe' \) -type f -print0 |
-    xargs -0 -n 50 objdump -p 2>/dev/null |
-    awk '/file format pei/ { file = $1; sub(/:$/, "", file) }
-         /DLL Name:/      { print file "\t" $3 }' |
-    while IFS=$'\t' read -r file dll; do
-      case "$(echo "$dll" | lower)" in api-ms-win-*|ext-ms-*) continue ;; esac
-      if ! grep -qxF "$(echo "$dll" | lower)" <<<"$known" && [ ! -e "$(dirname "$file")/$dll" ]; then
-        printf '%s\t%s\n' "${file#"$stage"/}" "$dll"
-      fi
-    done | sort -u
+  local files root
+  files=$(mktemp)
+  # D:/... throughout: objdump, a Windows program, prints its paths that way.
+  root=$(cygpath -m "$stage")
+  find "$root" \( -iname '*.dll' -o -iname '*.pyd' -o -iname '*.exe' \) -type f > "$files"
+  {
+    # Every name a DLL can be found as: bin, System32, and "dir/name" for
+    # each binary of the bundle (found beside its importer).
+    { ls "$bin"; ls "$system"; } 2>/dev/null | sed 's/^/K\t/'
+    sed 's/^/B\t/' "$files"
+    tr '\n' '\0' < "$files" | xargs -0 -n 100 objdump -p 2>/dev/null |
+      awk '/file format pei/ { file = $1; sub(/:$/, "", file) }
+           /DLL Name:/      { print "I\t" file "\t" $3 }'
+  } | awk -F'\t' -v stage="$root/" '
+      $1 == "K" { known[tolower($2)] = 1; next }
+      $1 == "B" { beside[tolower($2)] = 1; next }
+      $1 == "I" {
+        dll = tolower($3)
+        if (dll ~ /^(api-ms-win-|ext-ms-)/ || dll in known) next
+        dir = $2; sub(/\/[^\/]*$/, "", dir)
+        if ((tolower(dir "/" $3)) in beside) next
+        file = $2
+        if (index(file, stage) == 1) file = substr(file, length(stage) + 1)
+        print file "\t" $3
+      }' | sort -u
+  rm -f "$files"
 }
 
 if [ -n "$copy_from" ]; then
