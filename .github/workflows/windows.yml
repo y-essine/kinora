@@ -145,13 +145,55 @@ jobs:
 
       - name: Smoke test
         run: |
-          STAGE="$GITHUB_WORKSPACE/kinora-win"
+          # (Unix form: a "D:" in PATH would split there.)
+          STAGE="$(cygpath -u "$GITHUB_WORKSPACE")/kinora-win"
           # Only the bundle on the PATH: does Python find yt-dlp and Clapper's typelib?
           PATH="$STAGE/bin" PYTHONHOME="$STAGE" GI_TYPELIB_PATH="$STAGE/lib/girepository-1.0" \
             "$STAGE/bin/python.exe" -c "import yt_dlp, gi; gi.require_version('Clapper', '0.0'); from gi.repository import Clapper; print('python ok', yt_dlp.version.__version__)"
           PATH="$STAGE/bin" "$STAGE/libexec/gstreamer-1.0/gst-plugin-scanner.exe" --help >/dev/null 2>&1 || true
           PATH="$STAGE/bin" GST_PLUGIN_PATH="$STAGE/lib/gstreamer-1.0" \
             "$STAGE/bin/gst-inspect-1.0.exe" hlsdemux2 >/dev/null 2>&1 && echo "gst ok" || echo "gst-inspect not bundled"
+
+      - name: Self-test (kinora.exe --self-test)
+        run: |
+          STAGE="$GITHUB_WORKSPACE/kinora-win"
+          OUT="$GITHUB_WORKSPACE/self-test"
+          mkdir -p "$OUT"
+          # Two short clips, made with the build machine's GStreamer: VP8/Opus
+          # (WebM) and H.264/AAC (MP4), YouTube's usual codecs aside.
+          gst-launch-1.0 -q videotestsrc num-buffers=240 pattern=smpte ! video/x-raw,width=640,height=360,framerate=30/1 \
+            ! vp8enc deadline=1 ! webmmux name=m ! filesink location="$OUT/clip.webm" \
+            audiotestsrc num-buffers=350 ! audioconvert ! opusenc ! m. || echo "no WebM clip"
+          gst-launch-1.0 -q -e videotestsrc num-buffers=240 pattern=ball ! video/x-raw,width=640,height=360,framerate=30/1 \
+            ! x264enc ! h264parse ! mp4mux name=m ! filesink location="$OUT/clip.mp4" \
+            audiotestsrc num-buffers=350 ! audioconvert ! avenc_aac ! m. || echo "no MP4 clip"
+          MEDIA=()
+          for clip in "$OUT"/clip.*; do
+            [ -s "$clip" ] && MEDIA+=(--media "file:///$(cygpath -m "$clip")")
+          done
+          # Only what a user's Windows has: the bundle, no MSYS2 on the PATH or in XDG_*.
+          BIN="$(cygpath -u "$STAGE")/bin"
+          set +e
+          /usr/bin/timeout 600 /usr/bin/env -i SYSTEMROOT="$SYSTEMROOT" WINDIR="$WINDIR" TEMP="$TEMP" TMP="$TMP" \
+            USERPROFILE="$USERPROFILE" APPDATA="$APPDATA" LOCALAPPDATA="$LOCALAPPDATA" \
+            USERNAME="$USERNAME" COMPUTERNAME="$COMPUTERNAME" \
+            PATH="$BIN:/c/Windows/System32:/c/Windows" RUST_LOG="kinora=debug,kinora_core=debug" \
+            "$BIN/kinora.exe" --self-test --out "$(cygpath -w "$OUT")" "${MEDIA[@]}" \
+              --online "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
+          status=$?
+          set -e
+          echo "exit code $status"
+          LOG="$(cygpath -u "$LOCALAPPDATA")/kinora/kinora.log"
+          [ -f "$LOG" ] && cp "$LOG" "$OUT/" && tail -n 150 "$LOG"
+          cat "$OUT/self-test.txt" || true
+          exit $status
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kinora-windows-self-test
+          path: self-test/
+          if-no-files-found: ignore
 
       - name: Zip
         run: |
