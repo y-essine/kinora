@@ -132,12 +132,13 @@ jobs:
           cp /ucrt64/share/xml/iso-codes/iso_639.xml "$STAGE/share/xml/iso-codes/" 2>/dev/null || true
 
           # Every DLL any of it links to
-          deps() { ldd "$@" 2>/dev/null | grep -o '/ucrt64/bin/[^ ]*\.dll' ; }
+          # (ldd fails on the odd file; that must not fail the step.)
+          deps() { ldd "$@" 2>/dev/null | grep -o '/ucrt64/bin/[^ ]*\.dll' || true; }
           {
             deps "$STAGE"/bin/*.exe
             find "$STAGE/lib" "$STAGE/libexec" \( -name '*.dll' -o -name '*.pyd' -o -name '*.exe' \) \
-              -type f -print0 | xargs -0 -n 20 ldd 2>/dev/null | grep -o '/ucrt64/bin/[^ ]*\.dll'
-          } | sort -u | xargs -I{} cp -n {} "$STAGE/bin/"
+              -type f -print0 | { xargs -0 -n 20 ldd 2>/dev/null || true; } | grep -o '/ucrt64/bin/[^ ]*\.dll' || true
+          } | sort -u | xargs -r -I{} cp --update=none {} "$STAGE/bin/"
           ls "$STAGE/bin" | wc -l
           du -sh "$STAGE"
 
