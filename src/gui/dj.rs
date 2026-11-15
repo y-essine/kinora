@@ -323,7 +323,8 @@ impl Dj {
         queued
     }
 
-    /// Back one track, wherever the current one is.
+    /// Test hook: back one track, wherever the current one is.
+    #[cfg(feature = "dev-hooks")]
     pub fn back(&self) {
         self.step(true);
     }
