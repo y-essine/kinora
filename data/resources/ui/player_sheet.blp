@@ -91,6 +91,19 @@ template $TFPlayerSheet: Gtk.Widget {
           }
         }
 
+        // The window's Previous and Next, as on the player itself.
+        Button {
+          styles [
+            "flat",
+            "circular",
+          ]
+
+          valign: center;
+          icon-name: "media-skip-backward-symbolic";
+          tooltip-text: _("Previous");
+          action-name: "win.player-previous";
+        }
+
         Button {
           styles [
             "flat",
@@ -111,8 +124,8 @@ template $TFPlayerSheet: Gtk.Widget {
 
           valign: center;
           icon-name: "media-skip-forward-symbolic";
-          tooltip-text: _("Next Video");
-          clicked => $next() swapped;
+          tooltip-text: _("Next");
+          action-name: "win.player-next";
         }
 
         Button {

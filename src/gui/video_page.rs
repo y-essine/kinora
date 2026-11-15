@@ -317,6 +317,13 @@ impl VideoPage {
         }
     }
 
+    /// Start what plays over from the beginning.
+    pub fn restart(&self) {
+        if let Some(player) = self.imp().clapper.player() {
+            player.seek(0.0);
+        }
+    }
+
     /// The player's position in seconds.
     pub fn position_secs(&self) -> f64 {
         self.imp().clapper.player().map_or(0.0, |p| p.position())
@@ -583,6 +590,9 @@ pub mod imp {
         pub(super) up_next_store: FiniteVideoStore,
         #[template_child]
         pub(super) dj_slot: TemplateChild<gtk::Box>,
+        /// Kinora: "Up next" has arrived, so there is a next video.
+        #[property(get)]
+        has_next: Cell<bool>,
         /// Kinora: this page plays a DJ track (see `gui/dj.rs`).
         #[property(get, set = Self::set_dj)]
         dj: Cell<bool>,
@@ -645,6 +655,7 @@ pub mod imp {
                 stage_scrim: Default::default(),
                 details_box: Default::default(),
                 dj_slot: Default::default(),
+                has_next: Default::default(),
                 dj: Default::default(),
                 dj_available: Default::default(),
                 fade_base: Default::default(),
@@ -798,6 +809,64 @@ pub mod imp {
                     self.load_up_next(&video);
                 }
             }
+        }
+
+        /// Kinora: Previous and Next on the player, either side of Clapper's
+        /// play button (also in fullscreen). Clapper's bar has no place for
+        /// them of its own (its buttons only walk its own queue, which holds
+        /// one video here), so they are put into its button box. They are the
+        /// window's `player-previous` and `player-next`, and are greyed out
+        /// with those actions.
+        fn add_transport_buttons(&self) {
+            fn find(widget: &gtk::Widget, type_name: &str) -> Option<gtk::Widget> {
+                if widget.type_().name() == type_name {
+                    return Some(widget.clone());
+                }
+                let mut child = widget.first_child();
+                while let Some(c) = child {
+                    if let Some(found) = find(&c, type_name) {
+                        return Some(found);
+                    }
+                    child = c.next_sibling();
+                }
+                None
+            }
+            let play = find(self.clapper.upcast_ref(), "ClapperGtkSimpleControls")
+                .and_then(|controls| find(&controls, "ClapperGtkTogglePlayButton"));
+            let Some((play, parent)) = play.and_then(|p| {
+                let parent = p.parent().and_downcast::<gtk::Box>()?;
+                Some((p, parent))
+            }) else {
+                log::warn!("Player: no place for Previous and Next in Clapper's controls");
+                return;
+            };
+            let button = |icon: &str, tooltip: String, action: &str| {
+                let button = gtk::Button::builder()
+                    .icon_name(icon)
+                    .tooltip_text(tooltip)
+                    .action_name(action)
+                    .valign(gtk::Align::Center)
+                    .focus_on_click(false)
+                    .build();
+                // Look like the play button beside them.
+                for class in play.css_classes() {
+                    button.add_css_class(&class);
+                }
+                button.add_css_class("k-transport");
+                button
+            };
+            let previous = button(
+                "media-skip-backward-symbolic",
+                gettextrs::gettext("Previous (Shift+P)"),
+                "win.player-previous",
+            );
+            let next = button(
+                "media-skip-forward-symbolic",
+                gettextrs::gettext("Next (Shift+N)"),
+                "win.player-next",
+            );
+            parent.insert_child_after(&previous, play.prev_sibling().as_ref());
+            parent.insert_child_after(&next, Some(&play));
         }
 
         /// Kinora: toggle screen (`window_mode == false`) or window fullscreen.
@@ -1290,6 +1359,17 @@ pub mod imp {
 
             // Kinora: show the buffered part ahead of the playhead.
             crate::gui::buffer_bar::attach(&self.clapper);
+            self.add_transport_buttons();
+            self.up_next_store.connect_items_changed(clone!(
+                #[weak]
+                obj,
+                move |store, _, _, _| {
+                    let has_next = store.n_items() > 0;
+                    if obj.imp().has_next.replace(has_next) != has_next {
+                        obj.notify_has_next();
+                    }
+                }
+            ));
 
             // Set up MPRIS
             // Make sure that every instance of VideoPage gets its own own_name, otherwise having multiple videos opened at the same time (e.g. one in the bottom bar and one in the navigation stack) would overwrite each other.

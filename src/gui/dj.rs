@@ -12,6 +12,8 @@
 //!   player really plays, both volumes follow the plan's equal-power curve
 //!   every 50 ms; then the old player is paused and let go;
 //! - a cut (short or live tracks, crossfade off) waits for the end of stream;
+//! - Next and Previous are the same crossfade, asked for by hand: it starts as
+//!   soon as the other track plays, over the crossfade setting;
 //! - the queue is topped up in the background.
 //!
 //! Why this is not a `kinora_core::player::Player` adapter with
@@ -40,8 +42,9 @@ const FADE_STEP: Duration = Duration::from_millis(50);
 /// The next player is opened this long before the planned start: about what
 /// a prepared stream needs to begin playing.
 const LEAD: Duration = Duration::from_millis(2000);
-/// A skipped track does not wait for the next one: it fades out at once.
-const SKIP_FADE: Duration = Duration::from_millis(450);
+/// "Previous" within this many seconds of a track's start goes back one
+/// track; later it starts the track over.
+const RESTART_AFTER: f64 = 3.0;
 /// Give up waiting for the incoming player after this long.
 const START_TIMEOUT: Duration = Duration::from_secs(40);
 /// After a failed request for more tracks, wait before asking again.
@@ -53,8 +56,8 @@ const SHOWN: usize = 30;
 struct Fade {
     /// The page that is ending. It is no longer in the window.
     outgoing: VideoPage,
-    /// The page that fades in. `None`: a skip, only the old one fades out.
-    incoming: Option<VideoPage>,
+    /// The page that fades in.
+    incoming: VideoPage,
     /// How long the fade should take.
     wanted: Duration,
     began: Instant,
@@ -282,13 +285,140 @@ impl Dj {
         }
     }
 
-    /// The user skips the current track.
+    /// Next: crossfade into the next track now.
     pub fn skip(&self) {
-        if !self.is_on() {
+        self.step(false);
+    }
+
+    /// Previous: start the track over, or, within its first seconds, crossfade
+    /// back into the one that played before.
+    pub fn previous(&self) {
+        let page = self.0.page.borrow().clone();
+        match page {
+            Some(page) if page.position_secs() > RESTART_AFTER || !self.can_go_back() => {
+                log::info!("DJ: previous: starting the track over");
+                page.restart();
+            }
+            _ => self.step(true),
+        }
+    }
+
+    /// A video was picked somewhere in the app while the DJ is on. If it is
+    /// in the queue (a song of the playlist or mix that plays), the DJ mixes
+    /// into it like Next does, and `true` is returned; else it is not the
+    /// DJ's to play.
+    pub fn play_queued(&self, video: &Video) -> bool {
+        let id = video.id().id;
+        let queued = self
+            .0
+            .session
+            .borrow_mut()
+            .as_mut()
+            .is_some_and(|s| s.upcoming().iter().any(|t| t.id == id) && s.move_to(&id, 0));
+        if queued {
+            log::info!("DJ: picked {id} from the queue");
+            self.step(false);
+            self.refresh_panel();
+        }
+        queued
+    }
+
+    /// Back one track, wherever the current one is.
+    pub fn back(&self) {
+        self.step(true);
+    }
+
+    /// There is a track to go on to.
+    pub fn can_go_next(&self) -> bool {
+        self.0
+            .session
+            .borrow()
+            .as_ref()
+            .is_some_and(|s| s.peek_next().is_some())
+    }
+
+    /// A track played before this one.
+    pub fn can_go_back(&self) -> bool {
+        self.0
+            .session
+            .borrow()
+            .as_ref()
+            .is_some_and(|s| s.can_go_back())
+    }
+
+    /// A track was asked for and has not started playing yet: the fade waits
+    /// for it, and so do Next and Previous.
+    pub fn is_pending(&self) -> bool {
+        self.0
+            .fade
+            .borrow()
+            .as_ref()
+            .is_some_and(|f| f.running.is_none())
+    }
+
+    /// Next or Previous by hand: the other track's page opens over the
+    /// current one, and they crossfade over the setting as soon as it plays.
+    fn step(&self, back: bool) {
+        let inner = &self.0;
+        let Some(window) = inner.window.upgrade() else {
+            return;
+        };
+        if !self.is_on() || self.is_pending() {
             return;
         }
+        // A fade that is under way ends here: one crossfade at a time.
         self.finish_fade();
-        self.move_on(true);
+        let track = inner.session.borrow_mut().as_mut().and_then(|s| {
+            if back {
+                s.back().cloned()
+            } else {
+                s.skip().cloned()
+            }
+        });
+        let Some(track) = track else {
+            if !back {
+                self.out_of_music();
+            }
+            return;
+        };
+        let client = window.client();
+        let wanted = client.core().dj_settings().crossfade;
+        log::info!(
+            "DJ: {} by hand: crossfade to {} ({}) over the {:.0} s setting",
+            if back { "previous" } else { "next" },
+            track.id,
+            track.title,
+            wanted.as_secs_f64()
+        );
+        let (page, old) = window.imp().open_dj_track(&client.dj_video(&track), true);
+        self.adopt(&page);
+        if let Some(outgoing) = old {
+            // Silent until it really plays; then the curve takes over.
+            page.set_fade_gain(Some(0.0));
+            self.start_fade(outgoing, page, wanted);
+        }
+    }
+
+    /// Nothing is queued: more may be on its way; else the DJ is done.
+    fn out_of_music(&self) {
+        let inner = &self.0;
+        let finished = inner
+            .session
+            .borrow()
+            .as_ref()
+            .is_none_or(|s| s.refill_request().is_none());
+        if finished && !inner.refilling.get() {
+            self.toast(&gettextrs::gettext("The DJ has run out of music"));
+            self.leave();
+        }
+    }
+
+    /// Tell the panel and the window's Next and Previous what is possible now.
+    fn changed(&self) {
+        self.0.panel.set_pending(self.is_pending());
+        if let Some(window) = self.0.window.upgrade() {
+            window.imp().update_transport();
+        }
     }
 
     /// `page` is the current track's page from now on.
@@ -306,6 +436,8 @@ impl Dj {
         if let Some(session) = session.as_ref() {
             self.0.panel.show(session, &client);
         }
+        drop(session);
+        self.changed();
     }
 
     // ---- The loop ----
@@ -352,7 +484,7 @@ impl Dj {
             clapper::PlayerState::Stopped | clapper::PlayerState::Paused
         ) && duration.is_some_and(|d| position >= d - 0.75);
         if ended {
-            self.move_on(false);
+            self.move_on();
             return;
         }
 
@@ -368,45 +500,24 @@ impl Dj {
         }
     }
 
-    /// Make the next track current and open its page in place of the current
-    /// one. `skipped`: the user asked; the old track fades out quickly.
-    fn move_on(&self, skipped: bool) {
+    /// The track ended by itself: the next one takes its place (a cut).
+    fn move_on(&self) {
         let inner = &self.0;
         let Some(window) = inner.window.upgrade() else {
             return;
         };
-        let next = inner.session.borrow_mut().as_mut().and_then(|s| {
-            if skipped {
-                s.skip().cloned()
-            } else {
-                s.advance().cloned()
-            }
-        });
+        let next = inner
+            .session
+            .borrow_mut()
+            .as_mut()
+            .and_then(|s| s.advance().cloned());
         let Some(track) = next else {
-            // Nothing queued: more may be on its way; else the DJ is done.
-            let finished = inner
-                .session
-                .borrow()
-                .as_ref()
-                .is_none_or(|s| s.refill_request().is_none());
-            if finished && !inner.refilling.get() {
-                self.toast(&gettextrs::gettext("The DJ has run out of music"));
-                self.leave();
-            }
-            return;
+            return self.out_of_music();
         };
-        log::info!(
-            "DJ: {} {} ({})",
-            if skipped { "skip to" } else { "cut to" },
-            track.id,
-            track.title
-        );
+        log::info!("DJ: cut to {} ({})", track.id, track.title);
         let video = window.client().dj_video(&track);
-        let (page, old) = window.imp().open_dj_track(&video, skipped);
+        let (page, _) = window.imp().open_dj_track(&video, false);
         self.adopt(&page);
-        if let Some(outgoing) = old {
-            self.start_fade(outgoing, None, SKIP_FADE);
-        }
     }
 
     /// Open the next track's page over the current one and fade between them.
@@ -436,30 +547,28 @@ impl Dj {
             Some(outgoing) => {
                 // Silent until it really plays; then the curve takes over.
                 page.set_fade_gain(Some(0.0));
-                self.start_fade(outgoing, Some(page), fade);
+                self.start_fade(outgoing, page, fade);
             }
             None => page.set_fade_gain(None),
         }
     }
 
-    fn start_fade(&self, outgoing: VideoPage, incoming: Option<VideoPage>, wanted: Duration) {
+    fn start_fade(&self, outgoing: VideoPage, incoming: VideoPage, wanted: Duration) {
         let dj = Rc::downgrade(&self.0);
         let timer = glib::timeout_add_local(FADE_STEP, move || match dj.upgrade() {
             Some(inner) => Dj(inner).fade_step(),
             None => glib::ControlFlow::Break,
         });
-        let running = incoming
-            .is_none()
-            .then(|| (fade_plan(wanted), Instant::now()));
         self.0.fade.replace(Some(Fade {
             outgoing,
             incoming,
             wanted,
             began: Instant::now(),
-            running,
+            running: None,
             steps: 0,
             timer,
         }));
+        self.changed();
     }
 
     fn fade_step(&self) -> glib::ControlFlow {
@@ -468,10 +577,7 @@ impl Dj {
             return glib::ControlFlow::Break;
         };
         if fade.running.is_none() {
-            let started = fade
-                .incoming
-                .as_ref()
-                .is_none_or(|p| p.player_state() == clapper::PlayerState::Playing);
+            let started = fade.incoming.player_state() == clapper::PlayerState::Playing;
             if started {
                 // Fade over what the old track has left, at most.
                 let out = &fade.outgoing;
@@ -488,6 +594,10 @@ impl Dj {
                     fade.began.elapsed().as_secs_f64()
                 );
                 fade.running = Some((fade_plan(over), Instant::now()));
+                drop(slot);
+                // No longer pending: Next and Previous are back.
+                self.changed();
+                return glib::ControlFlow::Continue;
             } else if fade.began.elapsed() > START_TIMEOUT {
                 log::warn!("DJ: the next track did not start; giving up the fade");
                 drop(slot);
@@ -509,9 +619,7 @@ impl Dj {
         }
         let gains = plan.gains(elapsed);
         fade.outgoing.set_fade_gain(Some(gains.outgoing));
-        if let Some(incoming) = &fade.incoming {
-            incoming.set_fade_gain(Some(gains.incoming));
-        }
+        fade.incoming.set_fade_gain(Some(gains.incoming));
         // Twice a second is enough to follow it in the log.
         if fade.steps % 10 == 0 {
             log::info!(
@@ -519,11 +627,7 @@ impl Dj {
                 elapsed.as_secs_f64(),
                 plan.fade.as_secs_f64(),
                 gains.outgoing,
-                if fade.incoming.is_some() {
-                    gains.incoming
-                } else {
-                    1.0
-                }
+                gains.incoming
             );
         }
         fade.steps += 1;
@@ -543,9 +647,7 @@ impl Dj {
         if remove_timer {
             fade.timer.remove();
         }
-        if let Some(incoming) = &fade.incoming {
-            incoming.set_fade_gain(None);
-        }
+        fade.incoming.set_fade_gain(None);
         log::info!("DJ: fade done; releasing the old player");
         // Pause only, and drop it a moment later: stopping a Clapper player,
         // or ending one while another starts, has crashed (VideoPage::stop).
@@ -553,6 +655,7 @@ impl Dj {
         outgoing.set_fade_gain(Some(0.0));
         outgoing.stop();
         glib::timeout_add_local_once(Duration::from_millis(1500), move || drop(outgoing));
+        self.changed();
     }
 
     // ---- The queue ----
@@ -613,7 +716,6 @@ impl Dj {
 
     fn panel_action(&self, action: PanelAction) {
         match action {
-            PanelAction::Skip => return self.skip(),
             PanelAction::Leave => return self.leave(),
             PanelAction::PlayNow(id) => {
                 if let Some(session) = self.0.session.borrow_mut().as_mut() {
@@ -731,7 +833,6 @@ fn album_line(track: &Track) -> String {
 // ---- The panel ------------------------------------------------------------
 
 enum PanelAction {
-    Skip,
     Leave,
     PlayNow(String),
     PlayNext(String),
@@ -751,6 +852,7 @@ struct Panel {
     artists: gtk::Label,
     album: gtk::Label,
     count: gtk::Label,
+    pending: adw::Spinner,
     list: gtk::ListBox,
     more: gtk::Label,
     /// What is shown, to leave the widgets alone when nothing changed.
@@ -886,18 +988,32 @@ impl Panel {
         text.append(&title);
         text.append(&artists);
         text.append(&album);
+        // Shown while the next track is asked for and has not started.
+        let pending = adw::Spinner::builder()
+            .width_request(16)
+            .height_request(16)
+            .valign(gtk::Align::Center)
+            .visible(false)
+            .tooltip_text(gettextrs::gettext("The next track is starting"))
+            .build();
+        // The window's own Previous and Next: the same as on the player.
+        let previous = icon_button(
+            "media-skip-backward-symbolic",
+            &gettextrs::gettext("Previous (Shift+P)"),
+        );
+        previous.set_action_name(Some("win.player-previous"));
         let skip = icon_button(
             "media-skip-forward-symbolic",
-            &gettextrs::gettext("Skip (Shift+N)"),
+            &gettextrs::gettext("Next: mix into the next track (Shift+N)"),
         );
-        skip.connect_clicked(glib::clone!(
-            #[strong]
-            handler,
-            move |_| emit(&handler, PanelAction::Skip)
-        ));
+        skip.set_action_name(Some("win.player-next"));
         now.append(&art_frame);
         now.append(&text);
-        now.append(&skip);
+        now.append(&pending);
+        let transport = gtk::Box::builder().valign(gtk::Align::Center).build();
+        transport.append(&previous);
+        transport.append(&skip);
+        now.append(&transport);
 
         // The queue.
         let queue_header = gtk::Box::builder().spacing(8).build();
@@ -954,6 +1070,7 @@ impl Panel {
             artists,
             album,
             count,
+            pending,
             list,
             more,
             shown_now: RefCell::default(),
@@ -964,6 +1081,10 @@ impl Panel {
 
     fn widget(&self) -> &gtk::Widget {
         self.root.upcast_ref()
+    }
+
+    fn set_pending(&self, pending: bool) {
+        self.pending.set_visible(pending);
     }
 
     fn connect(&self, f: impl Fn(PanelAction) + 'static) {

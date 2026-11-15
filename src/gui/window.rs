@@ -238,6 +238,9 @@ pub mod imp {
     use gtk::CompositeTemplate;
 
     const MOBILE_BOTTOM_BAR_ITEMS: u32 = 3;
+    /// Kinora: this many seconds into a video, Previous starts it over
+    /// instead of going back one.
+    const PREVIOUS_RESTARTS_AFTER: f64 = 3.0;
 
     #[derive(CompositeTemplate, Properties)]
     #[properties(wrapper_type = super::Window)]
@@ -322,6 +325,8 @@ pub mod imp {
 
         // Kinora: the DJ (see `gui/dj.rs`).
         dj: std::cell::OnceCell<crate::gui::dj::Dj>,
+        /// The `player-previous` and `player-next` actions (see `update_transport`).
+        transport: std::cell::OnceCell<(SimpleAction, SimpleAction)>,
         /// A DJ session is running.
         #[property(get, set)]
         dj_on: Cell<bool>,
@@ -369,6 +374,7 @@ pub mod imp {
                 main_show_sidebar_visible: Default::default(),
                 watch_history_enabled: Default::default(),
                 dj: Default::default(),
+                transport: Default::default(),
                 dj_on: Default::default(),
                 dj_available: Default::default(),
 
@@ -434,10 +440,12 @@ pub mod imp {
             let Some(page) = self.player_sheet.video_page() else {
                 return;
             };
-            // With the DJ on, "next" skips the track; there is no way back.
+            // With the DJ on, both are crossfades between its tracks.
             if self.dj().is_on() {
                 if forward {
                     self.dj().skip();
+                } else {
+                    self.dj().previous();
                 }
                 return;
             }
@@ -445,11 +453,44 @@ pub mod imp {
                 if let Some(next) = page.next_video() {
                     self.open_video(next, PlayType::Default, true, true);
                 }
+            } else if page.position_secs() > PREVIOUS_RESTARTS_AFTER {
+                // Like every player: well into the video, Previous starts it over.
+                page.restart();
             } else {
                 let previous = self.player_history.borrow_mut().pop();
                 if let Some(previous) = previous {
                     self.open_video(previous, PlayType::Default, true, false);
                 }
+            }
+            self.update_transport();
+        }
+
+        /// Kinora: whether Previous and Next have somewhere to go; the
+        /// buttons on the player, in the mini-player and in the DJ's panel
+        /// are greyed out with their actions.
+        pub(crate) fn update_transport(&self) {
+            let page = self.player_sheet.video_page();
+            let into_it = page
+                .as_ref()
+                .is_some_and(|p| p.position_secs() > PREVIOUS_RESTARTS_AFTER);
+            let (previous, next) = match &page {
+                None => (false, false),
+                Some(_) if self.dj().is_on() => {
+                    // While a track that was asked for is starting, wait.
+                    let free = !self.dj().is_pending();
+                    (
+                        free && (into_it || self.dj().can_go_back()),
+                        free && self.dj().can_go_next(),
+                    )
+                }
+                Some(page) => (
+                    into_it || !self.player_history.borrow().is_empty(),
+                    page.has_next(),
+                ),
+            };
+            if let Some((previous_action, next_action)) = self.transport.get() {
+                previous_action.set_enabled(previous);
+                next_action.set_enabled(next);
             }
         }
 
@@ -501,11 +542,18 @@ pub mod imp {
         /// page (see `gui/dj.rs`).
         fn new_video_page(&self, video: &Video, dj: bool) -> VideoPage {
             let obj = self.obj();
+            let update_transport = clone!(
+                #[weak]
+                obj,
+                move |_: &VideoPage| obj.imp().update_transport()
+            );
             let video_page = if dj {
                 VideoPage::new_dj(video, &obj.client())
             } else {
                 VideoPage::new(video, &obj.client())
             };
+            video_page.connect_has_next_notify(update_transport.clone());
+            video_page.connect_position_notify(update_transport);
             obj.bind_property("dj-available", &video_page, "dj-available")
                 .sync_create()
                 .build();
@@ -731,7 +779,14 @@ pub mod imp {
                 return;
             }
 
-            // Anything else that is opened ends the DJ: back to ordinary playing.
+            // A song of what the DJ plays: it mixes into it, like Next. Anything
+            // else that is opened ends the DJ: back to ordinary playing.
+            if play_internal && self.dj().play_queued(&video) {
+                if !from_player {
+                    sheet.expand();
+                }
+                return;
+            }
             self.dj().leave();
 
             // The old one counts as watched.
@@ -1054,7 +1109,11 @@ pub mod imp {
                 glib::timeout_add_local_once(std::time::Duration::from_secs(secs), move || {
                     log::info!("DEV: DJ playlist {id}");
                     let target = (id.as_str(), "").to_variant();
-                    let _ = gtk::prelude::WidgetExt::activate_action(&o, "win.dj-playlist", Some(&target));
+                    let _ = gtk::prelude::WidgetExt::activate_action(
+                        &o,
+                        "win.dj-playlist",
+                        Some(&target),
+                    );
                 });
             }
             if let Ok(list) = std::env::var("KH_ACTION") {
@@ -1064,13 +1123,14 @@ pub mod imp {
                     let (o, name) = (obj.clone(), name.to_owned());
                     glib::timeout_add_local_once(std::time::Duration::from_secs(secs), move || {
                         // `video.NAME` goes to the open video page's own actions.
-                        let (target, full): (gtk::Widget, String) = match name.strip_prefix("video.") {
-                            Some(_) => match super::dev_find_video_page(o.upcast_ref()) {
-                                Some(page) => (page, name.clone()),
-                                None => return,
-                            },
-                            None => (o.clone().upcast(), format!("win.{name}")),
-                        };
+                        let (target, full): (gtk::Widget, String) =
+                            match name.strip_prefix("video.") {
+                                Some(_) => match super::dev_find_video_page(o.upcast_ref()) {
+                                    Some(page) => (page, name.clone()),
+                                    None => return,
+                                },
+                                None => (o.clone().upcast(), format!("win.{name}")),
+                            };
                         log::info!("DEV: action {full}");
                         let _ = gtk::prelude::WidgetExt::activate_action(&target, &full, None);
                     });
@@ -1883,16 +1943,28 @@ pub mod imp {
                 ));
                 actions.add_action(&action);
             }
+            // Previous and Next start greyed out: nothing plays yet.
+            let transport = ["player-previous", "player-next"].map(|name| {
+                let action = actions
+                    .lookup_action(name)
+                    .and_downcast::<SimpleAction>()
+                    .expect("The player's actions to be there");
+                action.set_enabled(false);
+                action
+            });
+            let [previous, next] = transport;
+            let _ = self.transport.set((previous, next));
             // Test hooks for the DJ: what the session holds (to the log), and
             // the queue's buttons applied to its third track.
             #[cfg(feature = "dev-hooks")]
             {
-                let dev_actions: [(&str, fn(&Self)); 6] = [
+                let dev_actions: [(&str, fn(&Self)); 7] = [
                     ("dj-show-queue", |s| {
                         if let Some(page) = s.current_video_page() {
                             page.dev_scroll_to(430.0);
                         }
                     }),
+                    ("dj-back", |s| s.dj().back()),
                     ("dj-near-end", |s| {
                         if let Some(page) = s.current_video_page() {
                             page.dev_seek_near_end(14.0);
@@ -2088,6 +2160,13 @@ pub mod imp {
         /// Kinora: the DJ, and whether it is offered (its extension is on).
         fn setup_dj(&self) {
             let obj = self.obj();
+            // Previous and Next follow what is in the player.
+            self.player_sheet.connect_video_page_notify(clone!(
+                #[weak]
+                obj,
+                move |_| obj.imp().update_transport()
+            ));
+            obj.connect_dj_on_notify(|obj| obj.imp().update_transport());
             let _ = self.dj.set(crate::gui::dj::Dj::new(&obj));
             let update = clone!(
                 #[weak]

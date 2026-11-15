@@ -409,11 +409,6 @@ pub mod imp {
         }
 
         #[template_callback]
-        fn next(&self) {
-            self.obj().emit_by_name::<()>("skip", &[&true]);
-        }
-
-        #[template_callback]
         fn close_clicked(&self) {
             self.obj().close();
         }
