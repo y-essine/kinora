@@ -316,6 +316,24 @@ hovered one). A warm track starts in about 0.1 s.
 
 ### Sound and motion
 
+- With **Start on the Beat** on (a switch in Preferences → Extensions → DJ,
+  off by default), the next track does not come in at 0:00 but **where its
+  drums come in**: the first place where the beat is there and stays, after a
+  quiet intro (a pad, a guitar, a voice alone). A fade then has two beats to
+  cross instead of a beat and a haze.
+  - A track that gets going within its first 5 s starts at its start. So does
+    one without a clear entry, and one that only gets going after a minute or
+    after 30 % of its length: by then it has had a verse, and that is not an
+    intro to skip. The log says which, per track.
+  - It costs nothing at the fade: the next track's player waits at its entry
+    instead of at its start, and still starts in about 0.1 s. A track that was
+    not ready ahead of time (Previous, a pick from the queue) goes there
+    first, about 0.2 s, if its entry is known from before.
+  - The first track of a session plays from its start, and so does a track
+    started over with Previous; the seek bar goes back before the entry like
+    anywhere else.
+  - It works with and without Match Beats; with both, the beats that are
+    matched are those at the entry.
 - With **Match Beats** on (a switch in Preferences → Extensions → DJ, off by
   default), a crossfade is also **beat-matched**: the next track plays at the
   tempo of the one that ends, at its own pitch, with its beats on the other's
@@ -364,6 +382,10 @@ playlists*), which hide while empty.
   only; two-finger scratches and a jog on the keys are not there.
 - **Bars, not only beats**: Match Beats puts beat on beat, not the first beat
   of a bar on the first beat of a bar.
+- **Where the old track leaves**: Start on the Beat picks the next track's
+  entry; the outgoing track still fades at its end, wherever that is in its
+  bars. Swung and played beats (no steady grid) only get an entry after a
+  plainly quiet start.
 - **Adding to the queue from elsewhere** ("Play next" on any video card): the
   engine has `play_next`/`enqueue`; no menu item uses them yet.
 - **One volume during a fade**: changing the volume while two tracks cross

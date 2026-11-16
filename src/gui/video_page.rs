@@ -191,6 +191,32 @@ impl VideoPage {
         }
     }
 
+    /// Kinora: have the track start at `position` instead of at its start
+    /// (the DJ's "Start on the Beat"): an accurate seek, which a loaded
+    /// player takes paused (a warm page) or playing. Once per page.
+    pub fn seek_entry(&self, position: f64) {
+        let imp = self.imp();
+        let Some(player) = imp.clapper.player() else {
+            return;
+        };
+        if imp.entry.replace(Some(position)).is_none() {
+            let done = imp.entry_done.clone();
+            player.connect_seek_done(move |_| done.set(true));
+        }
+        imp.entry_done.set(false);
+        player.seek_custom(position, clapper::PlayerSeekMethod::Accurate);
+    }
+
+    /// Kinora: where the track was told to start, if not at its start.
+    pub fn entry(&self) -> Option<f64> {
+        self.imp().entry.get()
+    }
+
+    /// Kinora: the player is where `seek_entry` sent it.
+    pub fn entry_ready(&self) -> bool {
+        self.imp().entry_done.get()
+    }
+
     /// Kinora: the page's player (for the app's MPRIS player).
     pub fn clapper_player(&self) -> Option<clapper::Player> {
         self.imp().clapper.player()
@@ -1101,6 +1127,10 @@ pub mod imp {
         pub(super) warming: Cell<bool>,
         /// A warm page that is to stay as it is until told (see `hold_warm`).
         pub(super) warm_held: Cell<bool>,
+        /// Where the track was told to start (see `seek_entry`), and
+        /// whether the player has got there.
+        pub(super) entry: Cell<Option<f64>>,
+        pub(super) entry_done: std::rc::Rc<Cell<bool>>,
         /// Kinora: "Up next" has arrived, so there is a next video.
         #[property(get)]
         has_next: Cell<bool>,
@@ -1198,6 +1228,8 @@ pub mod imp {
                 audio_only: Default::default(),
                 warming: Default::default(),
                 warm_held: Default::default(),
+                entry: Default::default(),
+                entry_done: Default::default(),
                 has_next: Default::default(),
                 dj: Default::default(),
                 dj_available: Default::default(),

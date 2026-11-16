@@ -19,9 +19,11 @@ pub const CROSSFADE_SECONDS: &str = "crossfade-seconds";
 pub const AVOID_REPEATS: &str = "avoid-repeats";
 /// Setting (toggle): play the tracks' videos instead of audio only.
 pub const SHOW_VIDEO: &str = "show-video";
-/// Setting (choice): where "DJ" starts, [`CURRENT_VIDEO`] or [`MY_MIX`].
 /// Setting (toggle): beat-match the crossfades.
 pub const MATCH_BEATS: &str = "match-beats";
+/// Setting (toggle): a crossfade brings a track in where its drums come in.
+pub const START_ON_BEAT: &str = "start-on-beat";
+/// Setting (choice): where "DJ" starts, [`CURRENT_VIDEO`] or [`MY_MIX`].
 pub const START_FROM: &str = "start-from";
 pub const CURRENT_VIDEO: &str = "current-video";
 pub const MY_MIX: &str = "my-mix";
@@ -102,6 +104,15 @@ impl DjExtension {
                         ),
                         false,
                     ),
+                    Setting::toggle(
+                        START_ON_BEAT,
+                        "Start on the Beat",
+                        Some(
+                            "A crossfade brings the next track in where its drums \
+                             come in, skipping a quiet intro",
+                        ),
+                        false,
+                    ),
                     choice(
                         START_FROM,
                         "Start From",
@@ -136,6 +147,7 @@ pub fn settings(ctx: &Context) -> DjSettings {
         avoid_repeats: ctx.flag(AVOID_REPEATS),
         show_video: ctx.flag(SHOW_VIDEO),
         match_beats: ctx.flag(MATCH_BEATS),
+        start_on_beat: ctx.flag(START_ON_BEAT),
         start_from: match ctx.text(START_FROM) {
             MY_MIX => StartFrom::MyMix,
             _ => StartFrom::CurrentVideo,
@@ -164,12 +176,14 @@ mod tests {
             (value_key(ID, AVOID_REPEATS), SettingValue::Bool(false)),
             (value_key(ID, START_FROM), text(MY_MIX)),
             (value_key(ID, MATCH_BEATS), SettingValue::Bool(true)),
+            (value_key(ID, START_ON_BEAT), SettingValue::Bool(true)),
         ]));
         let s = settings(&ctx());
         assert_eq!(s.crossfade, Duration::ZERO);
         assert!(!s.avoid_repeats);
         assert_eq!(s.start_from, StartFrom::MyMix);
         assert!(s.match_beats);
+        assert!(s.start_on_beat);
 
         // Out of range: the default.
         registry.set_values(HashMap::from([(

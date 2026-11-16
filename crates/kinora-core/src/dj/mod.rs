@@ -112,6 +112,8 @@ pub struct DjSettings {
     /// During a crossfade, play the incoming track at the outgoing one's
     /// tempo, beat on beat (see [`crate::beats`]). Off by default.
     pub match_beats: bool,
+    /// A crossfade brings the next track in where its drums come in.
+    pub start_on_beat: bool,
 }
 
 impl Default for DjSettings {
@@ -122,6 +124,7 @@ impl Default for DjSettings {
             start_from: StartFrom::CurrentVideo,
             show_video: false,
             match_beats: false,
+            start_on_beat: false,
         }
     }
 }

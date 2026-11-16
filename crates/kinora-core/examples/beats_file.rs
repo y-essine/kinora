@@ -9,11 +9,12 @@
 //! of time), then of a window that slides over the track (what it finds in
 //! the tail of whatever plays), each with the time the analysis took. A
 //! steady track should give the same tempo all along, and beats that stay
-//! where the first grid puts them.
+//! where the first grid puts them. Second line: where "Start on the Beat"
+//! would bring the track in (`ENTRY_ONLY=1` stops there).
 
 use std::time::Instant;
 
-use kinora_core::beats::{ANALYSIS_RATE, INTRO, analyse};
+use kinora_core::beats::{ANALYSIS_RATE, ENTRY_WINDOW, INTRO, analyse, find_entry};
 
 fn main() {
     let mut args = std::env::args().skip(1);
@@ -48,6 +49,25 @@ fn main() {
             took.as_secs_f64() * 1000.0
         ),
         None => println!("intro: no beat"),
+    }
+
+    // "Start on the Beat": where a crossfade would bring the track in. The
+    // file's length stands for the track's (a cut file: say `LENGTH=240`).
+    let length = std::env::var("LENGTH").ok().and_then(|l| l.parse().ok());
+    let started = Instant::now();
+    let entry = find_entry(cut(0.0, ENTRY_WINDOW), rate, length.or(Some(seconds)));
+    println!(
+        "entry: {:.2} s ({}{}), in {:.1} ms",
+        entry.start,
+        entry.found,
+        entry.grid.map_or(String::new(), |g| format!(
+            "; {:.2} BPM, confidence {:.2}",
+            g.bpm, g.confidence
+        )),
+        started.elapsed().as_secs_f64() * 1000.0
+    );
+    if std::env::var("ENTRY_ONLY").is_ok() {
+        return;
     }
 
     let mut from = 0.0;

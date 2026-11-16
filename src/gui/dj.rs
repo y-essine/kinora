@@ -75,6 +75,26 @@ const HOVER_DELAY: Duration = Duration::from_millis(400);
 /// How many queued tracks the panel lists.
 const SHOWN: usize = 30;
 
+// ---- Start on the Beat ----
+
+/// A warm track waits this long for its entry to be worked out before it
+/// counts as ready (at its start).
+const ENTRY_WAIT: Duration = Duration::from_secs(12);
+/// A track that was not ready ahead of time is given this long to get to
+/// its entry before the fade starts wherever it is.
+const ENTRY_SEEK_TIMEOUT: Duration = Duration::from_millis(2500);
+
+/// Getting the incoming track of a fade to its entry.
+#[derive(Clone, Copy)]
+enum ToEntry {
+    /// Nothing to do: it starts at its start, or is at its entry already.
+    No,
+    /// Seek there once its player is loaded.
+    Wanted(f64),
+    /// Told to, at this time.
+    Seeking(Instant),
+}
+
 // ---- Beat matching ----
 
 /// After a matched fade, the track goes back to its own tempo over this long.
@@ -376,16 +396,31 @@ impl BeatSync {
 }
 
 /// Work out the beats of a track's first seconds and keep them (on a thread
-/// of its own: it decodes).
-fn analyse_intro(core: std::sync::Arc<kinora_core::Core>, id: pcore::VideoId, uri: String) {
-    if core.beats(&id).is_some() {
+/// of its own: it decodes). With `entry` ("Start on the Beat") more of the
+/// track is decoded, and where it gets going is looked for too; `length` is
+/// the track's, in seconds.
+fn analyse_intro(
+    core: std::sync::Arc<kinora_core::Core>,
+    id: pcore::VideoId,
+    uri: String,
+    entry: bool,
+    length: Option<f64>,
+) {
+    if core
+        .beats(&id)
+        .is_some_and(|known| !entry || known.entry.is_some())
+    {
         return;
     }
     let started = Instant::now();
     let pcm = match crate::gui::deck_audio::decode(
         &uri,
         0.0,
-        beats::INTRO,
+        if entry {
+            beats::ENTRY_WINDOW
+        } else {
+            beats::INTRO
+        },
         beats::ANALYSIS_RATE,
         1,
         Duration::from_secs(30),
@@ -398,7 +433,7 @@ fn analyse_intro(core: std::sync::Arc<kinora_core::Core>, id: pcore::VideoId, ur
         }
     };
     let decoded = started.elapsed();
-    let analysed = core.analyse_beats(&id, &pcm.samples, pcm.rate);
+    let analysed = core.analyse_beats(&id, &pcm.samples, pcm.rate, entry, length);
     let took = started.elapsed();
     match analysed.intro {
         Some(grid) => log::info!(
@@ -407,7 +442,11 @@ fn analyse_intro(core: std::sync::Arc<kinora_core::Core>, id: pcore::VideoId, ur
             grid.bpm,
             grid.anchor,
             grid.confidence,
-            if grid.is_usable() { "" } else { " (too vague to match)" },
+            if grid.is_usable() {
+                ""
+            } else {
+                " (too vague to match)"
+            },
             pcm.seconds(),
             decoded.as_secs_f64(),
             (took - decoded).as_secs_f64() * 1000.0
@@ -418,6 +457,25 @@ fn analyse_intro(core: std::sync::Arc<kinora_core::Core>, id: pcore::VideoId, ur
             pcm.seconds(),
             decoded.as_secs_f64()
         ),
+    }
+    if let Some(entry) = analysed.entry {
+        log::info!(
+            "DJ: entry of {}: {} ({}{})",
+            id.id,
+            if entry.start > 0.0 {
+                format!("at {:.2} s", entry.start)
+            } else {
+                "at its start".to_owned()
+            },
+            entry.found,
+            entry
+                .grid
+                .filter(|_| entry.start > 0.0)
+                .map_or(String::new(), |grid| format!(
+                    "; {:.1} BPM there, confidence {:.2}",
+                    grid.bpm, grid.confidence
+                ))
+        );
     }
 }
 
@@ -483,6 +541,9 @@ struct Fade {
     readiness: &'static str,
     /// The fade is beat-matched ("Match Beats"), as far as it has got.
     sync: Option<BeatSync>,
+    /// The incoming track still has to get to its entry ("Start on the
+    /// Beat": one that was not ready ahead of time).
+    entry: ToEntry,
 }
 
 /// A track loaded ahead of time: its page, with the player paused at the start.
@@ -731,7 +792,11 @@ impl Dj {
     pub fn previous(&self) {
         let page = self.0.page.borrow().clone();
         match page {
-            Some(page) if page.position_secs() > RESTART_AFTER || !self.can_go_back() => {
+            // (Counted from where the track came in.)
+            Some(page)
+                if page.position_secs() - page.entry().unwrap_or(0.0) > RESTART_AFTER
+                    || !self.can_go_back() =>
+            {
                 log::info!("DJ: previous: starting the track over");
                 page.restart();
             }
@@ -1037,8 +1102,14 @@ impl Dj {
         // The outgoing track stays at the tempo it has now, and out of hands.
         outgoing.hold_tempo();
         outgoing.cancel_scratch();
-        let sync = self.beat_sync(&outgoing, &incoming);
-        if sync.is_none() {
+        let entry = self.entry_for(&incoming);
+        let from = match entry {
+            ToEntry::Wanted(start) => start,
+            _ => incoming.entry().unwrap_or(0.0),
+        };
+        let sync = self.beat_sync(&outgoing, &incoming, from);
+        // (A warm track that has yet to get to its entry waits for that.)
+        if sync.is_none() && !matches!(entry, ToEntry::Wanted(_)) {
             start_held(&incoming);
         }
         self.0.fade.replace(Some(Fade {
@@ -1051,8 +1122,44 @@ impl Dj {
             timer,
             readiness,
             sync,
+            entry,
         }));
         self.changed();
+    }
+
+    /// With "Start on the Beat" on: where a track that a fade brings in has
+    /// yet to be sent. A warm track is at its entry already; one that was
+    /// not ready ahead of time gets there when its player is loaded, if its
+    /// entry is known (it was analysed before).
+    fn entry_for(&self, incoming: &VideoPage) -> ToEntry {
+        let Some(client) = self.client() else {
+            return ToEntry::No;
+        };
+        let core = client.core();
+        if !core.dj_settings().start_on_beat || incoming.entry().is_some() {
+            return ToEntry::No;
+        }
+        let Some(video) = incoming.video() else {
+            return ToEntry::No;
+        };
+        match core.beats(&video.id()).and_then(|known| known.entry) {
+            Some(entry) if entry.start > 0.0 => {
+                log::info!(
+                    "DJ: {} was not at its entry yet: going to {:.2} s first",
+                    video.id().id,
+                    entry.start
+                );
+                ToEntry::Wanted(entry.start)
+            }
+            Some(_) => ToEntry::No,
+            None => {
+                log::info!(
+                    "DJ: {} starts at its start: its entry is not worked out yet",
+                    video.id().id
+                );
+                ToEntry::No
+            }
+        }
     }
 
     /// With "Match Beats" on, a warm track is not started when its page
@@ -1069,7 +1176,8 @@ impl Dj {
 
     /// With "Match Beats" on: what a fade from `outgoing` to `incoming`
     /// needs to be beat-matched, or why it will not be (in the log).
-    fn beat_sync(&self, outgoing: &VideoPage, incoming: &VideoPage) -> Option<BeatSync> {
+    /// The incoming track starts at `from` seconds (its entry, or 0).
+    fn beat_sync(&self, outgoing: &VideoPage, incoming: &VideoPage, from: f64) -> Option<BeatSync> {
         let client = self.client()?;
         let core = client.core();
         if !core.dj_settings().match_beats {
@@ -1089,7 +1197,8 @@ impl Dj {
         let intro_of = |page: &VideoPage| page.video().and_then(|v| core.beats(&v.id()));
         let grid = match intro_of(incoming) {
             None => return skip("the next track's beats are not worked out yet".into()),
-            Some(known) => match known.intro {
+            // (The beats of where it starts: its entry's, or its intro's.)
+            Some(known) => match known.grid_at(from) {
                 Some(grid) if grid.is_usable() => grid,
                 Some(grid) => {
                     return skip(format!(
@@ -1212,6 +1321,34 @@ impl Dj {
         };
         if fade.running.is_none() {
             let state = fade.incoming.player_state();
+            // "Start on the Beat", for a track that was not ready ahead of
+            // time: to its entry first, silent as it still is.
+            match fade.entry {
+                ToEntry::Wanted(start)
+                    if state == clapper::PlayerState::Playing || fade.incoming.is_warm() =>
+                {
+                    fade.incoming.seek_entry(start);
+                    fade.entry = ToEntry::Seeking(Instant::now());
+                    return glib::ControlFlow::Continue;
+                }
+                ToEntry::Seeking(since) => {
+                    let there = fade.incoming.entry_ready();
+                    if !there && since.elapsed() < ENTRY_SEEK_TIMEOUT {
+                        return glib::ControlFlow::Continue;
+                    }
+                    log::info!(
+                        "DJ: the next track {} its entry after {:.2} s",
+                        if there { "is at" } else { "did not get to" },
+                        since.elapsed().as_secs_f64()
+                    );
+                    fade.entry = ToEntry::No;
+                    // (Held for its beat, it stays; else it plays now.)
+                    if fade.sync.is_none() {
+                        start_held(&fade.incoming);
+                    }
+                }
+                _ => {}
+            }
             // A matched fade: the incoming track is brought to rest, then
             // let go on the beat (which starts the fade).
             match fade.sync.as_ref().map(|sync| sync.stage) {
@@ -1414,15 +1551,50 @@ impl Dj {
             warm.drain(..).partition(|w| queued.contains(&w.id));
         *warm = keep;
         gone.into_iter().for_each(|w| release(w.page));
+        let to_entry = client.core().dj_settings().start_on_beat;
         for w in warm.iter_mut().filter(|w| !w.ready) {
-            if w.page.is_warm() {
-                w.ready = true;
-                log::info!(
-                    "DJ: warm {} ready in {:.1} s",
-                    w.id,
-                    w.began.elapsed().as_secs_f64()
-                );
+            if !w.page.is_warm() {
+                continue;
             }
+            // "Start on the Beat": the loaded player goes to the track's
+            // entry and waits there, so the start is as instant as at 0. Its
+            // entry is being worked out meanwhile; that is waited for.
+            if to_entry && w.page.entry().is_none() {
+                let known = w
+                    .page
+                    .video()
+                    .and_then(|video| client.core().beats(&video.id()))
+                    .and_then(|known| known.entry);
+                match known {
+                    Some(entry) if entry.start > 0.0 => {
+                        log::info!(
+                            "DJ: warm {} goes to its entry at {:.2} s",
+                            w.id,
+                            entry.start
+                        );
+                        w.page.seek_entry(entry.start);
+                        continue;
+                    }
+                    Some(_) => {}
+                    None if w.began.elapsed() < ENTRY_WAIT => continue,
+                    None => log::info!(
+                        "DJ: warm {} stays at its start: no entry worked out in time",
+                        w.id
+                    ),
+                }
+            }
+            if w.page.entry().is_some() && !w.page.entry_ready() {
+                continue;
+            }
+            w.ready = true;
+            log::info!(
+                "DJ: warm {} ready in {:.1} s{}",
+                w.id,
+                w.began.elapsed().as_secs_f64(),
+                w.page
+                    .entry()
+                    .map_or(String::new(), |at| format!(", at its entry ({at:.2} s)"))
+            );
         }
 
         for track in &wanted {
@@ -1469,12 +1641,20 @@ impl Dj {
         }
     }
 
-    /// With "Match Beats" on: work out the beats of a track whose stream is
-    /// prepared, once, in the background. They are kept on disk, so a track
-    /// that was analysed before costs nothing.
+    /// With "Match Beats" or "Start on the Beat" on: work out the beats (and
+    /// the entry) of a track whose stream is prepared, once, in the
+    /// background. They are kept on disk, so a track that was analysed
+    /// before costs nothing.
     fn analyse_ahead(&self, client: &Client, track: &Track, video: &Video) {
+        let settings = client.core().dj_settings();
+        if !settings.match_beats && !settings.start_on_beat {
+            return;
+        }
+        // (Asked for again when the entry is wanted after all.)
+        let entry = settings.start_on_beat;
+        let key = format!("{}{}", track.id, if entry { "+entry" } else { "" });
         let mut analysed = self.0.analysed.borrow_mut();
-        if analysed.contains(&track.id) || !client.core().dj_settings().match_beats {
+        if analysed.contains(&key) {
             return;
         }
         let Some(uri) = client
@@ -1483,11 +1663,12 @@ impl Dj {
         else {
             return;
         };
-        analysed.push(track.id.clone());
+        analysed.push(key);
         let (core, id) = (client.core(), video.id());
+        let length = track.duration.map(|d| d.as_secs_f64());
         let _ = std::thread::Builder::new()
             .name("kinora-beats".into())
-            .spawn(move || analyse_intro(core, id, uri));
+            .spawn(move || analyse_intro(core, id, uri, entry, length));
     }
 
     /// The track is about to play: its warmed page, if there is one, and how
@@ -1674,6 +1855,22 @@ impl Dj {
         log::info!("DEV: match beats {}", if on { "on" } else { "off" });
     }
 
+    /// Test hook: switch "Start on the Beat".
+    #[cfg(feature = "dev-hooks")]
+    pub fn dev_toggle_entry(&self) {
+        let Some(window) = self.0.window.upgrade() else {
+            return;
+        };
+        let on = !window.client().core().dj_settings().start_on_beat;
+        crate::gui::extension_settings::store(
+            &window.imp().settings,
+            kinora_core::extension::builtin::dj::ID,
+            kinora_core::extension::builtin::dj::START_ON_BEAT,
+            kinora_core::extension::SettingValue::Bool(on),
+        );
+        log::info!("DEV: start on the beat {}", if on { "on" } else { "off" });
+    }
+
     /// Test hook: act on the queue as the panel's buttons would. `what` is
     /// `play-next`, `remove` or `play-now`, applied to the queue's third track.
     #[cfg(feature = "dev-hooks")]
@@ -1737,9 +1934,13 @@ fn begin_fade(fade: &mut Fade) {
     };
     let over = fade.wanted.min(left);
     log::info!(
-        "DJ: started after {:.1} s ({}); fading over {:.1} s",
+        "DJ: started after {:.1} s ({}){}; fading over {:.1} s",
         fade.began.elapsed().as_secs_f64(),
         fade.readiness,
+        fade.incoming.entry().map_or(String::new(), |entry| format!(
+            ", from its entry at {entry:.2} s (the player is at {:.2} s)",
+            fade.incoming.heard_position()
+        )),
         over.as_secs_f64()
     );
     fade.running = Some((fade_plan(over), Instant::now()));

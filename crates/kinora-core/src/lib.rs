@@ -453,13 +453,27 @@ impl Core {
         beats::load(&self.paths.beats_dir(), &video.id)
     }
 
-    /// Analyse the start of a track for the DJ's "Match Beats" and keep the
-    /// answer: `pcm` is mono audio at `rate` from the track's very beginning
-    /// (about [`beats::INTRO`] seconds of it; the frontend decodes it, ahead
-    /// of time and off its main thread, which is where this is to be called).
-    pub fn analyse_beats(&self, video: &VideoId, pcm: &[f32], rate: u32) -> beats::TrackBeats {
+    /// Analyse the start of a track for the DJ's "Match Beats" and "Start on
+    /// the Beat", and keep the answer: `pcm` is mono audio at `rate` from the
+    /// track's very beginning (about [`beats::INTRO`] seconds of it, or
+    /// [`beats::ENTRY_WINDOW`] with `entry`, which also looks for where the
+    /// track gets going; `length` is the whole track's, in seconds). The
+    /// frontend decodes it, ahead of time and off its main thread, which is
+    /// where this is to be called.
+    pub fn analyse_beats(
+        &self,
+        video: &VideoId,
+        pcm: &[f32],
+        rate: u32,
+        entry: bool,
+        length: Option<f64>,
+    ) -> beats::TrackBeats {
         let seconds = pcm.len() as f64 / rate.max(1) as f64;
-        let analysed = beats::TrackBeats::new(beats::analyse(pcm, rate, 0.0, None), seconds);
+        let intro = &pcm[..pcm.len().min((beats::INTRO * rate as f64) as usize)];
+        let mut analysed = beats::TrackBeats::new(beats::analyse(intro, rate, 0.0, None), seconds);
+        if entry {
+            analysed = analysed.with_entry(beats::find_entry(pcm, rate, length));
+        }
         if let Err(e) = beats::store(&self.paths.beats_dir(), &video.id, &analysed) {
             log::warn!("Could not keep the beats of {}: {e}", video.id);
         }

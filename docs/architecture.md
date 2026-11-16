@@ -151,7 +151,7 @@ list to store. Labels in manifests are English; translate them in the frontend.
 |---|---|---|---|
 | `account` (Network, Account) | `youtube-home` main feed source; `on_watched` marks the video watched on YouTube; menu item `import-subscriptions` (Home) | `personal-up-next`, `mark-watched` (both on) | Fully anonymous: no Home, anonymous Up next, nothing sent to the account. `Core::account_active` and the Client's `has-account` are false |
 | `home-chips` | a feed filter that, when asked, hides the playlist-only Mixes/Playlists chips and the playlist cards | `hide-playlist-chips` ("Hide Mixes and Playlists", off: they are kept so the DJ can play them) | Home is one feed without a chip bar |
-| `dj` (Network, Account, PlayerControl) | nothing to the fixed points: frontends call `Core::dj_*` (see *The DJ*) | `crossfade-seconds` (number 0..12, 6; stored as text), `avoid-repeats` (on), `show-video` (off: the DJ plays audio only), `match-beats` (off; see *Beat matching*), `start-from` (`current-video` \| `my-mix`) | `Core::dj_*` fail; nothing is fetched |
+| `dj` (Network, Account, PlayerControl) | nothing to the fixed points: frontends call `Core::dj_*` (see *The DJ*) | `crossfade-seconds` (number 0..12, 6; stored as text), `avoid-repeats` (on), `show-video` (off: the DJ plays audio only), `match-beats` (off; see *Beat matching*), `start-on-beat` (off; see *Start on the Beat*), `start-from` (`current-video` \| `my-mix`) | `Core::dj_*` fail; nothing is fetched |
 
 What stays in the core on purpose: anonymous Up next (it works without an account; the account
 extension only personalises it), prepared/fast-start playback, and connecting an account (the
@@ -235,7 +235,7 @@ PCM at a low rate (11 kHz is plenty) and gets a `BeatGrid { bpm, anchor, confide
   or why not (`NoMatch::TooFar`: more than `MAX_STRETCH`, 8 %). `BeatMatch::start_delay` says
   how long to hold the incoming track so that the beats land together, `BeatMatch::error` how
   far apart they are for two positions.
-- **Kept on disk**: `Core::analyse_beats(video, pcm, rate)` analyses a track's first seconds
+- **Kept on disk**: `Core::analyse_beats(video, pcm, rate, entry, length)` analyses a track's first seconds
   (`beats::INTRO`, 45 s: what a fade brings in) and writes `<cache>/beats/<video id>.json`;
   `Core::beats(video)` reads it. "No beat found" is kept too.
 - `cargo run --release -p kinora-core --example beats_file -- track.raw` tries it on real
@@ -277,6 +277,81 @@ figures say "clock settling" until then. What is heard is right all the same: in
 recorded under those conditions, the kicks of both tracks, folded over one beat, fall into one
 peak 12 ms wide with a shoulder 20 ms beside it (the fade's own figures claimed 30 to 90 ms).
 It has not been judged by ear.
+
+### Start on the Beat
+
+With the DJ's *Start on the Beat* on, a track is brought in where it gets going instead of at
+its start. `beats::find_entry(pcm, rate, length)` looks at the track's first 76 s
+(`beats::ENTRY_WINDOW`) and gives an `Entry { start, grid, found }`:
+
+1. The **drive** of a moment: the mean of an onset envelope over the 4 s after it, read every
+   0.5 s. The envelope is the one of the beat analysis with other weights (kick 1.5, middle
+   0.5, hats 1): drums are in the low and the high band, voices, pads and guitars in the middle.
+2. **Going**: 70 % of the drive of the strongest tenth of what was seen. The first moment at
+   which the drive is there, stays above three quarters of it for 8 s and has it on average is
+   the rough entry, good to a second or two.
+3. Sooner than 5 s: `FromTheStart`. Later than 60 s or 30 % of the track (`ENTRY_SEARCH`,
+   `ENTRY_SHARE`): `TooFar`. Both start at 0.
+4. **The beat**: the 16 s from there are analysed like an intro (`analyse`), which gives the
+   grid of that part; it has to be clear (confidence 0.2). The entry is the beat, from four
+   bars before the rough moment to two after, where the onsets on four beats exceed those on
+   the four before by the most (and which is itself a strong one). `start` is 30 ms before it,
+   `grid` is anchored on it. Where a part begins is a phrase's first beat, so no bars are
+   counted; the number of beats since the track's first sound is given when it is a whole
+   one (`Later { beats_in }`: 16, 48, 64 on most of the dance tracks tried, but 49, 63 and 75
+   too, so nothing is moved by it).
+5. **Without a steady beat** (swung, played by hand): only after a plainly quiet start (the
+   drive of the 4 s before at most 45 % of "going"), the first onset half as strong as the
+   strongest of the next seconds; no grid. Else `NoClearBeat`, and the track starts at 0.
+
+It is kept with the beats (`TrackBeats::entry`; the cache's version is 2, older files are
+analysed again). `Core::analyse_beats(video, pcm, rate, entry, length)` does both;
+`TrackBeats::grid_at(start)` gives the beats a fade goes by: the entry's when the track starts
+there, else the intro's.
+
+In the GTK frontend (`src/gui/dj.rs`):
+
+- **Ahead of time**: with the setting on, the thread that analyses a prepared track decodes
+  76 s instead of 45 s (1.5 to 2.3 s measured) and looks for the entry (9 ms in a release
+  build, 0.6 s in a debug build).
+- **Warm at the entry**: a warm player is sent to the entry (`VideoPage::seek_entry`, an
+  accurate seek, paused and silent) and counts as ready when it is there, 2.4 to 3.2 s after
+  warming began for a track never seen, 1 s for one on disk. If the entry is not worked out
+  within 12 s the track is ready at its start. From then on everything is as at 0: it starts
+  in 0.1 s, or held for the beat with *Match Beats* (the hold counts from wherever the player
+  rests).
+- **Not warm** (Previous, a pick from the queue, Next before the next track was ready): if the
+  entry is on disk, the incoming player is sent there once it plays, silent as it still is,
+  and the fade starts when it is there (0.2 s measured; given up after 2.5 s). If it is not
+  on disk, the track starts at its start.
+- A cut (the crossfade off, or a track that ended with nothing to fade to) uses the warm
+  player as it is, so it starts at the entry too. The first track of a session is never
+  warm, and starts at 0. "Previous" counts its 3 s from the entry.
+
+Measured on real tracks (`beats_file`, and the low band's level 8 s before and after the
+entry): Wake Me Up 39.6 s (+12 dB below 180 Hz), Animals 23.2 s (+20 dB), World, Hold On
+16.9 s (+22 dB), Lean On 29.6 s (+14 dB), In My Mind 47.3 s (+13 dB), Meet Her at the
+Loveparade 21.5 s (+17 dB), Zombie 12.7 s (+26 dB, no grid), Sunset Lover 42.2 s (+7 dB),
+Ecuador 34.2 s (+10 dB), Calabria 2008 38.2 s (+5 dB); Better Off Alone, Feel the Beat and
+Freestyler from their start. Less sure: Sandstorm 23.7 s (the riff with its snare roll, the
+kick is later), Children 32.8 or 42.5 s and Played-A-Live 18.0 or 11.6 s depending on the
+stream that was decoded (their drive builds up slowly, and the threshold falls differently).
+Missed: Tom's Diner (the beat comes in in two steps and is swung; it starts at 0). With
+*Match Beats*, on a null sink: the beats 0, 0, 3, 13 and 38 ms apart at the first reading of
+five fades that started at an entry, 4 to 8 ms on average over each fade. Not judged by ear.
+
+Looked at and left out (others' work, ideas only, no code): Mixxx's AutoDJ only skips digital
+silence (-60 dB) and takes intro and outro cues set by hand; Vande Veire and De Bie's
+dnb-autodj labels a segment "high" when its loudness and its onsets are above the track's
+mean and cues a track in at a low-to-high boundary, and Zehren et al. want the part after a
+cue to be salient (0.4 of the track's maximum): steps 1 and 2 are that idea on the envelope
+that was there; their bar and phrase counting needs a downbeat model. Two sources per video
+were tried as hints: YouTube's "most replayed" curve peaks at the drop or the chorus (86 to
+92 s in Animals, 186 s in Sandstorm), past where an entry may be, and costs a page per
+track; SponsorBlock's `music_offtopic` at a video's start would have changed one of 23
+tracks tried (18 s of film before Feel the Beat), its `poi_highlight` is a favourite moment
+with a vote or two, and it would send every track's id (or its hash's start) to one more
+service. Neither is used.
 
 ### The deck's audio
 
