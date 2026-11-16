@@ -20,6 +20,29 @@ use crate::{
 
 use super::window::Window;
 
+/// Kinora: a media item that knows its song. Prepared streams are local
+/// playlists (`ID.m3u8`, `ID.audio.m3u8`) with no tags, so Clapper's own title
+/// (fullscreen video) would otherwise show the file name.
+fn titled_item(uri: &str, video: &Video) -> MediaItem {
+    use glib::translate::ToGlibPtr;
+    let item = MediaItem::new(uri);
+    let mut tags = gst::TagList::new();
+    {
+        let tags = tags.get_mut().expect("a new tag list is writable");
+        tags.set_scope(gst::TagScope::Global);
+        tags.add::<gst::tags::Title>(&video.title().as_str(), gst::TagMergeMode::Replace);
+        let artist = video.uploader().name();
+        if !artist.is_empty() {
+            tags.add::<gst::tags::Artist>(&artist.as_str(), gst::TagMergeMode::Replace);
+        }
+    }
+    // SAFETY: both pointers are valid for the call; Clapper copies the tags.
+    unsafe {
+        clapper::ffi::clapper_media_item_populate_tags(item.to_glib_none().0, tags.as_ptr());
+    }
+    item
+}
+
 gtk::glib::wrapper! {
     pub struct VideoPage(ObjectSubclass<imp::VideoPage>)
         @extends adw::Bin, gtk::Widget,
@@ -68,7 +91,7 @@ impl VideoPage {
             imp.audio_stream.set(audio.is_some());
             if self.try_get_downloaded(&video).is_some() {
                 imp.fast_start_active.set(false);
-                queue.add_item(&MediaItem::new(&fallback));
+                queue.add_item(&titled_item(&fallback, &video));
                 self.start_player(&player);
             } else if let Some(prepared) =
                 audio.or_else(|| self.client().prepared_playback_uri(&video))
@@ -76,7 +99,7 @@ impl VideoPage {
                 // Kinora: prepared in the background; starts in a second or two.
                 log::info!("Playing prepared {}", video.id().id);
                 imp.fast_start_active.set(true);
-                queue.add_item(&MediaItem::new(&prepared));
+                queue.add_item(&titled_item(&prepared, &video));
                 self.start_player(&player);
                 self.fall_back_if_stuck(&video);
             } else {
@@ -92,7 +115,7 @@ impl VideoPage {
                     }
                     page.imp().fast_start_active.set(fast.is_some());
                     let watchdog = fast.is_some();
-                    queue.add_item(&MediaItem::new(&fast.unwrap_or(fallback)));
+                    queue.add_item(&titled_item(&fast.unwrap_or(fallback), &video));
                     page.start_player(&player);
                     if watchdog {
                         page.fall_back_if_stuck(&video);
@@ -311,8 +334,9 @@ impl VideoPage {
             imp.fast_start_active.set(false);
             if let Some(queue) = player.queue() {
                 queue.clear();
-                queue.add_item(&MediaItem::new(
+                queue.add_item(&titled_item(
                     &page.convert_to_clapper_playable_url(&video),
+                    &video,
                 ));
             }
             player.play();
@@ -1875,8 +1899,9 @@ pub mod imp {
                         if let (Some(video), Some(player)) = (obj.video(), imp.clapper.player()) {
                             let queue = player.queue().expect("Clapper does not have a queue");
                             queue.clear();
-                            queue.add_item(&clapper::MediaItem::new(
+                            queue.add_item(&super::titled_item(
                                 &obj.convert_to_clapper_playable_url(&video),
+                                &video,
                             ));
                             obj.start_player(&player);
                         }

@@ -1015,6 +1015,31 @@ pub mod imp {
         #[cfg(feature = "dev-hooks")]
         fn dev_hooks(&self) {
             let obj = self.obj().clone();
+            // Every key press the window sees, before anything handles it.
+            let keys = gtk::EventControllerKey::new();
+            keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+            keys.connect_key_pressed(|_, key, _, state| {
+                log::info!("DEV: key {:?} {state:?}", key.name());
+                glib::Propagation::Proceed
+            });
+            obj.add_controller(keys);
+            // Every click: where it lands and which widget is under it.
+            let clicks = gtk::GestureClick::new();
+            clicks.set_propagation_phase(gtk::PropagationPhase::Capture);
+            clicks.connect_pressed(|g, _, x, y| {
+                let w = g.widget();
+                let hit = w.and_then(|w| w.pick(x, y, gtk::PickFlags::DEFAULT));
+                let mut path = Vec::new();
+                let mut cur = hit;
+                while let Some(c) = cur {
+                    if path.len() < 6 {
+                        path.push(format!("{}{:?}", c.type_().name(), c.css_classes()));
+                    }
+                    cur = c.parent();
+                }
+                log::info!("DEV: click at {x:.0},{y:.0} -> {}", path.join(" < "));
+            });
+            obj.add_controller(clicks);
             let obj_open = obj.clone();
             if let Ok(page) = std::env::var("KH_PAGE") {
                 self.main_stack.set_visible_child_name(&page);
@@ -2007,10 +2032,18 @@ pub mod imp {
                             (Some(f), Some(p)) => f == p.upcast_ref::<gtk::Widget>() || f.is_ancestor(p),
                             _ => false,
                         };
-                        log::info!(
-                            "DEV: focus {:?} (in the current page: {inside})",
-                            focus.map(|f| f.type_().name())
-                        );
+                        let what = focus.as_ref().map(|f| {
+                            let b = f.downcast_ref::<gtk::Button>();
+                            format!(
+                                "{} .{:?} action={:?} icon={:?} tip={:?}",
+                                f.type_().name(),
+                                f.css_classes(),
+                                b.and_then(|b| gtk::prelude::ActionableExt::action_name(b)),
+                                b.and_then(|b| b.icon_name()),
+                                f.tooltip_text()
+                            )
+                        });
+                        log::info!("DEV: focus {what:?} (in the current page: {inside})");
                     }),
                     ("dev-fullscreen", |s| { if let Some(p) = s.current_video_page() { p.dev_fullscreen(false) } }),
                     ("dev-window-fullscreen", |s| { if let Some(p) = s.current_video_page() { p.dev_fullscreen(true) } }),
