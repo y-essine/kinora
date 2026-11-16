@@ -99,6 +99,13 @@ jobs:
           meson compile -C _build
           meson install -C _build
           cp extras/kinora-account extras/kinora-prepare "$STAGE/bin/"
+          # Launchers, so cmd runs the helpers by name: the account's cookies
+          # command (`kinora-account --browser ...`) goes through cmd.
+          for helper in kinora-account kinora-prepare; do
+            printf '@"%%~dp0python.exe" "%%~dp0%s" %%*\r\n' "$helper" > "$STAGE/bin/$helper.cmd"
+          done
+          printf '@"%%~dp0python.exe" -m yt_dlp %%*\r\n' > "$STAGE/bin/yt-dlp.cmd"
+          cat "$STAGE/bin/kinora-account.cmd"
 
       - name: Bundle runtime
         id: bundle
@@ -189,7 +196,7 @@ jobs:
           set +e
           /usr/bin/timeout 600 /usr/bin/env -i SYSTEMROOT="$SYSTEMROOT" WINDIR="$WINDIR" TEMP="$TEMP" TMP="$TMP" \
             USERPROFILE="$USERPROFILE" APPDATA="$APPDATA" LOCALAPPDATA="$LOCALAPPDATA" \
-            USERNAME="$USERNAME" COMPUTERNAME="$COMPUTERNAME" \
+            USERNAME="$USERNAME" COMPUTERNAME="$COMPUTERNAME" PATHEXT="$PATHEXT" COMSPEC="$COMSPEC" \
             PATH="$BIN:/c/Windows/System32:/c/Windows" RUST_LOG="kinora=debug,kinora_core=debug" \
             GALLIUM_DRIVER=llvmpipe \
             "$BIN/kinora.exe" --self-test --out "$(cygpath -w "$OUT")" "${MEDIA[@]}" \
@@ -197,7 +204,7 @@ jobs:
           status=$?
           set -e
           echo "exit code $status"
-          LOG="$(cygpath -u "$LOCALAPPDATA")/kinora/kinora.log"
+          LOG="$(cygpath -u "$LOCALAPPDATA")/kinora/kinora-self-test.log"
           [ -f "$LOG" ] && cp "$LOG" "$OUT/" && tail -n 150 "$LOG"
           cat "$OUT/self-test.txt" || true
           exit $status

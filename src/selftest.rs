@@ -184,6 +184,11 @@ async fn checks(app: &gtk::Application, options: &Options, report: &Report) {
         .await;
     report.check(true, "yt-dlp", command_result(version));
 
+    // The account path as the app runs it: a cookies command (quoted for this
+    // system, through its shell) that kinora-account answers. A dummy
+    // cookies.txt in a folder with a space; no real login involved.
+    report.check(true, "account cookies command", account(&options.out).await);
+
     for uri in &options.media {
         let result = play(uri, &options.out, "media", Duration::from_secs(60)).await;
         report.check(true, &format!("play {uri}"), result);
@@ -217,6 +222,34 @@ async fn checks(app: &gtk::Application, options: &Options, report: &Report) {
             screenshot(&window, &options.out.join("window.png")),
         ),
         None => report.fail("main window", "no window"),
+    }
+}
+
+async fn account(out: &Path) -> Result<String, String> {
+    let dir = out.join("account test");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let file = dir.join("cookies.txt");
+    std::fs::write(
+        &file,
+        "# Netscape HTTP Cookie File\n\
+         .youtube.com\tTRUE\t/\tTRUE\t2147483647\tLOGIN_INFO\tkinora-self-test\n",
+    )
+    .map_err(|e| e.to_string())?;
+    let command = kinora_core::account::file_command(&file);
+    let result = crate::TOKIO_RUNTIME
+        .spawn(async move {
+            kinora_core::account::cookies_file(&command)
+                .await
+                .map_err(|e| format!("`{command}`: {e}"))
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    match result? {
+        Some(path) => {
+            let _ = std::fs::remove_file(&path);
+            Ok(format!("exported to {}", path.display()))
+        }
+        None => Err("no cookies file".into()),
     }
 }
 

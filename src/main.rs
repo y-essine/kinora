@@ -180,7 +180,13 @@ fn init_logging() {
             .unwrap_or_else(std::env::temp_dir)
             .join("kinora");
         let _ = std::fs::create_dir_all(&dir);
-        if let Ok(file) = std::fs::File::create(dir.join("kinora.log")) {
+        // A self-test keeps its own log: the app's last session stays readable.
+        let name = if std::env::args().any(|a| a == "--self-test") {
+            "kinora-self-test.log"
+        } else {
+            "kinora.log"
+        };
+        if let Ok(file) = std::fs::File::create(dir.join(name)) {
             env_logger::Builder::from_env(
                 env_logger::Env::default().default_filter_or("kinora=info,kinora_core=info"),
             )
