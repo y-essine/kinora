@@ -164,6 +164,38 @@ template $TFVideoPage: Adw.Bin {
 
     // Kinora: one scrolling column, so the player scrolls away with the
     // page like on YouTube. In fullscreen only the player is left, filling it.
+    // (With the DJ on, the track's colours lie behind the whole page.)
+    Overlay {
+    vexpand: true;
+
+    Adw.Bin {}
+
+    [overlay]
+    Picture dj_glow {
+      styles [
+        "k-glow",
+        "k-dj-glow",
+      ]
+
+      content-fit: fill;
+      can-shrink: true;
+      can-target: false;
+      accessible-role: presentation;
+      visible: bind template.dj;
+      paintable: bind $pixbuf_to_ambient(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+    }
+
+    [overlay]
+    Box dj_scrim {
+      styles [
+        "k-dj-scrim",
+      ]
+
+      can-target: false;
+      visible: bind template.dj;
+    }
+
+    [overlay]
     ScrolledWindow page_scroller {
     hscrollbar-policy: never;
     vexpand: true;
@@ -172,12 +204,30 @@ template $TFVideoPage: Adw.Bin {
       orientation: vertical;
       valign: fill;
       vexpand: true;
+
+      // Kinora: the DJ's own page (see docs/design.md, "DJ"): one narrow
+      // column, the same at every width. First its bar: "DJ on" and the way
+      // out (the widgets are the DJ's, see gui/dj.rs).
+      Adw.Clamp dj_bar {
+        styles [
+          "k-dj-bar",
+        ]
+
+        maximum-size: 560;
+        visible: bind $dj_chrome_visible(template.dj, template.audio-only, template.fullscreened) as <bool>;
+
+        Box dj_bar_slot {}
+      }
+
       // Kinora: the stage. Behind the player, the video's own colours as a
       // soft light (its thumbnail, blurred once: see Utility::ambient_texture).
       Overlay stage {
         styles [
           "k-stage",
         ]
+
+        // (The DJ's audio-only tracks show the record player instead.)
+        visible: bind $stage_visible(template.dj, template.audio-only) as <bool>;
 
         Picture stage_glow {
           styles [
@@ -188,7 +238,7 @@ template $TFVideoPage: Adw.Bin {
           content-fit: fill;
           can-shrink: true;
           accessible-role: presentation;
-          visible: bind template.fullscreened inverted;
+          visible: bind $stage_light_visible(template.dj, template.fullscreened) as <bool>;
           paintable: bind $pixbuf_to_ambient(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
         }
 
@@ -199,7 +249,7 @@ template $TFVideoPage: Adw.Bin {
           ]
 
           can-target: false;
-          visible: bind template.fullscreened inverted;
+          visible: bind $stage_light_visible(template.dj, template.fullscreened) as <bool>;
         }
 
         // Sized in `setup`: 16:9, as large as the window allows.
@@ -366,9 +416,131 @@ template $TFVideoPage: Adw.Bin {
         }
       }
 
+      // Kinora: the DJ's record player: the artwork is the record's label.
+      $TFTurntable dj_deck {
+        styles [
+          "k-dj-deck",
+        ]
+
+        halign: center;
+        visible: bind $dj_vinyl(template.dj, template.audio-only) as <bool>;
+        playing: bind $is_playing(template.state) as <bool>;
+        artwork: bind $pixbuf_to_paintable(template.video as <$TFVideo>.thumbnail) as <Gdk.Paintable>;
+        tooltip-text: _("Play or Pause (Space)");
+      }
+
+      // Kinora: what plays, the line of the track, three large buttons, and
+      // the queue underneath.
+      Adw.Clamp dj_body {
+        styles [
+          "k-dj-body",
+        ]
+
+        maximum-size: 560;
+        visible: bind $dj_chrome_visible(template.dj, template.audio-only, template.fullscreened) as <bool>;
+
+        Box {
+          orientation: vertical;
+
+          Box dj_now_slot {
+            orientation: vertical;
+          }
+
+          Scale dj_seek {
+            styles [
+              "k-dj-seek",
+            ]
+
+            tooltip-text: _("Seek");
+
+            adjustment: Adjustment {
+              lower: 0;
+              upper: 1;
+              step-increment: 0.02;
+              page-increment: 0.1;
+            };
+          }
+
+          Box {
+            styles [
+              "k-dj-times",
+            ]
+
+            Label dj_elapsed {
+              styles [
+                "numeric",
+              ]
+
+              label: "0:00";
+              hexpand: true;
+              xalign: 0;
+            }
+
+            Label dj_length {
+              styles [
+                "numeric",
+              ]
+
+              xalign: 1;
+            }
+          }
+
+          Box {
+            styles [
+              "k-dj-transport",
+            ]
+
+            halign: center;
+            spacing: 28;
+
+            Button {
+              styles [
+                "circular",
+                "flat",
+                "k-dj-step",
+              ]
+
+              icon-name: "media-skip-backward-symbolic";
+              tooltip-text: _("Previous (Shift+P)");
+              action-name: "win.player-previous";
+              valign: center;
+            }
+
+            Button dj_play {
+              styles [
+                "circular",
+                "k-dj-play",
+              ]
+
+              icon-name: bind $dj_play_icon(template.state, template.loading) as <string>;
+              tooltip-text: _("Play or Pause (Space)");
+              action-name: "video.play-pause";
+              valign: center;
+            }
+
+            Button {
+              styles [
+                "circular",
+                "flat",
+                "k-dj-step",
+              ]
+
+              icon-name: "media-skip-forward-symbolic";
+              tooltip-text: _("Next: mix into the next track (Shift+N)");
+              action-name: "win.player-next";
+              valign: center;
+            }
+          }
+
+          Box dj_queue_slot {
+            orientation: vertical;
+          }
+        }
+      }
+
       Gtk.Box details_box {
         orientation: vertical;
-        visible: bind template.fullscreened inverted;
+        visible: bind $details_visible(template.dj, template.fullscreened) as <bool>;
 
         Adw.Clamp body_clamp {
           styles [
@@ -716,12 +888,6 @@ template $TFVideoPage: Adw.Bin {
                 orientation: vertical;
                 valign: start;
 
-                // The DJ's queue takes the place of Up next (see gui/dj.rs).
-                Gtk.Box dj_slot {
-                  orientation: vertical;
-                  visible: false;
-                }
-
                 Gtk.Box up_next_box {
                   styles [
                     "k-upnext",
@@ -776,6 +942,7 @@ template $TFVideoPage: Adw.Bin {
           }
         }
       }
+    }
     }
     }
   }

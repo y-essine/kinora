@@ -22,6 +22,7 @@ mod search_list;
 mod search_list_item;
 mod subscription_item;
 mod subscriptions_list;
+mod turntable;
 pub mod utility;
 mod video_item;
 mod video_list;

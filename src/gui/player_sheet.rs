@@ -1178,6 +1178,7 @@ pub mod imp {
             let Some(page) = self.video_page.borrow().clone() else {
                 return;
             };
+            page.fit(width, height);
             let _ = page.measure(gtk::Orientation::Horizontal, -1);
             // Laid out in full, always; the transform alone moves it.
             page.allocate(width, height, -1, None);

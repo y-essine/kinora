@@ -676,14 +676,33 @@ button.k-glass:hover {
 }
 
 /* --- DJ ----------------------------------------------------------------------
-   A mode of the player (see docs/design.md, "DJ"): the queue stands where Up
-   next would, and one amber word says it is on. */
-.k-dj-card {
-  padding: var(--k-space-3) var(--k-space-4) var(--k-space-4);
+   A mode of the player with a page of its own (see docs/design.md, "DJ"): one
+   narrow column, the same at every width. A record player, what plays, three
+   large buttons, the queue underneath; one amber word says the DJ is on. */
+.k-dj-glow {
+  opacity: 0.9;
+}
+
+/* The track's colours are strongest behind the record and gone by the queue. */
+.k-dj-scrim {
+  background-image: linear-gradient(to bottom,
+      rgba(11, 12, 15, 0.50) 0%,
+      rgba(11, 12, 15, 0.30) 30%,
+      rgba(11, 12, 15, 0.72) 68%,
+      var(--k-bg) 100%);
+}
+
+.k-dj-bar {
+  margin: 8px 16px 6px;
+}
+
+.k-dj-bar-row {
+  min-height: 44px;
 }
 
 .k-dj-on {
   padding-left: 14px;
+  margin-right: 4px;
   background-image: radial-gradient(circle, var(--k-accent) 0, var(--k-accent) 3px, transparent 3.5px);
   background-size: 8px 8px;
   background-repeat: no-repeat;
@@ -692,17 +711,117 @@ button.k-glass:hover {
 
 .k-dj-note,
 .k-dj-album {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--k-text-faint);
 }
 
 .k-dj-leave {
-  min-height: 28px;
-  padding: 0 10px;
+  min-height: 32px;
+  padding: 0 14px;
+  margin-left: 4px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   border-radius: var(--k-radius-pill);
+  color: var(--k-text);
+  background-color: var(--k-glass);
+}
+
+.k-dj-leave:hover {
+  background-color: var(--k-glass-hover);
+}
+
+.k-dj-video:checked {
+  color: var(--k-accent);
+}
+
+/* With its video, a track's stage keeps to the column's rhythm. */
+.k-stage.dj:not(.fullscreen) > clamp {
+  margin: 0 16px;
+}
+
+.k-stage.dj.edge:not(.fullscreen) > clamp {
+  margin: 0;
+}
+
+.k-dj-body {
+  margin: 18px 16px 40px;
+}
+
+.k-dj-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.k-dj-artists {
+  font-size: 16px;
   color: var(--k-text-dim);
+}
+
+/* The line of the track: thin and amber, with a knob to take hold of. */
+scale.k-dj-seek {
+  margin: 14px -6px 0;
+  padding: 6px;
+  min-height: 20px;
+}
+
+scale.k-dj-seek > trough {
+  min-height: 4px;
+  border-radius: var(--k-radius-pill);
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+scale.k-dj-seek > trough > highlight {
+  min-height: 4px;
+  border-radius: var(--k-radius-pill);
+  background-color: var(--k-accent);
+}
+
+scale.k-dj-seek > trough > slider {
+  min-width: 14px;
+  min-height: 14px;
+  margin: -5px;
+  border-radius: var(--k-radius-pill);
+  background-color: #ffffff;
+  box-shadow: var(--k-shadow-1);
+}
+
+.k-dj-times {
+  font-size: 12px;
+  color: var(--k-text-dim);
+}
+
+.k-dj-transport {
+  margin: 8px 0 22px;
+}
+
+button.k-dj-step {
+  min-width: 64px;
+  min-height: 64px;
+  -gtk-icon-size: 30px;
+}
+
+button.k-dj-play {
+  min-width: 84px;
+  min-height: 84px;
+  -gtk-icon-size: 38px;
+  color: var(--k-on-accent);
+  background-color: var(--k-accent);
+  box-shadow: var(--k-shadow-1);
+  transition: background-color var(--k-dur-fast) var(--k-ease);
+}
+
+button.k-dj-play:hover {
+  background-color: color-mix(in srgb, var(--k-accent) 88%, #ffffff);
+}
+
+button.k-dj-play:active {
+  background-color: color-mix(in srgb, var(--k-accent) 86%, #000000);
+}
+
+.k-dj-queue-box .k-upnext-list {
+  margin: 0 -8px;
+  background: none;
 }
 
 .k-dj-art {
@@ -710,13 +829,8 @@ button.k-glass:hover {
   background-color: var(--k-surface-2);
 }
 
-.k-dj-title {
-  font-size: 15px;
-  font-weight: 600;
-}
-
 .k-dj-row-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -739,6 +853,16 @@ button.k-glass:hover {
 .k-dj-queue > row:hover .k-dj-row-actions,
 .k-dj-queue > row:focus-within .k-dj-row-actions {
   opacity: 1;
+}
+
+.k-dj-length {
+  margin-right: 4px;
+  transition: opacity var(--k-dur-fast) var(--k-ease);
+}
+
+.k-dj-queue > row:hover .k-dj-length,
+.k-dj-queue > row:focus-within .k-dj-length {
+  opacity: 0;
 }
 
 /* Audio only: the artwork on its ambient colours, where the video would be. */

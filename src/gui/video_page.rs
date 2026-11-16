@@ -65,6 +65,7 @@ impl VideoPage {
             let audio = Some(self.audio_only())
                 .filter(|audio_only| *audio_only)
                 .and_then(|_| self.client().prepared_audio_playback_uri(&video));
+            imp.audio_stream.set(audio.is_some());
             if self.try_get_downloaded(&video).is_some() {
                 imp.fast_start_active.set(false);
                 queue.add_item(&MediaItem::new(&fallback));
@@ -336,8 +337,27 @@ impl VideoPage {
     // --- Kinora: what the player sheet needs (see `player_sheet.rs`) ---------
 
     /// The player's place in the page: x, y, width, height.
+    ///
+    /// On the DJ's record player it is a 16:9 band across the middle of the
+    /// record: the label with vinyl either side, which is what the
+    /// mini-player then shows.
     pub fn player_rect(&self) -> Option<[f64; 4]> {
-        let r = self.imp().player_frame.compute_bounds(self)?;
+        let imp = self.imp();
+        if imp.vinyl() {
+            let (x, y, r) = imp.dj_deck.record();
+            let centre = imp
+                .dj_deck
+                .compute_point(self, &gtk::graphene::Point::new(x as f32, y as f32))?;
+            let width = r * 1.8;
+            let height = width * 9.0 / 16.0;
+            return Some([
+                centre.x() as f64 - width / 2.0,
+                centre.y() as f64 - height / 2.0,
+                width,
+                height,
+            ]);
+        }
+        let r = imp.player_frame.compute_bounds(self)?;
         Some([
             r.x() as f64,
             r.y() as f64,
@@ -346,10 +366,34 @@ impl VideoPage {
         ])
     }
 
+    /// The page is about to be laid out at this size (by the sheet). The
+    /// DJ's record player is a square in its column, at most 44% of the
+    /// page's height, so the buttons and the first of the queue stay in
+    /// view. It is sized here, not a frame later, so a new track's page is
+    /// right from its first frame.
+    pub fn fit(&self, width: i32, height: i32) {
+        let imp = self.imp();
+        if !self.dj() {
+            return;
+        }
+        let side = ((width - 32).min(528) as f64)
+            .min(height as f64 * 0.44)
+            .max(180.0)
+            .round() as i32;
+        if imp.dj_deck.width_request() != side {
+            imp.dj_deck.set_size_request(side, side);
+        }
+    }
+
     /// Whether a point of the page is on the stage (the player and its glow).
     pub fn stage_contains(&self, x: f64, y: f64) -> bool {
-        self.imp()
-            .stage
+        let imp = self.imp();
+        let stage: &gtk::Widget = if imp.vinyl() {
+            imp.dj_deck.upcast_ref()
+        } else {
+            imp.stage.upcast_ref()
+        };
+        stage
             .compute_bounds(self)
             .is_some_and(|r| r.contains_point(&gtk::graphene::Point::new(x as f32, y as f32)))
     }
@@ -361,6 +405,11 @@ impl VideoPage {
         imp.stage_glow.set_opacity(opacity);
         imp.stage_scrim.set_opacity(opacity);
         imp.details_box.set_opacity(opacity);
+        // (The DJ's page: all but the record.)
+        imp.dj_glow.set_opacity(opacity);
+        imp.dj_scrim.set_opacity(opacity);
+        imp.dj_bar.set_opacity(opacity);
+        imp.dj_body.set_opacity(opacity);
     }
 
     /// How far the page is scrolled down, in pixels.
@@ -519,19 +568,22 @@ impl VideoPage {
         }
     }
 
-    /// Show the DJ's queue in place of Up next (`None` takes it out again).
-    pub fn set_dj_panel(&self, panel: Option<&gtk::Widget>) {
-        let slot = &self.imp().dj_slot;
-        while let Some(child) = slot.first_child() {
-            slot.remove(&child);
-        }
-        if let Some(panel) = panel {
-            if let Some(parent) = panel.parent().and_downcast::<gtk::Box>() {
-                parent.remove(panel);
+    /// Put the DJ's widgets into its page (`None` takes them out again): its
+    /// bar ("DJ on", Leave), what plays (title, artists), and the queue.
+    pub fn set_dj_panel(&self, parts: Option<[&gtk::Widget; 3]>) {
+        let imp = self.imp();
+        let slots = [&imp.dj_bar_slot, &imp.dj_now_slot, &imp.dj_queue_slot];
+        for (index, slot) in slots.into_iter().enumerate() {
+            while let Some(child) = slot.first_child() {
+                slot.remove(&child);
             }
-            slot.append(panel);
+            if let Some(part) = parts.map(|p| p[index]) {
+                if let Some(parent) = part.parent().and_downcast::<gtk::Box>() {
+                    parent.remove(part);
+                }
+                slot.append(part);
+            }
         }
-        slot.set_visible(panel.is_some());
     }
 
     /// The first "Up next" video, if they have arrived.
@@ -650,9 +702,15 @@ pub mod imp {
     use crate::backend::VideoSort;
     use crate::config::BASE_ID;
     use crate::gspawn;
+    use crate::gui::turntable::Turntable;
     use crate::gui::utility::Utility;
     use crate::gui::video_item::VideoItem;
 
+
+    /// "3:32", for the DJ's line.
+    fn clock(seconds: f64) -> String {
+        crate::gui::dj::format_length(Some(std::time::Duration::from_secs_f64(seconds.max(0.0))))
+    }
 
     #[derive(CompositeTemplate, Properties)]
     #[template(resource = "/ui/video_page.ui")]
@@ -709,8 +767,38 @@ pub mod imp {
         #[template_child]
         autoplay_switch: TemplateChild<gtk::Switch>,
         pub(super) up_next_store: FiniteVideoStore,
+        // Kinora: the DJ's page (see docs/design.md, "DJ").
         #[template_child]
-        pub(super) dj_slot: TemplateChild<gtk::Box>,
+        pub(super) dj_glow: TemplateChild<gtk::Picture>,
+        #[template_child]
+        pub(super) dj_scrim: TemplateChild<gtk::Box>,
+        #[template_child]
+        pub(super) dj_bar: TemplateChild<adw::Clamp>,
+        #[template_child]
+        pub(super) dj_bar_slot: TemplateChild<gtk::Box>,
+        #[template_child]
+        pub(super) dj_deck: TemplateChild<Turntable>,
+        #[template_child]
+        pub(super) dj_body: TemplateChild<adw::Clamp>,
+        #[template_child]
+        pub(super) dj_now_slot: TemplateChild<gtk::Box>,
+        #[template_child]
+        pub(super) dj_seek: TemplateChild<gtk::Scale>,
+        #[template_child]
+        dj_elapsed: TemplateChild<gtk::Label>,
+        #[template_child]
+        dj_length: TemplateChild<gtk::Label>,
+        #[template_child]
+        dj_play: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub(super) dj_queue_slot: TemplateChild<gtk::Box>,
+        /// A seek asked for on the DJ's line that waits a moment (the knob is
+        /// being dragged), and until when the line then ignores the player
+        /// (which still reports the old place).
+        dj_seek_pending: RefCell<Option<glib::SourceId>>,
+        dj_seek_quiet_until: Cell<Option<std::time::Instant>>,
+        /// What plays was loaded as sound alone: it has no picture to show.
+        pub(super) audio_stream: Cell<bool>,
         /// Kinora: the DJ's audio-only way: the stage shows the track's artwork
         /// and no video is decoded.
         #[property(get, set = Self::set_audio_only)]
@@ -783,7 +871,21 @@ pub mod imp {
                 stage_glow: Default::default(),
                 stage_scrim: Default::default(),
                 details_box: Default::default(),
-                dj_slot: Default::default(),
+                dj_glow: Default::default(),
+                dj_scrim: Default::default(),
+                dj_bar: Default::default(),
+                dj_bar_slot: Default::default(),
+                dj_deck: Default::default(),
+                dj_body: Default::default(),
+                dj_now_slot: Default::default(),
+                dj_seek: Default::default(),
+                dj_elapsed: Default::default(),
+                dj_length: Default::default(),
+                dj_play: Default::default(),
+                dj_queue_slot: Default::default(),
+                dj_seek_pending: Default::default(),
+                dj_seek_quiet_until: Default::default(),
+                audio_stream: Default::default(),
                 audio_only: Default::default(),
                 warming: Default::default(),
                 has_next: Default::default(),
@@ -928,11 +1030,74 @@ pub mod imp {
         /// A track that was loaded without its video keeps its artwork: the
         /// video comes with the next one.
         fn set_audio_only(&self, audio_only: bool) {
+            // (Sound alone was loaded: there is no picture to switch on.)
+            if !audio_only && self.audio_stream.get() {
+                return;
+            }
             if self.audio_only.replace(audio_only) == audio_only {
                 return;
             }
             if let Some(player) = self.clapper.player() {
                 player.set_video_enabled(!audio_only);
+            }
+        }
+
+        /// Kinora: the page shows the DJ's record player (an audio-only DJ
+        /// track) where the video would be.
+        pub(super) fn vinyl(&self) -> bool {
+            self.dj.get() && self.audio_only.get()
+        }
+
+        /// Kinora: the DJ page's line and its record's arm follow the player.
+        fn update_dj_progress(&self) {
+            if !self.dj.get() {
+                return;
+            }
+            let obj = self.obj();
+            let fraction = obj.progress_fraction();
+            self.dj_deck.set_progress(fraction);
+            let quiet = self
+                .dj_seek_quiet_until
+                .get()
+                .is_some_and(|until| std::time::Instant::now() < until);
+            if quiet || self.dj_seek_pending.borrow().is_some() {
+                return;
+            }
+            self.dj_seek.set_value(fraction);
+            self.dj_elapsed.set_label(&clock(obj.position_secs()));
+            self.dj_length
+                .set_label(&obj.duration_secs().map(clock).unwrap_or_default());
+        }
+
+        /// Kinora: the DJ's line was moved by hand. Seek once the hand rests,
+        /// not for every pixel on the way.
+        fn dj_seek_to(&self, fraction: f64) {
+            let obj = self.obj();
+            if let Some(duration) = obj.duration_secs() {
+                self.dj_elapsed
+                    .set_label(&clock(fraction.clamp(0.0, 1.0) * duration));
+            }
+            let source = glib::timeout_add_local_once(
+                std::time::Duration::from_millis(150),
+                clone!(
+                    #[weak]
+                    obj,
+                    move || {
+                        let imp = obj.imp();
+                        imp.dj_seek_pending.take();
+                        imp.dj_seek_quiet_until.set(Some(
+                            std::time::Instant::now() + std::time::Duration::from_millis(800),
+                        ));
+                        if let (Some(player), Some(duration)) =
+                            (imp.clapper.player(), obj.duration_secs())
+                        {
+                            player.seek(imp.dj_seek.value().clamp(0.0, 1.0) * duration);
+                        }
+                    }
+                ),
+            );
+            if let Some(old) = self.dj_seek_pending.replace(Some(source)) {
+                old.remove();
             }
         }
 
@@ -1135,10 +1300,11 @@ pub mod imp {
         }
 
         fn get_state(&self) -> clapper::PlayerState {
+            // (The template's own bindings ask before the player is there.)
             self.clapper
-                .player()
-                .expect("Clapper to have a player")
-                .state()
+                .try_get()
+                .and_then(|clapper| clapper.player())
+                .map_or(clapper::PlayerState::Stopped, |p| p.state())
         }
 
         fn get_position(&self) -> f64 {
@@ -1175,6 +1341,48 @@ pub mod imp {
         #[template_callback(function)]
         fn dj_offered(available: bool, dj: bool, platform: Option<String>) -> bool {
             available && !dj && platform.as_deref() == Some("youtube")
+        }
+
+        // Kinora: what the DJ's page shows instead of the video page (see
+        // docs/design.md, "DJ"). In fullscreen a track with its video is the
+        // video alone; the record player keeps its page.
+        #[template_callback(function)]
+        fn dj_vinyl(dj: bool, audio_only: bool) -> bool {
+            dj && audio_only
+        }
+
+        #[template_callback(function)]
+        fn stage_visible(dj: bool, audio_only: bool) -> bool {
+            !(dj && audio_only)
+        }
+
+        #[template_callback(function)]
+        fn stage_light_visible(dj: bool, fullscreened: bool) -> bool {
+            !dj && !fullscreened
+        }
+
+        #[template_callback(function)]
+        fn dj_chrome_visible(dj: bool, audio_only: bool, fullscreened: bool) -> bool {
+            dj && (audio_only || !fullscreened)
+        }
+
+        #[template_callback(function)]
+        fn details_visible(dj: bool, fullscreened: bool) -> bool {
+            !dj && !fullscreened
+        }
+
+        #[template_callback(function)]
+        fn is_playing(state: clapper::PlayerState) -> bool {
+            state == clapper::PlayerState::Playing
+        }
+
+        #[template_callback(function)]
+        fn dj_play_icon(state: clapper::PlayerState, loading: bool) -> &'static str {
+            match state {
+                clapper::PlayerState::Playing => "media-playback-pause-symbolic",
+                _ if loading => "content-loading-symbolic",
+                _ => "media-playback-start-symbolic",
+            }
         }
 
         #[template_callback(function)]
@@ -1372,8 +1580,17 @@ pub mod imp {
                 }
             ));
 
+            // Kinora: for the DJ's bar, which has no player to double click.
+            let action_fullscreen = SimpleAction::new("fullscreen", None);
+            action_fullscreen.connect_activate(clone!(
+                #[weak]
+                obj,
+                move |_, _| obj.imp().toggle_fullscreen_mode(false)
+            ));
+
             let actions = SimpleActionGroup::new();
             obj.insert_action_group("video", Some(&actions));
+            actions.add_action(&action_fullscreen);
             actions.add_action(&action_play_pause);
             actions.add_action(&action_seek_forward);
             actions.add_action(&action_seek_backward);
@@ -1540,20 +1757,23 @@ pub mod imp {
             // edge. Fullscreen lifts all of this and lets it fill.
             // Wide windows also put Up next in a column beside the details.
             self.stage.set_measure_overlay(&*self.stage_clamp, true);
-            let last = Cell::new((0, 0, false));
-            self.clapper.add_tick_callback(clone!(
-                #[weak]
-                obj,
-                #[upgrade_or]
-                glib::ControlFlow::Break,
-                move |clapper, _| {
-                    let state = (obj.width(), obj.height(), obj.fullscreened());
+            // (The DJ's page: a track's video is as high as the record player
+            // would be, see `fit`.)
+            let last = Cell::new((0, 0, false, false));
+            obj.add_tick_callback(move |obj, _| {
+                    let state = (obj.width(), obj.height(), obj.fullscreened(), obj.dj());
                     // Nothing to do unless the page changed size.
                     if last.replace(state) == state {
                         return glib::ControlFlow::Continue;
                     }
                     let imp = obj.imp();
-                    let (width, height, fullscreened) = state;
+                    let clapper = imp.clapper.get();
+                    let (width, height, fullscreened, dj) = state;
+                    if dj {
+                        imp.stage.add_css_class("dj");
+                    } else {
+                        imp.stage.remove_css_class("dj");
+                    }
                     if fullscreened {
                         clapper.set_height_request(-1);
                         imp.stage_clamp.set_maximum_size(i32::MAX);
@@ -1569,7 +1789,7 @@ pub mod imp {
                     }
                     let gutter = if narrow { 0.0 } else { 24.0 };
                     let by_width = (width as f64 - 2.0 * gutter) * 9.0 / 16.0;
-                    let cap = height as f64 * 0.72;
+                    let cap = height as f64 * if dj { 0.44 } else { 0.72 };
                     let player_height = by_width.min(cap).max(120.0).round();
                     clapper.set_height_request(player_height as i32);
                     imp.stage_clamp
@@ -1588,8 +1808,37 @@ pub mod imp {
                     imp.up_next_clamp.set_tightening_threshold(column);
                     imp.up_next_clamp.set_hexpand(!two_columns);
                     glib::ControlFlow::Continue
+            });
+
+            // Kinora: the DJ's page. Its line seeks; a click on the record
+            // plays or pauses; nothing turns with "Reduce effects".
+            self.dj_seek.connect_change_value(clone!(
+                #[weak]
+                obj,
+                #[upgrade_or]
+                Propagation::Proceed,
+                move |_, _, value| {
+                    obj.imp().dj_seek_to(value);
+                    Propagation::Proceed
                 }
             ));
+            let click = gtk::GestureClick::new();
+            click.connect_released(clone!(
+                #[weak]
+                obj,
+                move |gesture, _, x, y| {
+                    if gesture.widget().is_some_and(|w| w.contains(x, y)) {
+                        obj.play_pause();
+                    }
+                }
+            ));
+            self.dj_deck.add_controller(click);
+            settings
+                .bind("reduce-effects", &*self.dj_deck, "still")
+                .flags(gtk::gio::SettingsBindFlags::GET)
+                .build();
+            obj.connect_position_notify(|obj| obj.imp().update_dj_progress());
+            obj.connect_duration_notify(|obj| obj.imp().update_dj_progress());
 
             // Kinora: a new video's page opens at the top once it is shown (pages
             // are laid out only when on screen).
@@ -1775,6 +2024,7 @@ pub mod imp {
         fn class_init(klass: &mut Self::Class) {
             clapper_gtk::Video::ensure_type();
             clapper_gtk::Billboard::ensure_type();
+            Turntable::ensure_type();
             Self::bind_template(klass);
             Self::bind_template_callbacks(klass);
             Utility::bind_template_callbacks(klass);
@@ -1826,6 +2076,10 @@ pub mod imp {
 
     impl WidgetImpl for VideoPage {
         fn grab_focus(&self) -> bool {
+            // (The DJ's record player: the player itself is not shown.)
+            if self.vinyl() {
+                return self.dj_play.grab_focus();
+            }
             self.clapper.grab_focus()
         }
     }

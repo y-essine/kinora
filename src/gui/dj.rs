@@ -1,9 +1,10 @@
 //! Kinora: the DJ (see `docs/design.md`, "DJ", and `docs/architecture.md`,
 //! "The DJ"). The engine is `kinora_core::dj`; this is its frontend.
 //!
-//! The DJ is a mode of the one player, not another place: every track is an
-//! ordinary video page in the player sheet, with the DJ's queue where Up next
-//! would be. [`Dj`] keeps the session on the UI thread and runs its loop:
+//! The DJ is a mode of the one player, not another place: every track is a
+//! video page in the player sheet, which then shows the DJ's own layout (a
+//! record player, large controls, the queue underneath) instead of the video
+//! page's. [`Dj`] keeps the session on the UI thread and runs its loop:
 //!
 //! - while a track plays, the next one is prepared and the transition is
 //!   planned from the player's real length;
@@ -460,7 +461,7 @@ impl Dj {
     /// `page` is the current track's page from now on.
     fn adopt(&self, page: &VideoPage) {
         self.0.page.replace(Some(page.clone()));
-        page.set_dj_panel(Some(self.0.panel.widget()));
+        page.set_dj_panel(Some(self.0.panel.parts()));
         self.refresh_panel();
     }
 
@@ -1029,7 +1030,7 @@ fn fade_plan(over: Duration) -> TransitionPlan {
 }
 
 /// "3:32", or "1:02:05".
-fn format_length(length: Option<Duration>) -> String {
+pub(crate) fn format_length(length: Option<Duration>) -> String {
     let Some(length) = length else {
         return String::new();
     };
@@ -1066,12 +1067,15 @@ enum PanelAction {
 
 type Handler = Rc<RefCell<Option<Box<dyn Fn(PanelAction)>>>>;
 
-/// The DJ's part of the video page: what plays (artwork, artists, album) and
-/// the queue. One panel moves from page to page with the music.
+/// The DJ's parts of its page (the page itself has the record player and the
+/// controls, see `video_page.blp`): the bar ("DJ on", Show Video, Leave),
+/// what plays (title, artists, album), and the queue. One set of them moves
+/// from page to page with the music.
 struct Panel {
-    root: gtk::Box,
+    bar: gtk::Box,
+    now: gtk::Box,
+    queue: gtk::Box,
     note: gtk::Label,
-    art: gtk::Picture,
     title: gtk::Label,
     artists: gtk::Label,
     album: gtk::Label,
@@ -1159,14 +1163,11 @@ impl Panel {
             }
         };
 
-        let root = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .spacing(16)
-            .css_classes(["k-dj"])
-            .build();
-
         // "DJ on", where the music comes from, and the way out.
-        let header = gtk::Box::builder().spacing(8).build();
+        let header = gtk::Box::builder()
+            .spacing(4)
+            .css_classes(["k-dj-bar-row"])
+            .build();
         let on = gtk::Label::builder()
             .label(gettextrs::gettext("DJ on"))
             .css_classes(["k-kicker", "k-dj-on"])
@@ -1205,29 +1206,32 @@ impl Panel {
             handler,
             move |button| emit(&handler, PanelAction::ShowVideo(button.is_active()))
         ));
-        header.append(&on);
-        header.append(&note);
-        header.append(&show_video);
-        header.append(&leave);
+        // The record player fills the screen too (the page's own action).
+        let fullscreen = icon_button(
+            "view-fullscreen-symbolic",
+            &gettextrs::gettext("Fullscreen (F)"),
+        );
+        fullscreen.set_action_name(Some("video.fullscreen"));
 
-        // What plays.
+        // What plays: large, under the record.
         let now = gtk::Box::builder()
-            .spacing(12)
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(4)
             .css_classes(["k-dj-now"])
             .build();
-        let (art_frame, art) = artwork(64);
-        let text = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .spacing(2)
-            .hexpand(true)
-            .valign(gtk::Align::Center)
-            .build();
-        let title = label(&["k-dj-title"], 2);
-        let artists = label(&["k-card-meta"], 1);
-        let album = label(&["k-dj-album"], 1);
-        text.append(&title);
-        text.append(&artists);
-        text.append(&album);
+        let centred = |css: &[&str], lines: i32| {
+            let label = label(css, lines);
+            label.set_xalign(0.5);
+            label.set_justify(gtk::Justification::Center);
+            label
+        };
+        let title = centred(&["k-dj-title"], 2);
+        title.set_accessible_role(gtk::AccessibleRole::Heading);
+        let artists = centred(&["k-dj-artists"], 1);
+        let album = centred(&["k-dj-album"], 1);
+        now.append(&title);
+        now.append(&artists);
+        now.append(&album);
         // Shown while the next track is asked for and has not started.
         let pending = adw::Spinner::builder()
             .width_request(16)
@@ -1236,24 +1240,12 @@ impl Panel {
             .visible(false)
             .tooltip_text(gettextrs::gettext("The next track is starting"))
             .build();
-        // The window's own Previous and Next: the same as on the player.
-        let previous = icon_button(
-            "media-skip-backward-symbolic",
-            &gettextrs::gettext("Previous (Shift+P)"),
-        );
-        previous.set_action_name(Some("win.player-previous"));
-        let skip = icon_button(
-            "media-skip-forward-symbolic",
-            &gettextrs::gettext("Next: mix into the next track (Shift+N)"),
-        );
-        skip.set_action_name(Some("win.player-next"));
-        now.append(&art_frame);
-        now.append(&text);
-        now.append(&pending);
-        let transport = gtk::Box::builder().valign(gtk::Align::Center).build();
-        transport.append(&previous);
-        transport.append(&skip);
-        now.append(&transport);
+        header.append(&on);
+        header.append(&note);
+        header.append(&pending);
+        header.append(&show_video);
+        header.append(&fullscreen);
+        header.append(&leave);
 
         // The queue.
         let queue_header = gtk::Box::builder().spacing(8).build();
@@ -1273,6 +1265,7 @@ impl Panel {
             .selection_mode(gtk::SelectionMode::None)
             .activate_on_single_click(true)
             .css_classes(["k-upnext-list", "k-dj-queue"])
+            .valign(gtk::Align::Start)
             .build();
         list.connect_row_activated(glib::clone!(
             #[strong]
@@ -1287,25 +1280,17 @@ impl Panel {
         let queue = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(6)
+            .css_classes(["k-dj-queue-box"])
             .build();
         queue.append(&queue_header);
         queue.append(&list);
         queue.append(&more);
 
-        let top = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .spacing(12)
-            .css_classes(["k-panel", "k-dj-card"])
-            .build();
-        top.append(&header);
-        top.append(&now);
-        root.append(&top);
-        root.append(&queue);
-
         Self {
-            root,
+            bar: header,
+            now,
+            queue,
             note,
-            art,
             title,
             artists,
             album,
@@ -1320,8 +1305,13 @@ impl Panel {
         }
     }
 
-    fn widget(&self) -> &gtk::Widget {
-        self.root.upcast_ref()
+    /// The bar, what plays, and the queue: for the page's three places.
+    fn parts(&self) -> [&gtk::Widget; 3] {
+        [
+            self.bar.upcast_ref(),
+            self.now.upcast_ref(),
+            self.queue.upcast_ref(),
+        ]
     }
 
     fn set_pending(&self, pending: bool) {
@@ -1332,10 +1322,12 @@ impl Panel {
         self.handler.replace(Some(Box::new(f)));
     }
 
-    /// Take the panel out of its page and forget what it showed.
+    /// Take the parts out of their page and forget what they showed.
     fn clear(&self) {
-        if let Some(parent) = self.root.parent().and_downcast::<gtk::Box>() {
-            parent.remove(&self.root);
+        for part in self.parts() {
+            if let Some(parent) = part.parent().and_downcast::<gtk::Box>() {
+                parent.remove(part);
+            }
         }
         self.shown_now.take();
         self.shown_queue.take();
@@ -1363,7 +1355,6 @@ impl Panel {
             let album = album_line(track);
             self.album.set_label(&album);
             self.album.set_visible(!album.is_empty());
-            show_thumbnail(&self.art, &client.dj_video(track), client);
         }
 
         let upcoming = session.upcoming();
@@ -1395,7 +1386,7 @@ impl Panel {
             }
         };
         let line = gtk::Box::builder().spacing(10).build();
-        let (art_frame, art) = artwork(40);
+        let (art_frame, art) = artwork(48);
         show_thumbnail(&art, &client.dj_video(track), client);
         let text = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
@@ -1444,10 +1435,14 @@ impl Panel {
         ));
         actions.append(&play_next);
         actions.append(&remove);
+        // The length stands where the two buttons appear.
+        length.set_halign(gtk::Align::End);
+        length.set_can_target(false);
+        let end = gtk::Overlay::builder().child(&actions).build();
+        end.add_overlay(&length);
         line.append(&art_frame);
         line.append(&text);
-        line.append(&length);
-        line.append(&actions);
+        line.append(&end);
 
         let row = gtk::ListBoxRow::builder()
             .child(&line)
