@@ -24,6 +24,16 @@ Read this, then `docs/architecture.md`, `docs/design.md`, `CONTRIBUTING-KINORA.m
 - First run: https://github.com/y-essine/kinora/actions/runs/43761254918 — not
   known yet whether it passes. Next steps:
   1. `gh run view <id> --log-failed`, fix, push, `gh workflow run windows.yml`.
+     **First run failed in "Build Clapper"**: generating `Clapper-0.0.gir`,
+     g-ir-scanner's link fails with `undefined reference to
+     clapper_harvest_get_type` (MSYS2 UCRT64, gcc 16, gobject-introspection
+     1.86). Introspection is needed (blueprint reads the ClapperGtk GIR; the
+     Python enhancers load the Clapper typelib). Things to try: Clapper's own
+     CI uses MINGW64, not UCRT64 (try `msystem: MINGW64` and `mingw-w64-x86_64-*`
+     packages); look for the fix in Clapper's master (`git log -S
+     clapper_harvest` / its Windows workflow) and build a commit that has it;
+     or check whether `clapper-harvest.c` is left out of the Windows build
+     (a meson condition) while its header is still scanned.
   2. When green: bump the version (Cargo.toml, meson.build, PKGBUILD pkgver,
      a `<release>` in data/*.metainfo.xml.in.in), commit, tag `v0.1.0-beta.6`,
      push the tag; the workflow publishes the release.
