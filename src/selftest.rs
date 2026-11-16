@@ -215,14 +215,73 @@ async fn checks(app: &gtk::Application, options: &Options, report: &Report) {
     // The main window, as a user sees it first.
     crate::build_ui(app);
     glib::timeout_future(Duration::from_secs(12)).await;
-    match app.active_window().or_else(|| app.windows().into_iter().next()) {
-        Some(window) => report.check(
-            true,
-            "main window",
-            screenshot(&window, &options.out.join("window.png")),
-        ),
-        None => report.fail("main window", "no window"),
+    let Some(window) = app.active_window().or_else(|| app.windows().into_iter().next()) else {
+        report.fail("main window", "no window");
+        return;
+    };
+    report.check(
+        true,
+        "main window",
+        screenshot(&window, &options.out.join("window.png")),
+    );
+
+    // Every page of the main view, as the sidebar opens them (a page change
+    // crashed on Windows). A crash ends the test here: the last line printed
+    // names the page; crash.txt says where.
+    let stack = find_view_stack(window.upcast_ref());
+    match &stack {
+        Some(stack) => {
+            let pages: Vec<String> = (0..stack.pages().n_items())
+                .filter_map(|i| stack.pages().item(i).and_downcast::<adw::ViewStackPage>())
+                .filter_map(|page| page.name().map(|n| n.to_string()))
+                .collect();
+            for name in pages {
+                println!("self-test: page {name}");
+                stack.set_visible_child_name(&name);
+                glib::timeout_future(Duration::from_secs(4)).await;
+                report.check(
+                    true,
+                    &format!("page {name}"),
+                    screenshot(&window, &options.out.join(format!("page-{name}.png"))),
+                );
+            }
+            stack.set_visible_child_name("home");
+        }
+        None => report.fail("pages", "no view stack in the window"),
     }
+
+    // The account dialog (its browser profiles are only listed, not used).
+    println!("self-test: connect-account");
+    let _ = window.activate_action("win.connect-account", None);
+    glib::timeout_future(Duration::from_secs(5)).await;
+    let shown = app
+        .windows()
+        .into_iter()
+        .find(|w| w != &window && w.is_visible())
+        .map(|w| w.upcast::<gtk::Widget>())
+        .unwrap_or_else(|| window.clone().upcast());
+    report.check(
+        true,
+        "connect account dialog",
+        screenshot(&shown, &options.out.join("connect-account.png")),
+    );
+}
+
+/// The window's main view stack (Home, Feed, Search, ...).
+fn find_view_stack(widget: &gtk::Widget) -> Option<adw::ViewStack> {
+    if let Some(stack) = widget.downcast_ref::<adw::ViewStack>() {
+        if stack.child_by_name("home").is_some() {
+            return Some(stack.clone());
+        }
+    }
+    let mut child = widget.first_child();
+    while let Some(c) = child {
+        if let Some(found) = find_view_stack(&c) {
+            return Some(found);
+        }
+        child = c.next_sibling();
+    }
+    None
 }
 
 async fn account(out: &Path) -> Result<String, String> {

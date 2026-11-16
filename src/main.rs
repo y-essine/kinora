@@ -11,6 +11,7 @@ use gtk::{CssProvider, prelude::GtkWindowExt, prelude::RootExt};
 use std::sync::LazyLock;
 
 mod config;
+mod crashlog;
 mod migrate;
 use crate::config::BASE_ID;
 
@@ -173,6 +174,18 @@ fn init_css() {
 /// Kinora: logs. On Windows there is no console: they go to
 /// `%LOCALAPPDATA%\\kinora\\kinora.log` (info and up unless RUST_LOG says).
 fn init_logging() {
+    // Kinora: a panic goes to the log too, with where it happened. On Windows
+    // there is no console: without this a crash leaves no trace at all.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let thread = std::thread::current();
+        log::error!(
+            "panic in thread {}: {info}\n{}",
+            thread.name().unwrap_or("<unnamed>"),
+            std::backtrace::Backtrace::force_capture()
+        );
+        default_hook(info);
+    }));
     #[cfg(windows)]
     {
         let dir = std::env::var_os("LOCALAPPDATA")
@@ -180,6 +193,7 @@ fn init_logging() {
             .unwrap_or_else(std::env::temp_dir)
             .join("kinora");
         let _ = std::fs::create_dir_all(&dir);
+        crashlog::install(&dir);
         // A self-test keeps its own log: the app's last session stays readable.
         let name = if std::env::args().any(|a| a == "--self-test") {
             "kinora-self-test.log"

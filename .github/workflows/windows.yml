@@ -60,6 +60,7 @@ jobs:
             mingw-w64-ucrt-x86_64-python-gobject
             mingw-w64-ucrt-x86_64-yt-dlp
             mingw-w64-ucrt-x86_64-mesa
+            mingw-w64-ucrt-x86_64-webp-pixbuf-loader
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -107,6 +108,20 @@ jobs:
           printf '@"%%~dp0python.exe" -m yt_dlp %%*\r\n' > "$STAGE/bin/yt-dlp.cmd"
           cat "$STAGE/bin/kinora-account.cmd"
 
+      # The same program with the test hooks (KH_*, see CONTRIBUTING-KINORA.md),
+      # for driving it on a Windows machine without a rebuild per experiment.
+      # Its own artifact: drop it into a bundle's bin\. Never in the zip.
+      - name: Build kinora-dev.exe (dev hooks)
+        run: |
+          CARGO_HOME="$GITHUB_WORKSPACE/_build/cargo-home" cargo build --release --features dev-hooks \
+            --manifest-path Cargo.toml --target-dir _build/target
+          mkdir -p _dev-exe && cp _build/target/release/kinora.exe _dev-exe/kinora-dev.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kinora-dev-exe
+          path: _dev-exe/kinora-dev.exe
+
       - name: Bundle runtime
         id: bundle
         run: |
@@ -133,6 +148,9 @@ jobs:
           (cd "$STAGE/lib/gstreamer-1.0" && rm -f libgstx264.dll libgstx265.dll libgstsvtav1.dll \
              libgstsvthevcenc.dll libgstlame.dll libgsttwolame.dll libgstmpeg2enc.dll libgstmplex.dll \
              libgstfrei0r.dll libgstzbar.dll libgstvoamrwbenc.dll libgsty4menc.dll)
+
+          # Link stubs (.dll.a) are for building, not running.
+          find "$STAGE/lib" -name '*.dll.a' -delete
 
           # Settings schemas, icons
           cp /ucrt64/share/glib-2.0/schemas/*.xml "$STAGE/share/glib-2.0/schemas/"
@@ -206,6 +224,8 @@ jobs:
           echo "exit code $status"
           LOG="$(cygpath -u "$LOCALAPPDATA")/kinora/kinora-self-test.log"
           [ -f "$LOG" ] && cp "$LOG" "$OUT/" && tail -n 150 "$LOG"
+          CRASH="$(cygpath -u "$LOCALAPPDATA")/kinora/crash.txt"
+          [ -f "$CRASH" ] && cp "$CRASH" "$OUT/" && cat "$CRASH"
           cat "$OUT/self-test.txt" || true
           exit $status
 
