@@ -123,8 +123,16 @@ pub async fn test_command(command: &str) -> Result<(), Error> {
         .ok_or_else(|| "No command given".into())
 }
 
+#[cfg(not(windows))]
 fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+/// On Windows the command runs in `cmd`, which knows no single quotes: double
+/// quotes, as the helpers' (Python's) argument parsing reads them.
+#[cfg(windows)]
+fn shell_quote(s: &str) -> String {
+    format!("\"{}\"", s.replace('"', "\\\""))
 }
 
 /// YouTube's "Up next" for a video: personalised when an account is set up,
