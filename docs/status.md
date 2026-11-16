@@ -47,6 +47,19 @@ Read this, then `docs/architecture.md`, `docs/design.md`, `CONTRIBUTING-KINORA.m
   through `cmd /S /C` with `.cmd` launchers (kinora-account.cmd, ...) and
   double quotes. The player's error handler no longer aborts when Clapper drops
   it on its own thread ("Value dropped on a different thread").
+- Every page change and every toast crashed (access violation at address 0):
+  MSYS2's GTK 4.24 is built without AccessKit, so widgets get GTK's test
+  accessibility context, whose `announce` is a null pointer, and
+  `gtk_accessible_announce` (Kinora's page announcements, every AdwToast) calls
+  it. `windows_environment()` sets `GTK_A11Y=none` (no context: announce is
+  skipped). With an AccessKit-enabled GTK, use `GTK_A11Y=accesskit` instead.
+- Native crashes on Windows are written to `%LOCALAPPDATA%\kinora\crash.txt`
+  (`src/crashlog.rs`): registers and every stack address in a module as
+  `module+offset`. Resolve them against the same build's files (DLL export
+  tables, kinora.exe's symbol table), e.g. `objdump -d --start-address=` or a
+  small PE export lookup; with rip 0 the first stack entry is the caller.
+  Panics go to the log with a backtrace. CI also builds `kinora-dev.exe` (dev
+  hooks, artifact `kinora-dev-exe`): drop it into a bundle's `bin\`.
 - Next: merge `fix/windows-ci`; bump the version (Cargo.toml, meson.build,
   PKGBUILD pkgver, a `<release>` in data/*.metainfo.xml.in.in), tag
   `v0.1.0-beta.6`, push the tag; the workflow publishes the release.

@@ -224,6 +224,13 @@ fn windows_environment() {
         ("CLAPPER_ENHANCERS_PATH", root.join("lib/clapper-0.0/enhancers")),
         ("PYTHONHOME", root.clone()),
         ("GI_TYPELIB_PATH", root.join("lib/girepository-1.0")),
+        // MSYS2's GTK (4.24) is built without AccessKit, so on Windows every
+        // widget gets GTK's "test" accessibility context, whose announce is a
+        // null pointer: gtk_accessible_announce() (a page change, every
+        // AdwToast) then crashes. With no context at all GTK skips it. Nothing
+        // is lost: that GTK has no Windows screen reader support. A GTK with
+        // AccessKit should get GTK_A11Y=accesskit here instead.
+        ("GTK_A11Y", std::path::PathBuf::from("none")),
     ];
     for (name, value) in vars {
         if std::env::var_os(name).is_none() {

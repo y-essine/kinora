@@ -189,8 +189,9 @@ async fn checks(app: &gtk::Application, options: &Options, report: &Report) {
     // cookies.txt in a folder with a space; no real login involved.
     report.check(true, "account cookies command", account(&options.out).await);
 
-    for uri in &options.media {
-        let result = play(uri, &options.out, "media", Duration::from_secs(60)).await;
+    for (i, uri) in options.media.iter().enumerate() {
+        let name = format!("media-{}", i + 1);
+        let result = play(uri, &options.out, &name, Duration::from_secs(60)).await;
         report.check(true, &format!("play {uri}"), result);
     }
 
@@ -250,6 +251,22 @@ async fn checks(app: &gtk::Application, options: &Options, report: &Report) {
         None => report.fail("pages", "no view stack in the window"),
     }
 
+    // A toast: libadwaita announces it to screen readers, the path that
+    // crashed with a null pointer on Windows (see GTK_A11Y in main.rs).
+    match find_widget::<adw::ToastOverlay>(window.upcast_ref()) {
+        Some(overlay) => {
+            println!("self-test: toast");
+            overlay.add_toast(adw::Toast::new("Kinora self-test"));
+            glib::timeout_future(Duration::from_secs(2)).await;
+            report.check(
+                true,
+                "toast",
+                screenshot(&window, &options.out.join("toast.png")),
+            );
+        }
+        None => report.warn("toast", "no toast overlay in the window"),
+    }
+
     // The account dialog (its browser profiles are only listed, not used).
     println!("self-test: connect-account");
     let _ = window.activate_action("win.connect-account", None);
@@ -265,6 +282,21 @@ async fn checks(app: &gtk::Application, options: &Options, report: &Report) {
         "connect account dialog",
         screenshot(&shown, &options.out.join("connect-account.png")),
     );
+}
+
+/// The first widget of type `T` in `widget`'s tree.
+fn find_widget<T: IsA<gtk::Widget>>(widget: &gtk::Widget) -> Option<T> {
+    if let Some(found) = widget.downcast_ref::<T>() {
+        return Some(found.clone());
+    }
+    let mut child = widget.first_child();
+    while let Some(c) = child {
+        if let Some(found) = find_widget::<T>(&c) {
+            return Some(found);
+        }
+        child = c.next_sibling();
+    }
+    None
 }
 
 /// The window's main view stack (Home, Feed, Search, ...).
