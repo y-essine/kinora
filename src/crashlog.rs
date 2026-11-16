@@ -96,7 +96,6 @@ mod imp {
         // R8..R15 (8 bytes each), Rip at 0xF8.
         // SAFETY: the CONTEXT record is at least 0x100 bytes on x64.
         let reg = |offset: usize| unsafe { (context.add(offset) as *const usize).read_unaligned() };
-        let rip = reg(0xF8);
         let rsp = reg(0x98);
         let mut text = String::new();
         text.push_str(&format!(
