@@ -21,6 +21,7 @@ Upstream Pipeline's guide is in [CONTRIBUTING.md](CONTRIBUTING.md); this is the 
   `KH_DJ_PLAYLIST=ID@4` has the DJ play a playlist, album or mix (`LL` = Liked videos, `RD…` mixes, `PL…`).
   `KH_FIRST_RUN=1` shows "How do you want to watch?". While any `KH_` hook is set it does not come up by itself, so test runs are never interrupted.
   A window on a hidden workspace is not laid out: scroll hooks only work after the window was shown once (take a screenshot first).
+- **Self-test** (every build, Windows included): `kinora --self-test --out DIR [--media URI]... [--online URL]` checks the install on the machine it runs on (settings schema, translations, enhancers, helpers, the account cookies command, playback through Clapper, the main window) without anyone clicking, writes `DIR/self-test.txt` and screenshots, and exits with the number of failures. The Windows CI runs it; see `docs/status.md`.
 - **Side by side**: development builds do not hand over to an instance that is already running, so builds from several checkouts (or two windows of one, to compare states) run next to each other.
 - **Design**: the look is described in [docs/design.md](docs/design.md); new interface parts use its tokens and components.
 - **Faster builds**: `dev/build.sh` links with `mold` when it's installed, and uses `sccache` in linked git worktrees so parallel checkouts share compiled dependencies (in the main checkout sccache would add ~1 s to every small rebuild). Measured: a one-file Rust change rebuilds in about 3 s.

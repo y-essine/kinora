@@ -15,27 +15,50 @@ Read this, then `docs/architecture.md`, `docs/design.md`, `CONTRIBUTING-KINORA.m
   buffered segment on the seek bar; `kinora-prepare` (`--audio`) skips dead
   HLS renditions.
 
-## In progress: the Windows build
+## The Windows build (green on `fix/windows-ci`, 2026-11-16)
 - `.github/workflows/windows.yml` (MSYS2 UCRT64): builds Clapper 0.10.0 and
   clapper-enhancers 0.10.0 (yt-dlp, PeerTube) from source, then Kinora, then
   bundles GTK, GStreamer, Python + yt-dlp + PyGObject into
-  `Kinora-<version>-windows-x86_64.zip` (artifact). On a `v*` tag push it
+  `Kinora-<version>-windows-x86_64.zip` (artifact `kinora-windows`, made
+  whenever the bundle builds). On a `v*` tag push, with every step green, it
   also creates a GitHub pre-release with the zip.
-- First run: https://github.com/y-essine/kinora/actions/runs/43761254918 — not
-  known yet whether it passes. Next steps:
-  1. `gh run view <id> --log-failed`, fix, push, `gh workflow run windows.yml`.
-  2. When green: bump the version (Cargo.toml, meson.build, PKGBUILD pkgver,
-     a `<release>` in data/*.metainfo.xml.in.in), commit, tag `v0.1.0-beta.6`,
-     push the tag; the workflow publishes the release.
-  3. Test the zip on Windows: unzip, run `bin\kinora.exe`; log at
-     `%LOCALAPPDATA%\kinora\kinora.log`.
+- Run by hand: `gh workflow run windows.yml --ref <branch>`, then
+  `gh run view <id> --log-failed`. A run takes ~15 min.
+- **`kinora --self-test`** (`src/selftest.rs`, in every build): checks the
+  settings schema, translations, Clapper's enhancers, yt-dlp, the account
+  cookies command (dummy cookies.txt through the system shell), plays
+  `--media URI`s (required) and an `--online URL` (warn only), opens the main
+  window and saves screenshots to `--out DIR`. Exit code = failures. CI runs it
+  with only the bundle visible (`env -i`) and uploads `kinora-windows-self-test`
+  (report, PNGs, `kinora-self-test.log`). The runner has no GPU, so CI tests a
+  copy of the bundle with Mesa's llvmpipe `opengl32.dll`; the zip has none.
+  YouTube refuses GitHub's IPs ("confirm you're not a bot"): online is warn-only.
+- Tested on a real Windows 11 PC (zip from run 43776143983): every check ok,
+  YouTube plays through Clapper + yt-dlp (~9-13 s to the first frame),
+  `kinora-prepare` works, browser profiles (Chrome, Firefox) are found.
+- What it took (all in this branch): Clapper 0.10.0 misses DLL exports the
+  Rust bindings use and builds MPRIS only on Linux —
+  `build-aux/windows/patch-clapper.sh` patches that (each edit checked; a new
+  Clapper may need it updated or dropped). ninja runs commands without a shell
+  on Windows: `build-aux/cargo-build.sh`. DLLs are collected from the import
+  tables (`build-aux/windows/check-bundle.sh`, also the smoke test; ldd missed
+  libgirepository-2.0). Translations are found beside kinora.exe
+  (`locale_dir()`), not at the build path. The account's cookies command runs
+  through `cmd /S /C` with `.cmd` launchers (kinora-account.cmd, ...) and
+  double quotes. The player's error handler no longer aborts when Clapper drops
+  it on its own thread ("Value dropped on a different thread").
+- Next: merge `fix/windows-ci`; bump the version (Cargo.toml, meson.build,
+  PKGBUILD pkgver, a `<release>` in data/*.metainfo.xml.in.in), tag
+  `v0.1.0-beta.6`, push the tag; the workflow publishes the release.
 - Windows code paths: `kinora_core::helper` (helpers run through the bundled
-  `python.exe`, no console; cookies command via `cmd /C`), `windows_environment()`
-  in `src/main.rs` (CLAPPER_ENHANCERS_PATH, PYTHONHOME, GI_TYPELIB_PATH from the
-  app folder), `kinora-account` Windows browser folders. Untested on Windows.
+  `python.exe`, no console), `windows_environment()` and `locale_dir()` in
+  `src/main.rs`, `kinora-account` Windows browser folders. Log:
+  `%LOCALAPPDATA%\kinora\kinora.log`.
 - Expected limits: Chrome/Edge/Brave cookies on Windows use app-bound
-  encryption that yt-dlp can't read (Firefox should work); no media keys
-  (Clapper's MPRIS only drives its own queue; also no MPRIS on Windows).
+  encryption that yt-dlp can't read (Firefox works, or a cookies.txt); no
+  media keys (no MPRIS on Windows: it is built but finds no session bus, hence
+  the harmless "win32 session dbus binary not found" warning). Not yet tried by
+  hand on Windows: DJ crossfades, downloads, the external player, fullscreen.
 
 ## Open items
 - A Clapper crash (SIGSEGV in `g_main_context_unref`, reactables thread) seen
