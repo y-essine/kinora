@@ -57,7 +57,7 @@ kicker 11/700 uppercase in the accent.
 | **Player sheet** `TFPlayerSheet` | `player_sheet.{rs,blp}` | Holds the one video page over the window, and the mini-player it shrinks into. See *Player*. |
 | **Panel** `.k-panel` | CSS | A quiet container for text (the description). |
 | **DJ page** | `video_page.blp`, `dj.rs` | The player's page while the DJ is on: a record player, what plays, three large buttons, the queue. See *DJ*. |
-| **Record player** `TFTurntable` | `turntable.rs` | A deck with the track's artwork as the record's label; it turns while playing. See *DJ*. |
+| **Record player** `TFTurntable` | `turntable.rs` | A deck with the track's artwork as the record's label; it turns while playing, and can be scratched. See *DJ*. |
 | **Playlist card and shelf** | `playlist_shelf.rs` | A playlist or mix: a poster on a stack, with a count and a kicker. A shelf is a titled row of them. See *DJ*. |
 | **Way to watch** `.k-mode-card` | `first_run.rs` | One of the four choices of the first launch. See *First run*. |
 | **Badge** `.k-badge` | CSS | Small label on a picture (duration, downloaded). |
@@ -213,7 +213,7 @@ the room. Top to bottom:
    but at most 44 % of the page's height, so the buttons and the first of
    the queue stay in view. On it a platter, a record whose label is the
    track's artwork, and a tonearm with an amber headshell. A click on it
-   plays or pauses.
+   plays or pauses; the record can be taken by hand (see *Scratching*).
 3. **What plays**: title (24/800, two lines at most), artists (16, dim),
    "album · year" for songs (13, faint). Centred.
 4. **The line of the track**: thin, amber, with a knob; elapsed time and
@@ -242,6 +242,37 @@ what the page is for, and it only runs while music plays.
   the arm swings on when it plays. This is the picture's part of a crossfade.
 - With *reduce effects* nothing turns or swings: the arm is on the record or
   off it, and there is no glow. Frames are only drawn while something moves.
+
+### Scratching
+
+**The record can be taken by hand**, like the vinyl on an Instagram story:
+press on it, drag it around its spindle, and it turns with the pointer while
+the sound does what the record does.
+
+- **The record follows the hand** exactly, at any speed and in both
+  directions. One turn is 5 s of the track, the same as when it plays by
+  itself, so holding the record at its own speed sounds like nothing happened.
+- **The sound follows the record**: forwards faster or slower, backwards in
+  reverse, still when the hand is still. The pitch goes with the speed, as on
+  vinyl, and glides (the needle has a few milliseconds of inertia). There is
+  no stutter and no click: nothing seeks while the record is held.
+- **The arm, the line and the clock follow too**: they show where the needle
+  is, and the track goes on from there.
+- **Let go, the record runs up to speed** over about half a second, sound and
+  picture together, and plays on from where it was left. A record that was
+  paused comes to rest instead, and stays paused at its new place.
+- It can be taken again while it runs up: that is how scratching goes.
+- **A press without a drag is still play/pause**, anywhere on the deck. A drag
+  that starts on the deck beside the record still pulls the page down to the
+  mini-player; only the record itself is a handle.
+- The first second after and twelve seconds before the needle are at hand the
+  moment the record is taken; more of the track (25 s after, then 20 s
+  before) arrives within a second or two. At the end of what is at hand the
+  needle stops, as at the end of a record.
+- Not while the DJ crossfades that track, and not with *Show Video* on (there
+  is no record then).
+- *Reduce effects* does not switch this off: the record only moves because a
+  hand moves it.
 
 **Fullscreen** (F, or the button in the bar) keeps the page as it is and takes
 the header away. **Minimized**, the mini-player shows a band across the middle
@@ -285,6 +316,21 @@ hovered one). A warm track starts in about 0.1 s.
 
 ### Sound and motion
 
+- With **Match Beats** on (a switch in Preferences → Extensions → DJ, off by
+  default), a crossfade is also **beat-matched**: the next track plays at the
+  tempo of the one that ends, at its own pitch, with its beats on the other's
+  beats, so the kicks land together instead of galloping. Once the old track
+  is gone, the new one eases back to its own tempo over 8 s; nothing stays
+  stretched.
+  - Tracks are stretched by 8 % at most. A track at about half or double
+    the other's tempo is matched to every other beat. Further apart, or with
+    no clear beat in either (a quiet intro, speech), the fade is the plain
+    one; the log says why.
+  - It costs less than a beat: the next track is held for a moment and let go
+    on the beat. Next and Previous stay as quick as they are. How close the
+    beats then are depends on that start (a few hundredths of a second);
+    longer fades are also corrected on the way.
+  - Nothing to see: it is only heard.
 - A track **crossfades** into the next over the *Crossfade* setting (0 to 12 s, a slider in Preferences →
   Extensions; short tracks fade shorter, live and very short ones cut). The
   curve is equal power, so the loudness does not dip halfway.
@@ -314,7 +360,10 @@ playlists*), which hide while empty.
   comes with the next track.
 - **The queue's buttons without a pointer**: *Play next* and *Remove* need
   hover or the keyboard; a touch screen only gets "play now".
-- **Scratching**: the record cannot be dragged to seek.
+- **Scratching by touch and by keyboard**: the record is taken with a pointer
+  only; two-finger scratches and a jog on the keys are not there.
+- **Bars, not only beats**: Match Beats puts beat on beat, not the first beat
+  of a bar on the first beat of a bar.
 - **Adding to the queue from elsewhere** ("Play next" on any video card): the
   engine has `play_next`/`enqueue`; no menu item uses them yet.
 - **One volume during a fade**: changing the volume while two tracks cross
@@ -372,7 +421,8 @@ adds the `reduce-effects` class to the window. With it on:
 - no transitions and no hover growth;
 - rows jump instead of gliding;
 - videos are no longer prepared when the pointer rests on a card;
-- the DJ's record does not turn and its arm does not swing.
+- the DJ's record does not turn and its arm does not swing (it still turns
+  in a hand: scratching is the user's own motion).
 
 Anything new that is decorative must check this setting (in CSS:
 `window.reduce-effects …`; in Rust: `settings.boolean("reduce-effects")`).

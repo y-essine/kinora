@@ -33,6 +33,11 @@ impl Paths {
     pub fn streams_dir(&self) -> PathBuf {
         self.cache_dir.join("streams")
     }
+
+    /// The tempo and beats of tracks the DJ analysed (see [`crate::beats`]).
+    pub fn beats_dir(&self) -> PathBuf {
+        self.cache_dir.join("beats")
+    }
 }
 
 /// The YouTube account, as configured by the user.

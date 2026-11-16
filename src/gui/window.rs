@@ -1998,7 +1998,7 @@ pub mod imp {
             // the queue's buttons applied to its third track.
             #[cfg(feature = "dev-hooks")]
             {
-                let dev_actions: [(&str, fn(&Self)); 13] = [
+                let dev_actions: [(&str, fn(&Self)); 15] = [
                     ("dev-focus", |s| {
                         let obj = s.obj();
                         let focus = gtk::prelude::GtkWindowExt::focus(&*obj);
@@ -2017,6 +2017,12 @@ pub mod imp {
                     ("dev-pick", |s| { if let Some(p) = s.current_video_page() { p.dev_pick_buttons() } }),
                     ("dj-queue-hover", |s| s.dj().dev_queue("hover")),
                     ("dj-show-video", |s| s.dj().dev_toggle_video()),
+                    ("dj-match-beats", |s| s.dj().dev_toggle_match()),
+                    ("dj-scratch", |s| {
+                        if let Some(page) = s.current_video_page() {
+                            page.dev_scratch(&std::env::var("KH_SCRATCH").unwrap_or_default());
+                        }
+                    }),
                     ("dj-show-queue", |s| {
                         if let Some(page) = s.current_video_page() {
                             page.dev_scroll_to(430.0);

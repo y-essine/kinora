@@ -39,6 +39,7 @@ face, like a Tauri app for Windows or an mpv-based player, can reuse the brain a
 | `streams.rs` | Prepared playback (`kinora-prepare`) and the experimental RustyPipe fast start (DASH/HLS) |
 | `player.rs` | The `Player` trait and playback helpers |
 | `dj/` | The DJ engine: YouTube Music radio, the session queue, crossfade planning (see *The DJ*) |
+| `beats.rs` | Tempo and beat grid of PCM a frontend hands in, tempo matching, the cache by video id (see *Beat matching*) |
 | `extension/` | The extension model, the registry and the built-in extensions |
 
 Rules:
@@ -47,7 +48,7 @@ Rules:
   values (`AccountConfig`, `PlaybackConfig`, the disabled list and setting values). The core
   never knows whether they came from GSettings, a JSON file or a web form.
 - **Paths are passed in** (`Paths::new(cache_dir)`): `account/` holds RustyPipe's cache,
-  `streams/` the prepared manifests.
+  `streams/` the prepared manifests, `beats/` the analysed tracks.
 - **Shared types** are pipeline-core's `pcore::Video` and `pcore::Channel` (same revision for the
   app and the core through `[workspace.dependencies]`), and the core's `HomePage`/`HomeChip`/
   `PlaylistCard`.
@@ -150,7 +151,7 @@ list to store. Labels in manifests are English; translate them in the frontend.
 |---|---|---|---|
 | `account` (Network, Account) | `youtube-home` main feed source; `on_watched` marks the video watched on YouTube; menu item `import-subscriptions` (Home) | `personal-up-next`, `mark-watched` (both on) | Fully anonymous: no Home, anonymous Up next, nothing sent to the account. `Core::account_active` and the Client's `has-account` are false |
 | `home-chips` | a feed filter that, when asked, hides the playlist-only Mixes/Playlists chips and the playlist cards | `hide-playlist-chips` ("Hide Mixes and Playlists", off: they are kept so the DJ can play them) | Home is one feed without a chip bar |
-| `dj` (Network, Account, PlayerControl) | nothing to the fixed points: frontends call `Core::dj_*` (see *The DJ*) | `crossfade-seconds` (number 0..12, 6; stored as text), `avoid-repeats` (on), `show-video` (off: the DJ plays audio only), `start-from` (`current-video` \| `my-mix`) | `Core::dj_*` fail; nothing is fetched |
+| `dj` (Network, Account, PlayerControl) | nothing to the fixed points: frontends call `Core::dj_*` (see *The DJ*) | `crossfade-seconds` (number 0..12, 6; stored as text), `avoid-repeats` (on), `show-video` (off: the DJ plays audio only), `match-beats` (off; see *Beat matching*), `start-from` (`current-video` \| `my-mix`) | `Core::dj_*` fail; nothing is fetched |
 
 What stays in the core on purpose: anonymous Up next (it works without an account; the account
 extension only personalises it), prepared/fast-start playback, and connecting an account (the
@@ -209,6 +210,144 @@ What a frontend does: keep the `DjSession`; when a track starts, prepare `peek_n
 the transition with the player's real duration; at `start_at` start the next track at volume 0
 and set both volumes from `gains(elapsed)` every ~50 ms for `fade`, then stop the old one (a cut:
 on end of stream); call `advance()` (or `skip()`), then refill in the background.
+
+### Beat matching
+
+`kinora_core::beats` finds the tempo and the beats of a piece of audio, says how to match one
+track to another, and keeps the answers on disk. It decodes nothing: a frontend hands in mono
+PCM at a low rate (11 kHz is plenty) and gets a `BeatGrid { bpm, anchor, confidence }` back
+(`anchor`: the time of one beat, in seconds of the track).
+
+- **Analysis** (`beats::analyse(pcm, rate, start, near)`): an onset envelope at 200 Hz (the
+  energy of three bands, compressed, its rise from one step to the next, what stands out from
+  the local mean); the tempo from the envelope's autocorrelation, read with a comb (a period
+  also shows at its multiples) and a broad preference for tempos around 120 BPM, then refined
+  against the envelope so that the beats of the whole window stay in step (0.05 % steps); the
+  phase where a pulse train collects the most onsets. `near` keeps the search within 6 % of a
+  tempo already known for the track. `confidence` is how alike the envelope is to itself one
+  to four beats on: a drum machine gives 0.6 and more, a rap verse over a steady beat 0.13 to
+  0.35 (and the right tempo), an intro without drums under 0.1 (and any tempo);
+  `BeatGrid::is_usable` draws the line at 0.12. Measured (release build): 45 s in 11 ms, 12 s
+  in 3 ms; on steady tracks, 12 s windows all along the track agree within 0.1 %.
+- **Half and double tempo** stay ambiguous for some music (70 BPM may come out as 140), so
+  `beats::match_tempo(outgoing_bpm, outgoing_rate, incoming_bpm, max_stretch)` also tries the
+  incoming track at half and double its tempo, and gives a `BeatMatch` (the rate to play it at)
+  or why not (`NoMatch::TooFar`: more than `MAX_STRETCH`, 8 %). `BeatMatch::start_delay` says
+  how long to hold the incoming track so that the beats land together, `BeatMatch::error` how
+  far apart they are for two positions.
+- **Kept on disk**: `Core::analyse_beats(video, pcm, rate)` analyses a track's first seconds
+  (`beats::INTRO`, 45 s: what a fade brings in) and writes `<cache>/beats/<video id>.json`;
+  `Core::beats(video)` reads it. "No beat found" is kept too.
+- `cargo run --release -p kinora-core --example beats_file -- track.raw` tries it on real
+  audio (`ffmpeg -i TRACK -ac 1 -ar 11025 -f f32le track.raw`).
+
+What the GTK frontend does with it (`src/gui/dj.rs`, only with the DJ's *Match Beats* setting
+on; off, none of this runs):
+
+1. **Ahead of time**: when the next track's stream is prepared, a thread decodes its first 45 s
+   (`deck_audio::decode`: `uridecodebin3` to mono 11 kHz, read with a pad probe) and has the
+   core analyse and keep them. About 1.5 s for a track never seen (1.3 to 5 s measured),
+   nearly all of it the download; nothing for one that is on disk.
+2. **When a fade is asked for** (also by Next): the beats of the track that ends are read from
+   the last 12 s it actually played (its `Tap`, below), on a thread, in a few milliseconds. So
+   they are known wherever in the track the fade starts.
+3. **The start**: a warm track is not started when its page opens. It waits at its very
+   start (the one place a player is at for certain), is told its tempo (`BeatMatch::rate`),
+   and is let go after `start_delay`: less than a beat later, so that its beats land on the
+   outgoing ones. The fade begins then. (What the sound device had already taken in, about a
+   second, still plays at the track's own tempo; `start_delay` counts that in.) A track that
+   was not warm starts when it can, and is then paused and let go the same way.
+4. **During the fade**, the outgoing beats are read again from its `Tap` every 1.5 s, and a
+   tempo that comes out different is followed. The two positions are compared every 50 ms
+   (`BeatMatch::error`), but only acted on once the incoming player has played for 8 s (see
+   below): from then on, beats more than 12 ms apart are nudged together with a measured dose
+   of tempo (at most 4 %, about 0.6 s). A fade of the default 6 s therefore rests on its
+   start alone.
+5. **Afterwards** the incoming track goes back to its own tempo over 8 s (`ease_tempo_home`).
+
+How well it does (a mix of 1990s dance tracks, `KH_DJ_PLAYLIST=RDy6120QOlsfU@3`, Next every
+27 s: five of seven fades matched, with stretches from -5.2 % to +2.4 %; the other two had no
+clear beat on one side; the players' positions read every 50 ms): beats 3 to 6 ms apart on
+average and 12 ms at worst per fade. The start alone put them 2 to 11 ms apart, and four of
+the five fades needed no nudge after it. That is with a sound device that keeps good time (a
+null sink recorded at 20 ms latency) and the comparison acted on from the start
+(`KH_TRUST_CLOCK=1`). On an ordinary device a player's clock wanders by up to 70 ms in its
+first seconds (the click track again), which is why step 4 waits, and why the fade's own
+figures say "clock settling" until then. What is heard is right all the same: in a fade
+recorded under those conditions, the kicks of both tracks, folded over one beat, fall into one
+peak 12 ms wide with a shoulder 20 ms beside it (the fade's own figures claimed 30 to 90 ms).
+It has not been judged by ear.
+
+### The deck's audio
+
+Scratching and beat matching need three things Clapper's player does not offer, so the GTK
+frontend adds them around it (`src/gui/deck_audio.rs`, `src/gui/scratch.rs`). Only the
+`gstreamer` crate is used; audio is read and written with pad probes and `appsrc`'s signals, so
+no further GStreamer library is linked (the Windows build needs nothing new; without the
+`scaletempo` element there is simply no beat matching).
+
+What was measured first, on a prepared HLS audio stream (GStreamer 1.28, Clapper 0.10):
+
+- Clapper's `speed` is a flushing seek: about 0.15 s without sound each time, and it changes
+  the pitch (no `scaletempo` in its pipeline by default). Backwards (a negative speed) works
+  but takes about a second to start.
+- A seek costs 0.15 to 0.4 s of silence. Scratching by seeking is out of the question.
+- A GStreamer "instant rate change" keeps playing but is not taken up by `scaletempo`, and it
+  breaks the position the player reports on these streams.
+- The sound device has taken in about 1.2 s more than is heard.
+- A player's clock (the sound server's, for its stream) wanders in the first seconds it
+  plays: by up to 3 % in rate and 70 ms in place, settling within about 8 s. A null sink
+  recorded at a short latency (`parec --latency-msec=20`) does not show this, an ordinary
+  device and a null sink recorded any other way do. To measure a fade's timing, play to such
+  a null sink (`PULSE_SINK=…`) and set `KH_TRUST_CLOCK=1`, which has the DJ act on the
+  positions from the start.
+
+So:
+
+- **`Tap`**, each page's audio filter (`audioconvert ! capsfilter ! identity ! scaletempo`):
+  - *keeps the last 12 s* the player decoded (a DJ page only), with their place in the track:
+    the scratch's audio, there the moment the record is taken, and the outgoing track's beats;
+  - *changes the tempo without a seek*: a probe pushes a new segment event to `scaletempo`
+    between two buffers, with the same place in the track and on the clock and another rate.
+    The tempo changes there, at the same pitch, without a gap, and the player's position
+    stays true: checked with a click track recorded off a null sink, where every click was
+    heard within 5 ms of when the reported position passed it, through tempo changes of up to
+    4 % a second apart. Segments that come from the player (after a seek) are rewritten on
+    the way. A tempo set now is heard about 1.2 s later; `Tap::flow` says from where in the
+    track, which is what the DJ's timing goes by;
+  - *stays engaged* for a track whose tempo will be changed (`Tap::set_engaged`, said before
+    the player starts; the DJ's pages with *Match Beats* on): its own tempo is then 1.00002
+    instead of 1. At exactly 1 `scaletempo` only passes audio through, and going between
+    that and any other rate loses about 50 ms of audio, which the sound device puts right a
+    second later with a gap (the same recording showed both). Between two other rates
+    nothing is lost. A tap that is not engaged leaves the audio untouched;
+  - *says where the player really is* (`Tap::position`), to a few milliseconds: the
+    pipeline's clock read through the segments the tap sent. Clapper's own `position` is
+    refreshed a few times a second, and the position the sound device reports goes by the
+    newest segment, whose audio is not heard yet: around every change of tempo it is off by
+    up to 50 ms for more than a second. Stretched audio is also heard a little off where its
+    segment puts it (30 ms late at 0.94, 30 ms early at 1.06), which is counted in.
+- **`decode`**: a stretch of a prepared stream as PCM, by a pipeline of its own on the caller's
+  thread.
+- **`Scratch`**: while the record is held, the track's player is paused and this plays instead:
+  the PCM around the needle, read with cubic interpolation at the hand's speed, forwards or
+  backwards, through `appsrc ! audioconvert ! audioresample ! autoaudiosink` in 5 ms buffers
+  (the device is asked for a 40 ms buffer). The needle heads for where the hand is, at the
+  hand's speed, with a few milliseconds of inertia, so the pitch glides instead of stepping
+  with the pointer's events; where it stands still it is silent; read faster than recorded,
+  the sound is dulled first. Its audio is the `Tap`'s 12 s, with 25 s after and 20 s before
+  decoded onto it in the background.
+- **Handing back** (`video_page.rs`, `scratch_step`): let go, the needle runs up to the
+  recorded speed in the scratch itself. The player is told to seek (accurately, paused) to
+  where the needle will be once it is nearly at speed, 0.8 s on or more; when the needle gets
+  there the player is told to play, and once it does it comes in over 64 ms while the scratch
+  goes out. A player that is slow to start is met further on instead. No seek is ever heard.
+- The scratch's sound device gets its volume said outright (the player's): a sound server
+  gives a new stream the volume it remembers for the app, whatever that was.
+- Measured (the scripted scratch of the `dj-scratch` test hook, recorded off a null sink): 25 ms of
+  silence when the record is taken, none when it is handed back, the player within 20 ms of
+  the needle then; more audio 1.5 s after the record is taken. Memory: 4 MB for the 12 s a
+  DJ page keeps, 20 MB more while a record is in a hand.
 
 ### Playlists and mixes
 

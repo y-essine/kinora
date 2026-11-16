@@ -38,12 +38,18 @@ impl VideoPage {
     /// Kinora: the page of a DJ track (see `gui/dj.rs`): no Up next and no
     /// autoplay of its own, the DJ's queue is shown instead.
     pub fn new_dj(video: &Video, client: &Client, audio_only: bool) -> Self {
-        Object::builder()
+        let page: Self = Object::builder()
             .property("client", client)
             .property("dj", true)
             .property("audio-only", audio_only)
             .property("video", video)
-            .build()
+            .build();
+        // With "Match Beats" the track's tempo will be changed: its player
+        // has to know before it starts (see `Tap::set_engaged`).
+        if let Some(tap) = page.imp().tap() {
+            tap.set_engaged(client.core().dj_settings().match_beats);
+        }
+        page
     }
 
     pub fn play(&self) {
@@ -66,6 +72,7 @@ impl VideoPage {
                 .filter(|audio_only| *audio_only)
                 .and_then(|_| self.client().prepared_audio_playback_uri(&video));
             imp.audio_stream.set(audio.is_some());
+            imp.playing_uri.replace(None);
             if self.try_get_downloaded(&video).is_some() {
                 imp.fast_start_active.set(false);
                 queue.add_item(&MediaItem::new(&fallback));
@@ -76,6 +83,7 @@ impl VideoPage {
                 // Kinora: prepared in the background; starts in a second or two.
                 log::info!("Playing prepared {}", video.id().id);
                 imp.fast_start_active.set(true);
+                imp.playing_uri.replace(Some(prepared.clone()));
                 queue.add_item(&MediaItem::new(&prepared));
                 self.start_player(&player);
                 self.fall_back_if_stuck(&video);
@@ -134,10 +142,21 @@ impl VideoPage {
             && self.duration_secs().is_some()
     }
 
+    /// Kinora: keep a warm page waiting at its start although it is shown
+    /// (`start_warm` then does nothing): the DJ lets it go on the beat.
+    pub fn hold_warm(&self, hold: bool) {
+        self.imp().warm_held.set(hold);
+    }
+
+    /// A warm page that waits to be let go (see `hold_warm`).
+    pub fn is_warm_held(&self) -> bool {
+        self.imp().warm_held.get() && self.imp().warming.get()
+    }
+
     /// Play a page that was warmed (or is still warming).
     pub fn start_warm(&self) {
         let imp = self.imp();
-        if !imp.warming.replace(false) {
+        if imp.warm_held.get() || !imp.warming.replace(false) {
             return;
         }
         imp.play_started.set(Some(std::time::Instant::now()));
@@ -155,6 +174,10 @@ impl VideoPage {
     }
 
     pub fn play_pause(&self) {
+        // (Not while the record is in a hand: the scratch plays then.)
+        if self.imp().scratch.borrow().is_some() {
+            return;
+        }
         let player = self
             .imp()
             .clapper
@@ -256,6 +279,156 @@ impl VideoPage {
         player.pause();
     }
 
+    /// Kinora: a scratch that is under way ends here (the DJ changes track).
+    pub fn cancel_scratch(&self) {
+        self.imp().end_scratch();
+    }
+
+    /// Test hook: scratch the record as a hand would. `turns` is a list of
+    /// "milliseconds:degrees" (see `Turntable::dev_scratch`); empty: a few
+    /// baby scratches, a pull back and a push.
+    #[cfg(feature = "dev-hooks")]
+    pub fn dev_scratch(&self, turns: &str) {
+        let mut turns: Vec<(u64, f64)> = turns
+            .split(',')
+            .filter_map(|turn| {
+                let (at, degrees) = turn.split_once(':')?;
+                Some((at.trim().parse().ok()?, degrees.trim().parse().ok()?))
+            })
+            .collect();
+        if turns.is_empty() {
+            turns = vec![
+                (250, 0.0),
+                (400, -45.0),
+                (520, 0.0),
+                (640, -45.0),
+                (760, 0.0),
+                (880, -45.0),
+                (1000, 0.0),
+                (1500, -150.0),
+                (1800, -150.0),
+                (2300, 60.0),
+            ];
+        }
+        log::info!("DEV: scratch {turns:?}");
+        self.imp().dj_deck.dev_scratch(turns);
+        // What the needle does, ten times a second.
+        let page = glib::prelude::ObjectExt::downgrade(self);
+        glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
+            let Some(page) = page.upgrade() else {
+                return glib::ControlFlow::Break;
+            };
+            match page.imp().scratch_report() {
+                Some(report) => {
+                    log::info!("DEV: scratch: {report}");
+                    glib::ControlFlow::Continue
+                }
+                None => {
+                    log::info!(
+                        "DEV: scratch over: the player is {:?} at {:.2} s",
+                        page.player_state(),
+                        page.heard_position()
+                    );
+                    glib::ControlFlow::Break
+                }
+            }
+        });
+    }
+
+    /// Kinora: play on (a paused player).
+    pub fn resume(&self) {
+        if let Some(player) = self.imp().clapper.player() {
+            player.play();
+        }
+    }
+
+    /// Kinora: the prepared stream that plays, if it is one (a manifest any
+    /// GStreamer pipeline can read).
+    pub fn playing_uri(&self) -> Option<String> {
+        self.imp().playing_uri.borrow().clone()
+    }
+
+    /// Kinora: the last seconds the player decoded (a DJ page keeps them).
+    pub fn deck_audio(&self) -> Option<crate::gui::deck_audio::Pcm> {
+        self.imp().tap()?.snapshot()
+    }
+
+    /// Kinora: the position that is heard right now, to the millisecond
+    /// (Clapper's own is refreshed a few times a second).
+    pub fn heard_position(&self) -> f64 {
+        self.imp()
+            .tap()
+            .and_then(|tap| tap.position())
+            .unwrap_or_else(|| self.position_secs())
+    }
+
+    /// Kinora: how far into the track the player has decoded: a tempo set
+    /// now is heard from there on.
+    pub fn flow_position(&self) -> Option<f64> {
+        self.imp().tap()?.flow()
+    }
+
+    /// Kinora: the tempo can be changed (see `set_tempo`).
+    pub fn can_stretch(&self) -> bool {
+        self.imp().tap().is_some_and(|tap| tap.stretches())
+    }
+
+    /// Kinora: the rate the track plays at, 1 being its own tempo.
+    pub fn tempo(&self) -> f64 {
+        self.imp().tap().map_or(1.0, |tap| tap.rate())
+    }
+
+    /// Kinora: play at `rate` times the track's tempo, at the same pitch and
+    /// without a break (the DJ's beat matching).
+    pub fn set_tempo(&self, rate: f64) {
+        self.hold_tempo();
+        if let Some(tap) = self.imp().tap() {
+            tap.set_rate(rate);
+        }
+    }
+
+    /// Kinora: stay at the tempo of now (see `ease_tempo_home`).
+    pub fn hold_tempo(&self) {
+        if let Some(source) = self.imp().tempo_ease.take() {
+            source.remove();
+        }
+    }
+
+    /// Kinora: back to the track's own tempo, little by little over `over`.
+    pub fn ease_tempo_home(&self, over: std::time::Duration) {
+        const STEP: std::time::Duration = std::time::Duration::from_millis(250);
+        self.hold_tempo();
+        let from = self.tempo();
+        if (from - 1.0).abs() < 1e-6 {
+            return;
+        }
+        let began = std::time::Instant::now();
+        let page = glib::prelude::ObjectExt::downgrade(self);
+        let source = glib::timeout_add_local(STEP, move || {
+            let Some(page) = page.upgrade() else {
+                return glib::ControlFlow::Break;
+            };
+            let imp = page.imp();
+            let done = (began.elapsed().as_secs_f64() / over.as_secs_f64().max(0.001)).min(1.0);
+            // (Smooth at both ends.)
+            let eased = done * done * (3.0 - 2.0 * done);
+            if let Some(tap) = imp.tap() {
+                tap.set_rate(if done >= 1.0 {
+                    1.0
+                } else {
+                    from + (1.0 - from) * eased
+                });
+            }
+            if done >= 1.0 {
+                imp.tempo_ease.take();
+                log::info!("DJ: {} is back at its own tempo", page.video().map(|v| v.id().id).unwrap_or_default());
+                return glib::ControlFlow::Break;
+            }
+            glib::ControlFlow::Continue
+        });
+        self.imp().tempo_ease.replace(Some(source));
+    }
+
     /// Kinora: keep a page that is let go alive a little longer: at least 3 s
     /// after now and 10 s after it was made. A Clapper player ended while its
     /// threads are still starting crashed the app (SIGSEGV in
@@ -277,6 +450,7 @@ impl VideoPage {
             .clapper
             .player()
             .expect("Clapper does not have a player");
+        self.cancel_scratch();
         // Only pause: the page is destroyed right after, which ends the player.
         // Stopping or clearing the queue here raced with Clapper's player thread
         // (a crash, or the next page's player never starting).
@@ -702,7 +876,103 @@ pub mod imp {
     use crate::backend::VideoSort;
     use crate::config::BASE_ID;
     use crate::gspawn;
-    use crate::gui::turntable::Turntable;
+    use crate::gui::scratch::Scratch;
+    use crate::gui::turntable::{Hand, SPIN, Turntable};
+
+    /// Let go, the needle and the player meet at least this far on, in
+    /// seconds (the player has to seek there first).
+    const HAND_BACK_FROM: f64 = 0.8;
+    /// The player is told to play this long before the needle is where it
+    /// waits, in seconds: about what it takes to be heard.
+    const HAND_BACK_LEAD: f64 = 0.01;
+    /// Once the player is heard again, the needle is kept this long (its
+    /// sound fades at once), in milliseconds.
+    const HAND_BACK_SETTLE: u128 = 300;
+    /// A player that was told to play and is not heard after this long is
+    /// late, in milliseconds.
+    const HAND_BACK_PATIENCE: u128 = 250;
+
+    /// The DJ's record in a hand (see `deck_hand`).
+    pub(super) struct ScratchSession {
+        /// What plays the hand's moves; `None`: nothing of the track was at
+        /// hand, and the record is moved without sound.
+        engine: Option<Scratch>,
+        /// Where the track would be with the record turned back to where it
+        /// was taken, in seconds.
+        origin: f64,
+        duration: f64,
+        was_playing: bool,
+        /// The record is being dragged (not only pressed).
+        pub(super) taken: bool,
+        /// Where the hand has the record, in seconds of the track.
+        hand: f64,
+        /// Let go: on its way back to the player.
+        pub(super) released: Option<Released>,
+        timer: Option<glib::SourceId>,
+    }
+
+    pub(super) struct Released {
+        at: std::time::Instant,
+        /// The needle's place and the label's turn when it was let go.
+        position: f64,
+        turn: f64,
+        /// Where the player was told to wait for the needle.
+        target: Option<f64>,
+        seek_done: std::rc::Rc<Cell<bool>>,
+        seeks: u32,
+        /// The player was told to play, and is heard.
+        handed: Option<std::time::Instant>,
+        joined: Option<std::time::Instant>,
+        signal: Option<glib::SignalHandlerId>,
+    }
+
+    impl Released {
+        fn forget(mut self, player: Option<&clapper::Player>) {
+            if let (Some(player), Some(signal)) = (player, self.signal.take()) {
+                player.disconnect(signal);
+            }
+        }
+    }
+
+    /// Decode more of the track around what the scratch has, in the
+    /// background: 25 s after it first (handed over as it comes), then 20 s
+    /// before it.
+    fn feed_scratch(engine: &Scratch, uri: String) {
+        let (feeder, rate, (start, end)) = (engine.feeder(), engine.sample_rate(), engine.range());
+        let _ = std::thread::Builder::new()
+            .name("kinora-scratch".into())
+            .spawn(move || {
+                use crate::gui::deck_audio::decode;
+                let began = std::time::Instant::now();
+                let timeout = std::time::Duration::from_secs(20);
+                let ahead = feeder.clone();
+                let after = decode(
+                    &uri,
+                    (end - 0.05).max(0.0),
+                    25.0,
+                    rate,
+                    2,
+                    timeout,
+                    Some(std::sync::Arc::new(move |pcm| ahead.extend(&pcm))),
+                );
+                let after_took = began.elapsed().as_secs_f64();
+                let from = (start - 20.0).max(0.0);
+                let before = (feeder.wanted() && start > 0.5)
+                    .then(|| decode(&uri, from, start - from + 0.05, rate, 2, timeout, None))
+                    .map(|pcm| pcm.map(|pcm| feeder.extend(&pcm)));
+                log::info!(
+                    "Scratch: more of the track: after {} ({after_took:.2} s), before {} ({:.2} s)",
+                    after.map_or_else(|e| e, |_| "ok".into()),
+                    match before {
+                        Some(Ok(true)) => "ok".into(),
+                        Some(Ok(false)) => "does not join on".into(),
+                        Some(Err(e)) => e,
+                        None => "not needed".into(),
+                    },
+                    began.elapsed().as_secs_f64() - after_took
+                );
+            });
+    }
     use crate::gui::utility::Utility;
     use crate::gui::video_item::VideoItem;
 
@@ -805,6 +1075,8 @@ pub mod imp {
         audio_only: Cell<bool>,
         /// The page is loaded ahead of time, paused (see `warm`).
         pub(super) warming: Cell<bool>,
+        /// A warm page that is to stay as it is until told (see `hold_warm`).
+        pub(super) warm_held: Cell<bool>,
         /// Kinora: "Up next" has arrived, so there is a next video.
         #[property(get)]
         has_next: Cell<bool>,
@@ -816,6 +1088,19 @@ pub mod imp {
         dj_available: Cell<bool>,
         /// The user's volume while the DJ fades this player (see `set_fade_gain`).
         pub(super) fade_base: Cell<Option<f64>>,
+        /// Kinora: the player's audio filter: it keeps what just played and
+        /// changes the tempo (see `gui/deck_audio.rs`). Empty when GStreamer
+        /// lacks its elements.
+        pub(super) tap: std::cell::OnceCell<Option<crate::gui::deck_audio::Tap>>,
+        /// The tempo is on its way back to the track's own (see `ease_tempo_home`).
+        pub(super) tempo_ease: RefCell<Option<glib::SourceId>>,
+        /// What the player was given to play.
+        pub(super) playing_uri: RefCell<Option<String>>,
+        /// Kinora: the record is in a hand, or on its way back to the player
+        /// (see `deck_hand`).
+        pub(super) scratch: RefCell<Option<ScratchSession>>,
+        /// The player's sound coming back in after a scratch.
+        pub(super) scratch_ramp: RefCell<Option<glib::SourceId>>,
         /// Kinora: the page is shrunk into the mini-player (see `player_sheet.rs`).
         #[property(get, set)]
         minimized: Cell<bool>,
@@ -888,10 +1173,16 @@ pub mod imp {
                 audio_stream: Default::default(),
                 audio_only: Default::default(),
                 warming: Default::default(),
+                warm_held: Default::default(),
                 has_next: Default::default(),
                 dj: Default::default(),
                 dj_available: Default::default(),
                 fade_base: Default::default(),
+                tap: Default::default(),
+                tempo_ease: Default::default(),
+                playing_uri: Default::default(),
+                scratch: Default::default(),
+                scratch_ramp: Default::default(),
                 minimized: Default::default(),
                 double_click: Default::default(),
                 stage_clamp: Default::default(),
@@ -1042,6 +1333,33 @@ pub mod imp {
             }
         }
 
+        /// Test hook: where the hand and the needle are.
+        #[cfg(feature = "dev-hooks")]
+        pub(super) fn scratch_report(&self) -> Option<String> {
+            let slot = self.scratch.borrow();
+            let session = slot.as_ref()?;
+            Some(match &session.engine {
+                Some(engine) => {
+                    let (from, to) = engine.range();
+                    format!(
+                        "hand {:.3} s  needle {:.3} s  rate {:+.2}  audio {:.1}..{:.1} s{}{}",
+                        session.hand,
+                        engine.position(),
+                        engine.rate(),
+                        from,
+                        to,
+                        if session.taken { "  held" } else { "" },
+                        if session.released.is_some() { "  let go" } else { "" },
+                    )
+                }
+                None => format!("hand {:.3} s, no sound", session.hand),
+            })
+        }
+
+        pub(super) fn tap(&self) -> Option<&crate::gui::deck_audio::Tap> {
+            self.tap.get().and_then(|tap| tap.as_ref())
+        }
+
         /// Kinora: the page shows the DJ's record player (an audio-only DJ
         /// track) where the video would be.
         pub(super) fn vinyl(&self) -> bool {
@@ -1050,7 +1368,13 @@ pub mod imp {
 
         /// Kinora: the DJ page's line and its record's arm follow the player.
         fn update_dj_progress(&self) {
-            if !self.dj.get() {
+            // (In a hand, the record says where the track is.)
+            let scratched = self
+                .scratch
+                .borrow()
+                .as_ref()
+                .is_some_and(|s| s.taken || s.released.is_some());
+            if !self.dj.get() || scratched {
                 return;
             }
             let obj = self.obj();
@@ -1067,6 +1391,415 @@ pub mod imp {
             self.dj_elapsed.set_label(&clock(obj.position_secs()));
             self.dj_length
                 .set_label(&obj.duration_secs().map(clock).unwrap_or_default());
+        }
+
+        // ---- Kinora: scratching (see docs/design.md, "DJ") ----
+        //
+        // While the record is held, the player rests and `gui/scratch.rs`
+        // plays what the hand does, from the audio the player just decoded
+        // and more that is decoded around it. Let go, the needle runs up to
+        // speed there too, the player seeks to a place a little ahead, and
+        // takes over when the needle gets there.
+
+        /// A hand on the deck (see [`Hand`]).
+        pub(super) fn deck_hand(&self, hand: Hand) -> bool {
+            match hand {
+                Hand::Tap | Hand::Away => {
+                    // What was got ready for a scratch is not needed.
+                    let ready = self
+                        .scratch
+                        .borrow()
+                        .as_ref()
+                        .is_some_and(|s| !s.taken && s.released.is_none());
+                    if ready {
+                        self.end_scratch();
+                    }
+                    if hand == Hand::Tap {
+                        self.obj().play_pause();
+                    }
+                }
+                Hand::Down => return self.scratch_down(),
+                Hand::Turn(degrees) => self.scratch_turn(degrees),
+                Hand::Up => self.scratch_up(),
+            }
+            true
+        }
+
+        /// The user's volume as a gain (Clapper's volume is on a cubic scale).
+        fn scratch_volume(&self) -> f64 {
+            self.clapper
+                .player()
+                .filter(|player| !player.is_muted())
+                .map_or(0.0, |player| player.volume().clamp(0.0, 1.5).powi(3))
+        }
+
+        /// The pointer went down on the record: get ready to scratch, so
+        /// that the first move of the hand is heard at once.
+        fn scratch_down(&self) -> bool {
+            let obj = self.obj();
+            if let Some(session) = self.scratch.borrow_mut().as_mut() {
+                // Taken again while it runs up to speed.
+                let again = session.released.is_some() && session.engine.is_some();
+                session.taken &= !again;
+                return again;
+            }
+            // (Not while the DJ fades this track, or holds it ready.)
+            let state = obj.player_state();
+            if !self.vinyl()
+                || self.fade_base.get().is_some()
+                || self.warming.get()
+                || !matches!(
+                    state,
+                    clapper::PlayerState::Playing | clapper::PlayerState::Paused
+                )
+            {
+                return false;
+            }
+            let Some(duration) = obj.duration_secs() else {
+                return false;
+            };
+            let origin = obj.heard_position();
+            let engine = self
+                .tap()
+                .and_then(|tap| tap.snapshot())
+                .filter(|audio| audio.start <= origin + 0.02 && origin <= audio.end() + 0.02)
+                .and_then(|audio| Scratch::new(audio, self.scratch_volume()));
+            self.scratch.replace(Some(ScratchSession {
+                engine,
+                origin,
+                duration,
+                was_playing: state == clapper::PlayerState::Playing,
+                taken: false,
+                hand: origin,
+                released: None,
+                timer: None,
+            }));
+            true
+        }
+
+        /// The record is dragged, `degrees` from where it was taken.
+        fn scratch_turn(&self, degrees: f64) {
+            let obj = self.obj();
+            let mut slot = self.scratch.borrow_mut();
+            let Some(session) = slot.as_mut() else {
+                return;
+            };
+            if !session.taken {
+                session.taken = true;
+                if let Some(released) = session.released.take() {
+                    // Taken again: on from where the needle is.
+                    released.forget(self.clapper.player().as_ref());
+                    if let Some(engine) = &session.engine {
+                        session.origin = engine.position();
+                        engine.grab(session.origin, engine.rate());
+                    }
+                } else {
+                    session.origin = obj.heard_position();
+                    if session.was_playing {
+                        obj.pause();
+                    }
+                    match &session.engine {
+                        Some(engine) => {
+                            engine.grab(session.origin, if session.was_playing { 1.0 } else { 0.0 });
+                            let (from, to) = engine.range();
+                            log::info!(
+                                "Scratch: the record is taken at {:.2} s ({:.1} s before and {:.1} s after it at hand)",
+                                session.origin,
+                                session.origin - from,
+                                to - session.origin
+                            );
+                            // (Played another way, the track's prepared
+                            // audio does as well, if there is any.)
+                            let uri = obj.playing_uri().or_else(|| {
+                                let video = obj.video()?;
+                                obj.client().prepared_audio_playback_uri(&video)
+                            });
+                            if let Some(uri) = uri {
+                                feed_scratch(engine, uri);
+                            }
+                        }
+                        None => log::info!(
+                            "Scratch: the record is taken at {:.2} s, without sound (nothing of the track at hand)",
+                            session.origin
+                        ),
+                    }
+                }
+                session.origin -= degrees / SPIN;
+            }
+            session.hand = (session.origin + degrees / SPIN).clamp(0.0, session.duration - 0.05);
+            if let Some(engine) = &session.engine {
+                engine.hand(session.hand);
+            }
+            let (hand, duration) = (session.hand, session.duration);
+            drop(slot);
+            self.show_scratch(hand, duration);
+        }
+
+        /// While the record is in a hand, the arm, the line and the clock
+        /// follow it.
+        fn show_scratch(&self, position: f64, duration: f64) {
+            let fraction = (position / duration.max(0.001)).clamp(0.0, 1.0);
+            self.dj_deck.set_progress(fraction);
+            self.dj_seek.set_value(fraction);
+            self.dj_elapsed.set_label(&clock(position));
+        }
+
+        /// The record is let go.
+        fn scratch_up(&self) {
+            let obj = self.obj();
+            let mut slot = self.scratch.borrow_mut();
+            let Some(session) = slot.as_mut().filter(|session| session.taken) else {
+                return;
+            };
+            session.taken = false;
+            let Some(player) = self.clapper.player() else {
+                return;
+            };
+            let Some(engine) = &session.engine else {
+                // Without sound: the track goes on where the hand left it.
+                player.seek(session.hand);
+                if session.was_playing {
+                    player.play();
+                }
+                drop(slot);
+                self.end_scratch();
+                return;
+            };
+            engine.release(session.was_playing);
+            log::info!(
+                "Scratch: let go at {:.2} s, the record turning at {:+.2}",
+                engine.position(),
+                engine.rate()
+            );
+            let seek_done = std::rc::Rc::new(Cell::new(false));
+            let signal = player.connect_seek_done(clone!(
+                #[strong]
+                seek_done,
+                move |_| seek_done.set(true)
+            ));
+            session.released = Some(Released {
+                at: std::time::Instant::now(),
+                position: engine.position(),
+                turn: self.dj_deck.turn(),
+                target: None,
+                seek_done,
+                seeks: 0,
+                handed: None,
+                joined: None,
+                signal: Some(signal),
+            });
+            if session.timer.is_none() {
+                session.timer = Some(glib::timeout_add_local(
+                    std::time::Duration::from_millis(8),
+                    clone!(
+                        #[weak]
+                        obj,
+                        #[upgrade_or]
+                        glib::ControlFlow::Break,
+                        move || obj.imp().scratch_step()
+                    ),
+                ));
+            }
+        }
+
+        /// Let go, every few milliseconds: the record on the screen turns
+        /// with the needle, and the player takes over when the needle is
+        /// where the player waits.
+        fn scratch_step(&self) -> glib::ControlFlow {
+            let obj = self.obj();
+            let mut slot = self.scratch.borrow_mut();
+            let (Some(session), Some(player)) = (slot.as_mut(), self.clapper.player()) else {
+                return glib::ControlFlow::Break;
+            };
+            let (Some(released), Some(engine)) = (session.released.as_mut(), &session.engine)
+            else {
+                session.timer = None;
+                return glib::ControlFlow::Break;
+            };
+            let position = engine.position();
+            let (duration, was_playing) = (session.duration, session.was_playing);
+            self.dj_deck
+                .set_turn(released.turn + (position - released.position) * SPIN);
+            let since = released.at.elapsed().as_secs_f64();
+
+            // A record that was not playing comes to rest; the player waits
+            // where it stopped.
+            if !was_playing {
+                if since > 3.0 * crate::gui::scratch::SPIN_UP {
+                    player.seek_custom(position, clapper::PlayerSeekMethod::Accurate);
+                    drop(slot);
+                    self.end_scratch();
+                    return glib::ControlFlow::Break;
+                }
+                drop(slot);
+                self.show_scratch(position, duration);
+                return glib::ControlFlow::Continue;
+            }
+
+            // The player was told to play: the needle goes on until it is
+            // heard, then the one fades in as the other fades out.
+            if let Some(handed) = released.handed {
+                let playing = obj.player_state() == clapper::PlayerState::Playing;
+                let waited = handed.elapsed().as_millis();
+                let (_, end) = engine.range();
+                match released.joined {
+                    Some(joined) if joined.elapsed().as_millis() >= HAND_BACK_SETTLE => {
+                        drop(slot);
+                        self.end_scratch();
+                        return glib::ControlFlow::Break;
+                    }
+                    Some(_) => return glib::ControlFlow::Continue,
+                    None if playing => {
+                        released.joined = Some(std::time::Instant::now());
+                        log::info!(
+                            "Scratch: the player has the track again at {:.2} s, {:+.0} ms from the record ({:.2} s after it was let go)",
+                            obj.heard_position(),
+                            (obj.heard_position() - position) * 1000.0,
+                            since
+                        );
+                        engine.end();
+                        drop(slot);
+                        self.fade_in();
+                        return glib::ControlFlow::Continue;
+                    }
+                    // The player is slow to start: meet further on instead,
+                    // while there is audio to go on with.
+                    None if waited > HAND_BACK_PATIENCE
+                        && released.seeks < 3
+                        && end - position > 2.0 =>
+                    {
+                        log::info!("Scratch: the player did not start in time; meeting further on");
+                        player.pause();
+                        released.handed = None;
+                        released.target = None;
+                    }
+                    None if waited > 10_000 => {
+                        drop(slot);
+                        self.end_scratch();
+                        return glib::ControlFlow::Break;
+                    }
+                    None => {}
+                }
+                drop(slot);
+                self.show_scratch(position, duration);
+                return glib::ControlFlow::Continue;
+            }
+
+            let give_up = since > 6.0;
+            let ready = released.seek_done.get();
+            match released.target {
+                None => {
+                    // Where the needle will be once it turns at (nearly) the
+                    // recorded speed, as far as there is audio.
+                    let off = engine.rate() - 1.0;
+                    // (Twice as far on for every time the player was late.)
+                    let lasts = (crate::gui::scratch::SPIN_UP * (off.abs() / 0.03).max(1.0).ln())
+                        .clamp(HAND_BACK_FROM, 2.5)
+                        .max(HAND_BACK_FROM * f64::from(1u32 << released.seeks.min(3)));
+                    let coast = off
+                        * crate::gui::scratch::SPIN_UP
+                        * (1.0 - (-lasts / crate::gui::scratch::SPIN_UP).exp());
+                    let (_, end) = engine.range();
+                    let target = (position + lasts + coast)
+                        .min(end - 0.2)
+                        .max(position)
+                        .clamp(0.0, (duration - 0.3).max(0.0));
+                    released.seek_done.set(false);
+                    released.seeks += 1;
+                    released.target = Some(target);
+                    player.seek_custom(target, clapper::PlayerSeekMethod::Accurate);
+                }
+                Some(target) if ready || give_up => {
+                    let there = position >= target - HAND_BACK_LEAD;
+                    let late = position > target + 0.12;
+                    if late && released.seeks < 3 && !engine.starved() && !give_up {
+                        // The player took too long: meet further on.
+                        released.target = None;
+                    } else if there || engine.starved() || give_up {
+                        released.handed = Some(std::time::Instant::now());
+                        log::info!(
+                            "Scratch: handing back at {:.2} s (the player waits at {:.2} s, the record turns at {:+.2}{})",
+                            position,
+                            target,
+                            engine.rate(),
+                            if engine.starved() { ", out of audio" } else { "" }
+                        );
+                        drop(slot);
+                        // Silent until it is heard to play (see above).
+                        obj.set_fade_gain(Some(0.0));
+                        player.play();
+                        return glib::ControlFlow::Continue;
+                    }
+                }
+                Some(_) => {}
+            }
+            drop(slot);
+            self.show_scratch(position, duration);
+            glib::ControlFlow::Continue
+        }
+
+        /// The player plays again: its sound comes in as the needle's goes.
+        fn fade_in(&self) {
+            let obj = self.obj();
+            let step = Cell::new(0u32);
+            let ramp = glib::timeout_add_local(
+                std::time::Duration::from_millis(8),
+                clone!(
+                    #[weak]
+                    obj,
+                    #[upgrade_or]
+                    glib::ControlFlow::Break,
+                    move || {
+                        const STEPS: u32 = 8;
+                        step.set(step.get() + 1);
+                        if step.get() >= STEPS {
+                            obj.imp().scratch_ramp.take();
+                            obj.set_fade_gain(None);
+                            return glib::ControlFlow::Break;
+                        }
+                        obj.set_fade_gain(Some(step.get() as f64 / STEPS as f64));
+                        glib::ControlFlow::Continue
+                    }
+                ),
+            );
+            if let Some(old) = self.scratch_ramp.replace(Some(ramp)) {
+                old.remove();
+            }
+        }
+
+        /// The scratch is over (handed back, or given up): the record turns
+        /// by itself again.
+        pub(super) fn end_scratch(&self) {
+            let Some(mut session) = self.scratch.take() else {
+                return;
+            };
+            if let Some(timer) = session.timer.take() {
+                timer.remove();
+            }
+            if let Some(released) = session.released.take() {
+                released.forget(self.clapper.player().as_ref());
+            }
+            if let Some(ramp) = self.scratch_ramp.take() {
+                ramp.remove();
+                self.obj().set_fade_gain(None);
+            }
+            self.dj_deck.set_held(false);
+            if let Some(engine) = session.engine.take() {
+                #[cfg(feature = "dev-hooks")]
+                if let (Ok(path), Some((samples, rate))) =
+                    (std::env::var("KH_SCRATCH_DUMP"), engine.dump())
+                {
+                    let bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
+                    let _ = std::fs::write(&path, bytes);
+                    log::info!("DEV: scratch: {} frames at {rate} Hz written to {path}", samples.len() / 2);
+                }
+                // Its last sound fades; then it goes.
+                engine.end();
+                glib::timeout_add_local_once(std::time::Duration::from_millis(150), move || {
+                    drop(engine)
+                });
+            }
+            self.update_dj_progress();
         }
 
         /// Kinora: the DJ's line was moved by hand. Seek once the hand rests,
@@ -1105,6 +1838,9 @@ pub mod imp {
         fn set_dj(&self, dj: bool) {
             if self.dj.replace(dj) == dj {
                 return;
+            }
+            if let Some(tap) = self.tap() {
+                tap.set_recording(dj);
             }
             let obj = self.obj();
             if dj {
@@ -1622,6 +2358,15 @@ pub mod imp {
             let settings = &self.settings;
             let billboard = &self.billboard;
 
+            // Kinora: the deck's audio (the scratch and beat matching).
+            let tap = self.clapper.player().and_then(|player| {
+                let tap = crate::gui::deck_audio::Tap::new()?;
+                player.set_audio_filter(Some(tap.element()));
+                tap.set_recording(self.dj.get());
+                Some(tap)
+            });
+            let _ = self.tap.set(tap);
+
             let shortcut_escape = Shortcut::new(
                 Some(
                     ShortcutTrigger::parse_string("Escape")
@@ -1810,8 +2555,9 @@ pub mod imp {
                     glib::ControlFlow::Continue
             });
 
-            // Kinora: the DJ's page. Its line seeks; a click on the record
-            // plays or pauses; nothing turns with "Reduce effects".
+            // Kinora: the DJ's page. Its line seeks; a click on the deck plays
+            // or pauses, and the record can be scratched; nothing turns by
+            // itself with "Reduce effects".
             self.dj_seek.connect_change_value(clone!(
                 #[weak]
                 obj,
@@ -1822,17 +2568,13 @@ pub mod imp {
                     Propagation::Proceed
                 }
             ));
-            let click = gtk::GestureClick::new();
-            click.connect_released(clone!(
+            self.dj_deck.connect_hand(clone!(
                 #[weak]
                 obj,
-                move |gesture, _, x, y| {
-                    if gesture.widget().is_some_and(|w| w.contains(x, y)) {
-                        obj.play_pause();
-                    }
-                }
+                #[upgrade_or]
+                false,
+                move |_, hand| obj.imp().deck_hand(hand)
             ));
-            self.dj_deck.add_controller(click);
             settings
                 .bind("reduce-effects", &*self.dj_deck, "still")
                 .flags(gtk::gio::SettingsBindFlags::GET)
