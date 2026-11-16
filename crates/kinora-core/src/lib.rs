@@ -11,6 +11,7 @@
 //! spawn them on its runtime and hand the results to its UI thread.
 
 pub mod account;
+pub mod beats;
 pub mod config;
 pub mod dj;
 pub mod extension;
@@ -444,5 +445,24 @@ impl Core {
             return None;
         }
         streams::prepared_audio(&video.id)
+    }
+
+    /// What is known about a video's beats (see [`beats`]): analysed before
+    /// and kept on disk. `None`: not analysed yet.
+    pub fn beats(&self, video: &VideoId) -> Option<beats::TrackBeats> {
+        beats::load(&self.paths.beats_dir(), &video.id)
+    }
+
+    /// Analyse the start of a track for the DJ's "Match Beats" and keep the
+    /// answer: `pcm` is mono audio at `rate` from the track's very beginning
+    /// (about [`beats::INTRO`] seconds of it; the frontend decodes it, ahead
+    /// of time and off its main thread, which is where this is to be called).
+    pub fn analyse_beats(&self, video: &VideoId, pcm: &[f32], rate: u32) -> beats::TrackBeats {
+        let seconds = pcm.len() as f64 / rate.max(1) as f64;
+        let analysed = beats::TrackBeats::new(beats::analyse(pcm, rate, 0.0, None), seconds);
+        if let Err(e) = beats::store(&self.paths.beats_dir(), &video.id, &analysed) {
+            log::warn!("Could not keep the beats of {}: {e}", video.id);
+        }
+        analysed
     }
 }

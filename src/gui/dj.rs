@@ -17,6 +17,14 @@
 //!   soon as the other track plays, over the crossfade setting;
 //! - the queue is topped up in the background.
 //!
+//! With "Match Beats" on, a crossfade is also beat-matched (see
+//! `docs/architecture.md`, "Beat matching"): the next track's tempo and
+//! beats are worked out ahead of time, from the first seconds of its
+//! prepared stream; when the fade starts, those of the track that ends are
+//! read from the audio it just played. The incoming track is then held for
+//! less than a beat and let go so that its beats land on the outgoing ones,
+//! at the outgoing tempo, and eases back to its own afterwards.
+//!
 //! The DJ is audio first: unless "Show video" is on, a track is prepared and
 //! played as audio only, and its page shows the artwork. To make changing
 //! track immediate, the next track (and the queue row the pointer rests on)
@@ -35,6 +43,7 @@ use std::time::{Duration, Instant};
 use adw::prelude::*;
 use glib::subclass::types::ObjectSubclassIsExt;
 use gtk::{gdk, glib};
+use kinora_core::beats::{self, BeatGrid, BeatMatch};
 use kinora_core::dj::{DjSeed, DjSession, RadioSource, Track, TransitionPlan};
 
 use crate::backend::{Client, Video};
@@ -66,6 +75,397 @@ const HOVER_DELAY: Duration = Duration::from_millis(400);
 /// How many queued tracks the panel lists.
 const SHOWN: usize = 30;
 
+// ---- Beat matching ----
+
+/// After a matched fade, the track goes back to its own tempo over this long.
+const TEMPO_HOME: Duration = Duration::from_secs(8);
+/// The fade waits this long, at most, for the beats of the track that ends
+/// (they are worked out on another thread when the fade is asked for).
+const BEATS_WAIT: Duration = Duration::from_millis(300);
+/// The incoming player is given this long to come to rest before it is let
+/// go on the beat.
+const REST_TIMEOUT: Duration = Duration::from_millis(1500);
+/// The incoming track is held at least this long, in seconds.
+const SHORTEST_HOLD: f64 = 0.04;
+/// From telling a held player to play until it is heard, in seconds (measured:
+/// the beats of matched fades came that much late without it).
+const START_LATENCY: f64 = 0.002;
+/// Beats that are further apart than this are nudged together, in seconds...
+const NUDGE_FROM: f64 = 0.012;
+/// ...by playing a little faster or slower: by this much at most, and for
+/// about this long.
+const NUDGE_MOST: f64 = 0.04;
+const NUDGE_OVER: f64 = 0.6;
+/// The tail of the playing track has to be at least this long to find its
+/// beats in, in seconds.
+const SHORTEST_TAIL: f64 = 5.0;
+/// During a matched fade, the outgoing beats are read again this often from
+/// what it played since: the beats that are compared are then never far from
+/// audio that was looked at.
+const REREAD: Duration = Duration::from_millis(1500);
+/// A player's clock is only to be trusted to a few milliseconds once it has
+/// played for this long.
+const CLOCK_SETTLES: Duration = Duration::from_secs(8);
+
+/// Where a beat-matched fade is.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Stage {
+    /// The incoming track has to start, and the outgoing beats be known.
+    Waiting,
+    /// The incoming player was told to pause, to be let go on the beat.
+    Resting(Instant),
+    /// It rests; a timer lets it go.
+    Held,
+    /// Both play, beat on beat.
+    Matched,
+}
+
+/// A nudge that is under way.
+struct Nudge {
+    /// When to go back to the matched tempo.
+    until: Option<Instant>,
+    /// When the nudge has been heard in full, and the beats can be compared
+    /// again.
+    heard: Instant,
+}
+
+/// The beat matching of one fade.
+struct BeatSync {
+    incoming: BeatGrid,
+    /// The outgoing track's beats, on their way from the thread that works
+    /// them out, and when they were last asked for.
+    arriving: Option<std::sync::mpsc::Receiver<Option<BeatGrid>>>,
+    read: Instant,
+    outgoing: Option<BeatGrid>,
+    matched: Option<BeatMatch>,
+    stage: Stage,
+    asked: Instant,
+    /// The incoming track plays at the matched tempo from here on, in seconds.
+    matched_from: f64,
+    hold: Option<glib::SourceId>,
+    /// When the incoming track was let go.
+    let_go: Option<Instant>,
+    /// The last readings of how far the beats are apart, and those that
+    /// counted (the middle one of every three).
+    readings: Vec<f64>,
+    errors: Vec<f64>,
+    nudge: Option<Nudge>,
+}
+
+/// What a fade that waits for its beats does next.
+enum Beats {
+    Wait,
+    /// Fade without matching.
+    Plain,
+    Match(BeatMatch),
+}
+
+impl BeatSync {
+    /// The incoming track plays: are the outgoing beats there, and do the
+    /// tempos match?
+    fn poll(&mut self, outgoing_rate: f64) -> Beats {
+        if self.outgoing.is_none() {
+            match self.arriving.as_ref().map(|arriving| arriving.try_recv()) {
+                Some(Ok(Some(grid))) => {
+                    self.outgoing = Some(grid);
+                    self.arriving = None;
+                }
+                Some(Ok(None)) | None => {
+                    log::info!("DJ: beat match skipped: the playing track has no clear beat");
+                    return Beats::Plain;
+                }
+                Some(Err(std::sync::mpsc::TryRecvError::Empty))
+                    if self.asked.elapsed() < BEATS_WAIT =>
+                {
+                    return Beats::Wait;
+                }
+                Some(Err(_)) => {
+                    log::info!("DJ: beat match skipped: the playing track's beats came too late");
+                    return Beats::Plain;
+                }
+            }
+        }
+        let Some(outgoing) = self.outgoing else {
+            return Beats::Plain;
+        };
+        match beats::match_tempo(
+            outgoing.bpm,
+            outgoing_rate,
+            self.incoming.bpm,
+            beats::MAX_STRETCH,
+        ) {
+            Ok(matched) => {
+                log::info!(
+                    "DJ: beat match: {:.1} BPM into {:.1} BPM{}: stretch {:+.1} %",
+                    self.incoming.bpm,
+                    outgoing.bpm * outgoing_rate,
+                    match matched.multiple {
+                        m if m > 1.5 => " (counted double)",
+                        m if m < 0.75 => " (counted half)",
+                        _ => "",
+                    },
+                    (matched.rate - 1.0) * 100.0
+                );
+                self.matched = Some(matched);
+                Beats::Match(matched)
+            }
+            Err(why) => {
+                log::info!(
+                    "DJ: beat match skipped ({:.1} BPM into {:.1} BPM): {why}",
+                    self.incoming.bpm,
+                    outgoing.bpm * outgoing_rate
+                );
+                Beats::Plain
+            }
+        }
+    }
+
+    /// Both tracks play: read how far their beats are apart, and nudge the
+    /// incoming one when it is too far. A tempo set now is heard a second
+    /// later (what the sound device has taken in plays out first), so a
+    /// nudge is one measured dose, and the beats are compared again only
+    /// once it has been heard.
+    fn follow(&mut self, outgoing: &VideoPage, incoming: &VideoPage) -> Option<(f64, bool)> {
+        self.read_again(outgoing, incoming);
+        let (matched, grid) = (self.matched?, self.outgoing?);
+        let now = Instant::now();
+        if log::log_enabled!(log::Level::Debug) {
+            let (at_out, at_in) = (outgoing.heard_position(), incoming.heard_position());
+            log::debug!(
+                "DJ: beats: at {:.3} s: out {:.3} s  in {:.3} s (taken in up to {:.3} s)  {:+.1} ms  tempo {:.4}{}",
+                self.asked.elapsed().as_secs_f64(),
+                at_out,
+                at_in,
+                incoming.flow_position().unwrap_or(0.0),
+                matched.error(&grid, at_out, &self.incoming, at_in) * 1000.0,
+                incoming.tempo(),
+                if self.nudge.is_some() { "  nudging" } else { "" }
+            );
+        }
+        if let Some(nudge) = self.nudge.as_mut() {
+            if nudge.until.is_some_and(|until| now >= until) {
+                nudge.until = None;
+                incoming.set_tempo(matched.rate);
+            }
+            if now < nudge.heard {
+                return None;
+            }
+            self.nudge = None;
+            self.readings.clear();
+        }
+        let playing = |page: &VideoPage| page.player_state() == clapper::PlayerState::Playing;
+        let position = incoming.heard_position();
+        if !playing(outgoing) || !playing(incoming) || position < self.matched_from + 0.1 {
+            return None;
+        }
+        let error = matched.error(&grid, outgoing.heard_position(), &self.incoming, position);
+        // A player's clock wanders in its first seconds (by 70 ms, measured):
+        // what it says then is shown, but nothing is done about it. The start
+        // was timed from the track's very beginning, which needs no clock.
+        let settled = self.let_go.is_some_and(|at| at.elapsed() >= CLOCK_SETTLES)
+            || (cfg!(feature = "dev-hooks") && std::env::var("KH_TRUST_CLOCK").is_ok());
+        if !settled {
+            return Some((error, false));
+        }
+        self.readings.push(error);
+        if self.readings.len() < 3 {
+            return Some((error, true));
+        }
+        self.readings.sort_by(f64::total_cmp);
+        let middle = self.readings[1];
+        self.readings.clear();
+        self.errors.push(middle);
+        if middle.abs() >= NUDGE_FROM {
+            // Early beats: slower for a moment. `by` of the tempo for
+            // `lasts` seconds takes `by * lasts` seconds off the lead.
+            let by = (middle / NUDGE_OVER).clamp(-NUDGE_MOST, NUDGE_MOST);
+            let lasts = middle / by;
+            let ahead = incoming
+                .flow_position()
+                .map_or(1.2, |flow| ((flow - position) / matched.rate).clamp(0.0, 3.0));
+            incoming.set_tempo(matched.rate * (1.0 - by));
+            self.nudge = Some(Nudge {
+                until: Some(now + Duration::from_secs_f64(lasts)),
+                heard: now + Duration::from_secs_f64(lasts + ahead + 0.1),
+            });
+            log::info!(
+                "DJ: beats {:+.0} ms apart: {:+.1} % for {:.2} s",
+                middle * 1000.0,
+                -by * 100.0,
+                lasts
+            );
+        }
+        Some((error, true))
+    }
+
+    /// Keep the outgoing beats fresh: read them again from what it played
+    /// since, around the tempo found before. A tempo that comes out a little
+    /// different is followed.
+    fn read_again(&mut self, outgoing: &VideoPage, incoming: &VideoPage) {
+        let Some(arriving) = self.arriving.as_ref() else {
+            let (Some(grid), true) = (self.outgoing, self.read.elapsed() >= REREAD) else {
+                return;
+            };
+            self.read = Instant::now();
+            if let Some(tail) = outgoing.deck_audio() {
+                self.arriving = spawn_tail(tail, Some(grid.bpm), false);
+            }
+            return;
+        };
+        let grid = match arriving.try_recv() {
+            Ok(Some(grid)) => grid,
+            Ok(None) | Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                self.arriving = None;
+                return;
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => return,
+        };
+        self.arriving = None;
+        self.outgoing = Some(grid);
+        let Some(matched) = self.matched else {
+            return;
+        };
+        let again = beats::match_tempo(
+            grid.bpm,
+            matched.rate_out,
+            self.incoming.bpm,
+            beats::MAX_STRETCH,
+        );
+        if let Ok(again) = again.map(|again| BeatMatch {
+            // (Counted as before: a fade does not change its mind on that.)
+            rate: again.rate * again.multiple / matched.multiple,
+            multiple: matched.multiple,
+            period_in: matched.period_in,
+            ..again
+        }) && (again.rate - 1.0).abs() <= beats::MAX_STRETCH + 0.01
+        {
+            if (again.rate - matched.rate).abs() > 0.001 {
+                log::info!(
+                    "DJ: the playing track is at {:.1} BPM now: stretch {:+.1} %",
+                    grid.bpm,
+                    (again.rate - 1.0) * 100.0
+                );
+                if self.nudge.as_ref().is_none_or(|nudge| nudge.until.is_none()) {
+                    incoming.set_tempo(again.rate);
+                }
+            }
+            self.matched = Some(again);
+        }
+    }
+
+    /// For the log: how well the beats were together.
+    fn summary(&self) -> String {
+        if self.errors.is_empty() {
+            return format!(
+                "started on the beat; not measured (a player's clock takes {} s to settle)",
+                CLOCK_SETTLES.as_secs()
+            );
+        }
+        let n = self.errors.len() as f64;
+        let mean = self.errors.iter().map(|e| e.abs()).sum::<f64>() / n;
+        let worst = self.errors.iter().fold(0.0f64, |w, e| w.max(e.abs()));
+        format!(
+            "{} readings, beats {:.0} ms apart on average, {:.0} ms at worst, {:+.0} ms at first, {:+.0} ms at the end",
+            self.errors.len(),
+            mean * 1000.0,
+            worst * 1000.0,
+            self.errors[0] * 1000.0,
+            self.errors[self.errors.len() - 1] * 1000.0
+        )
+    }
+}
+
+/// Work out the beats of a track's first seconds and keep them (on a thread
+/// of its own: it decodes).
+fn analyse_intro(core: std::sync::Arc<kinora_core::Core>, id: pcore::VideoId, uri: String) {
+    if core.beats(&id).is_some() {
+        return;
+    }
+    let started = Instant::now();
+    let pcm = match crate::gui::deck_audio::decode(
+        &uri,
+        0.0,
+        beats::INTRO,
+        beats::ANALYSIS_RATE,
+        1,
+        Duration::from_secs(30),
+        None,
+    ) {
+        Ok(pcm) => pcm,
+        Err(e) => {
+            log::warn!("DJ: could not decode {} for its beats: {e}", id.id);
+            return;
+        }
+    };
+    let decoded = started.elapsed();
+    let analysed = core.analyse_beats(&id, &pcm.samples, pcm.rate);
+    let took = started.elapsed();
+    match analysed.intro {
+        Some(grid) => log::info!(
+            "DJ: beats of {}: {:.1} BPM, first beat at {:.2} s, confidence {:.2}{} ({:.0} s decoded in {:.2} s, analysed in {:.0} ms)",
+            id.id,
+            grid.bpm,
+            grid.anchor,
+            grid.confidence,
+            if grid.is_usable() { "" } else { " (too vague to match)" },
+            pcm.seconds(),
+            decoded.as_secs_f64(),
+            (took - decoded).as_secs_f64() * 1000.0
+        ),
+        None => log::info!(
+            "DJ: beats of {}: none found ({:.0} s decoded in {:.2} s)",
+            id.id,
+            pcm.seconds(),
+            decoded.as_secs_f64()
+        ),
+    }
+}
+
+/// The beats of the track that ends, from the last seconds it played:
+/// around the tempo of its start when that is known, else (or when that
+/// finds nothing clear: tracks change) any tempo.
+fn analyse_tail(
+    pcm: crate::gui::deck_audio::Pcm,
+    near: Option<f64>,
+    first: bool,
+) -> Option<BeatGrid> {
+    let started = Instant::now();
+    let (mono, rate) = beats::downmix(&pcm.samples, pcm.channels, pcm.rate, beats::ANALYSIS_RATE);
+    let grid = near
+        .and_then(|bpm| beats::analyse(&mono, rate, pcm.start, Some(bpm)))
+        .filter(BeatGrid::is_usable)
+        .or_else(|| beats::analyse(&mono, rate, pcm.start, None));
+    match grid {
+        Some(_) if !first => {}
+        Some(grid) => log::info!(
+            "DJ: beats of what plays ({:.1} s up to {:.1} s): {:.1} BPM, confidence {:.2}, in {:.0} ms",
+            pcm.seconds(),
+            pcm.end(),
+            grid.bpm,
+            grid.confidence,
+            started.elapsed().as_secs_f64() * 1000.0
+        ),
+        None => log::info!("DJ: beats of what plays: none found"),
+    }
+    grid.filter(BeatGrid::is_usable)
+}
+
+/// [`analyse_tail`] on a thread of its own; the answer arrives on the channel.
+fn spawn_tail(
+    tail: crate::gui::deck_audio::Pcm,
+    near: Option<f64>,
+    first: bool,
+) -> Option<std::sync::mpsc::Receiver<Option<BeatGrid>>> {
+    let (send, arriving) = std::sync::mpsc::channel();
+    std::thread::Builder::new()
+        .name("kinora-beats".into())
+        .spawn(move || {
+            let _ = send.send(analyse_tail(tail, near, first));
+        })
+        .ok()
+        .map(|_| arriving)
+}
+
 /// A fade that is running.
 struct Fade {
     /// The page that is ending. It is no longer in the window.
@@ -81,6 +481,8 @@ struct Fade {
     timer: glib::SourceId,
     /// How ready the incoming track was: "warm", "prepared" or "cold".
     readiness: &'static str,
+    /// The fade is beat-matched ("Match Beats"), as far as it has got.
+    sync: Option<BeatSync>,
 }
 
 /// A track loaded ahead of time: its page, with the player paused at the start.
@@ -102,6 +504,8 @@ struct Inner {
     tick: RefCell<Option<glib::SourceId>>,
     /// The ids of the tracks whose streams were asked for ahead of time.
     prepared: RefCell<Vec<String>>,
+    /// The ids of the tracks whose beats were asked for.
+    analysed: RefCell<Vec<String>>,
     /// Players loaded ahead (see [`Warm`]), oldest first.
     warm: RefCell<Vec<Warm>>,
     /// The queued track the pointer rested on last.
@@ -127,6 +531,7 @@ impl Dj {
             fade: RefCell::default(),
             tick: RefCell::default(),
             prepared: RefCell::default(),
+            analysed: RefCell::default(),
             warm: RefCell::default(),
             hovered: RefCell::default(),
             starting: Cell::default(),
@@ -423,6 +828,7 @@ impl Dj {
             wanted.as_secs_f64()
         );
         let (warmed, readiness) = self.take_ahead(&client, &track);
+        Self::hold_for_beats(&client, warmed.as_ref());
         let (page, old) = window
             .imp()
             .open_dj_track(&client.dj_video(&track), true, warmed);
@@ -433,6 +839,7 @@ impl Dj {
             self.start_fade(outgoing, page, wanted, readiness);
         } else {
             page.set_fade_gain(None);
+            start_held(&page);
         }
     }
 
@@ -504,6 +911,23 @@ impl Dj {
 
         // Get the next track ready once this one is under way.
         self.warm_up(&client, next.as_ref().filter(|_| playing && position > 3.0));
+        // A track that plays unprepared (the first one) gets its audio
+        // prepared all the same: that is what the scratch decodes more of
+        // the track from.
+        if playing
+            && position > 3.0
+            && page.playing_uri().is_none()
+            && let Some(video) = page.video()
+        {
+            let mut asked = inner.prepared.borrow_mut();
+            let id = video.id().id;
+            if !asked.contains(&id) {
+                asked.push(id);
+                if client.prepared_audio_playback_uri(&video).is_none() {
+                    client.prepare_audio_playback(&video);
+                }
+            }
+        }
         self.refill();
 
         // The track ended by itself (a cut, or nothing was ready to fade to).
@@ -580,6 +1004,7 @@ impl Dj {
         );
         let client = window.client();
         let (warmed, readiness) = self.take_ahead(&client, &track);
+        Self::hold_for_beats(&client, warmed.as_ref());
         let (page, old) = window
             .imp()
             .open_dj_track(&client.dj_video(&track), true, warmed);
@@ -590,7 +1015,10 @@ impl Dj {
                 page.set_fade_gain(Some(0.0));
                 self.start_fade(outgoing, page, fade, readiness);
             }
-            None => page.set_fade_gain(None),
+            None => {
+                page.set_fade_gain(None);
+                start_held(&page);
+            }
         }
     }
 
@@ -606,6 +1034,13 @@ impl Dj {
             Some(inner) => Dj(inner).fade_step(),
             None => glib::ControlFlow::Break,
         });
+        // The outgoing track stays at the tempo it has now, and out of hands.
+        outgoing.hold_tempo();
+        outgoing.cancel_scratch();
+        let sync = self.beat_sync(&outgoing, &incoming);
+        if sync.is_none() {
+            start_held(&incoming);
+        }
         self.0.fade.replace(Some(Fade {
             outgoing,
             incoming,
@@ -615,7 +1050,158 @@ impl Dj {
             steps: 0,
             timer,
             readiness,
+            sync,
         }));
+        self.changed();
+    }
+
+    /// With "Match Beats" on, a warm track is not started when its page
+    /// opens: it waits at its very start, the one place a player is at for
+    /// certain, to be let go on the beat (or at once, if the beats do not
+    /// match: see `start_held`).
+    fn hold_for_beats(client: &Client, warmed: Option<&VideoPage>) {
+        if let Some(page) = warmed.filter(|page| page.is_warm())
+            && client.core().dj_settings().match_beats
+        {
+            page.hold_warm(true);
+        }
+    }
+
+    /// With "Match Beats" on: what a fade from `outgoing` to `incoming`
+    /// needs to be beat-matched, or why it will not be (in the log).
+    fn beat_sync(&self, outgoing: &VideoPage, incoming: &VideoPage) -> Option<BeatSync> {
+        let client = self.client()?;
+        let core = client.core();
+        if !core.dj_settings().match_beats {
+            return None;
+        }
+        let skip = |why: String| {
+            log::info!("DJ: beat match skipped: {why}");
+            None
+        };
+        if !incoming.can_stretch() {
+            return skip(
+                "the next track's player cannot change tempo (loaded before Match Beats \
+                 was switched on, or no scaletempo element)"
+                    .into(),
+            );
+        }
+        let intro_of = |page: &VideoPage| page.video().and_then(|v| core.beats(&v.id()));
+        let grid = match intro_of(incoming) {
+            None => return skip("the next track's beats are not worked out yet".into()),
+            Some(known) => match known.intro {
+                Some(grid) if grid.is_usable() => grid,
+                Some(grid) => {
+                    return skip(format!(
+                        "the next track has no clear beat ({:.1} BPM, confidence {:.2})",
+                        grid.bpm, grid.confidence
+                    ));
+                }
+                None => return skip("the next track has no beat".into()),
+            },
+        };
+        let tail = match outgoing.deck_audio() {
+            Some(pcm) if pcm.seconds() >= SHORTEST_TAIL => pcm,
+            Some(pcm) => {
+                return skip(format!(
+                    "only {:.1} s of the playing track to go by",
+                    pcm.seconds()
+                ));
+            }
+            None => return skip("nothing of the playing track to go by".into()),
+        };
+        let near = intro_of(outgoing)
+            .and_then(|known| known.intro)
+            .filter(BeatGrid::is_usable)
+            .map(|grid| grid.bpm);
+        let Some(arriving) = spawn_tail(tail, near, true) else {
+            return skip("no thread to work the beats out on".into());
+        };
+        Some(BeatSync {
+            incoming: grid,
+            arriving: Some(arriving),
+            read: Instant::now(),
+            outgoing: None,
+            matched: None,
+            stage: Stage::Waiting,
+            asked: Instant::now(),
+            matched_from: 0.0,
+            hold: None,
+            let_go: None,
+            readings: Vec::new(),
+            errors: Vec::new(),
+            nudge: None,
+        })
+    }
+
+    /// The incoming player rests: let it go when its beats will land on the
+    /// outgoing ones.
+    fn hold_for_the_beat(&self, fade: &mut Fade) {
+        let Some(sync) = fade.sync.as_mut() else {
+            return;
+        };
+        let (Some(matched), Some(grid)) = (sync.matched, sync.outgoing) else {
+            return;
+        };
+        let position_in = fade.incoming.heard_position();
+        // What the player has taken in plays at the track's own tempo.
+        let matched_from = fade
+            .incoming
+            .flow_position()
+            .unwrap_or(position_in)
+            .max(position_in);
+        // (Stretched, the track will be heard a little off its place.)
+        let stretched = BeatGrid {
+            anchor: sync.incoming.anchor
+                - crate::gui::deck_audio::STRETCH_LAG * (matched.rate - 1.0),
+            ..sync.incoming
+        };
+        let wait = matched.start_delay(
+            &grid,
+            fade.outgoing.heard_position(),
+            &stretched,
+            position_in,
+            matched_from,
+            SHORTEST_HOLD + START_LATENCY,
+        ) - START_LATENCY;
+        log::info!(
+            "DJ: holding the next track {:.0} ms for the beat (at {:.2} s, matched from {:.2} s)",
+            wait * 1000.0,
+            position_in,
+            matched_from
+        );
+        sync.matched_from = matched_from;
+        sync.stage = Stage::Held;
+        let dj = Rc::downgrade(&self.0);
+        sync.hold = Some(glib::timeout_add_local_once(
+            Duration::from_secs_f64(wait.max(0.0)),
+            move || {
+                if let Some(inner) = dj.upgrade() {
+                    Dj(inner).let_go();
+                }
+            },
+        ));
+    }
+
+    /// The beat is there: the held track plays, and the fade begins.
+    fn let_go(&self) {
+        let mut slot = self.0.fade.borrow_mut();
+        let Some(fade) = slot.as_mut() else {
+            return;
+        };
+        let Some(sync) = fade.sync.as_mut().filter(|s| s.stage == Stage::Held) else {
+            return;
+        };
+        sync.hold = None;
+        sync.stage = Stage::Matched;
+        sync.let_go = Some(Instant::now());
+        if fade.incoming.is_warm_held() {
+            start_held(&fade.incoming);
+        } else {
+            fade.incoming.resume();
+        }
+        begin_fade(fade);
+        drop(slot);
         self.changed();
     }
 
@@ -625,24 +1211,68 @@ impl Dj {
             return glib::ControlFlow::Break;
         };
         if fade.running.is_none() {
-            let started = fade.incoming.player_state() == clapper::PlayerState::Playing;
-            if started {
-                // Fade over what the old track has left, at most.
-                let out = &fade.outgoing;
-                let left = match (out.player_state(), out.duration_secs()) {
-                    (clapper::PlayerState::Playing, Some(d)) => {
-                        Duration::from_secs_f64((d - out.position_secs()).max(0.0))
+            let state = fade.incoming.player_state();
+            // A matched fade: the incoming track is brought to rest, then
+            // let go on the beat (which starts the fade).
+            match fade.sync.as_ref().map(|sync| sync.stage) {
+                Some(Stage::Held) => return glib::ControlFlow::Continue,
+                Some(Stage::Resting(_)) if state == clapper::PlayerState::Paused => {
+                    self.hold_for_the_beat(fade);
+                    return glib::ControlFlow::Continue;
+                }
+                Some(Stage::Resting(since)) if since.elapsed() < REST_TIMEOUT => {
+                    return glib::ControlFlow::Continue;
+                }
+                Some(Stage::Resting(_)) => {
+                    log::info!("DJ: beat match given up: the next track did not come to rest");
+                    fade.sync = None;
+                    fade.incoming.set_tempo(1.0);
+                    fade.incoming.resume();
+                    return glib::ControlFlow::Continue;
+                }
+                _ => {}
+            }
+            // A warm track that waits at its start: let go on the beat, or
+            // at once when the beats do not match.
+            if fade.incoming.is_warm_held() {
+                let beats = match fade.sync.as_mut() {
+                    Some(sync) if fade.incoming.can_stretch() => sync.poll(fade.outgoing.tempo()),
+                    Some(_) => {
+                        log::info!(
+                            "DJ: beat match skipped: the next track's player cannot change tempo"
+                        );
+                        Beats::Plain
                     }
-                    _ => Duration::ZERO,
+                    None => Beats::Plain,
                 };
-                let over = fade.wanted.min(left);
-                log::info!(
-                    "DJ: started after {:.1} s ({}); fading over {:.1} s",
-                    fade.began.elapsed().as_secs_f64(),
-                    fade.readiness,
-                    over.as_secs_f64()
-                );
-                fade.running = Some((fade_plan(over), Instant::now()));
+                match beats {
+                    Beats::Wait => {}
+                    Beats::Plain => {
+                        fade.sync = None;
+                        start_held(&fade.incoming);
+                    }
+                    Beats::Match(matched) => {
+                        fade.incoming.set_tempo(matched.rate);
+                        self.hold_for_the_beat(fade);
+                    }
+                }
+                return glib::ControlFlow::Continue;
+            }
+            let started = state == clapper::PlayerState::Playing;
+            if started {
+                if let Some(sync) = fade.sync.as_mut() {
+                    match sync.poll(fade.outgoing.tempo()) {
+                        Beats::Wait => return glib::ControlFlow::Continue,
+                        Beats::Plain => fade.sync = None,
+                        Beats::Match(matched) => {
+                            sync.stage = Stage::Resting(Instant::now());
+                            fade.incoming.pause();
+                            fade.incoming.set_tempo(matched.rate);
+                            return glib::ControlFlow::Continue;
+                        }
+                    }
+                }
+                begin_fade(fade);
                 drop(slot);
                 // No longer pending: Next and Previous are back.
                 self.changed();
@@ -669,14 +1299,24 @@ impl Dj {
         let gains = plan.gains(elapsed);
         fade.outgoing.set_fade_gain(Some(gains.outgoing));
         fade.incoming.set_fade_gain(Some(gains.incoming));
+        let beats = fade
+            .sync
+            .as_mut()
+            .and_then(|sync| sync.follow(&fade.outgoing, &fade.incoming));
         // Twice a second is enough to follow it in the log.
         if fade.steps % 10 == 0 {
             log::info!(
-                "DJ: fade {:.2}/{:.2} s  out {:.2}  in {:.2}",
+                "DJ: fade {:.2}/{:.2} s  out {:.2}  in {:.2}{}",
                 elapsed.as_secs_f64(),
                 plan.fade.as_secs_f64(),
                 gains.outgoing,
-                gains.incoming
+                gains.incoming,
+                beats.map_or(String::new(), |(error, settled)| format!(
+                    "  beats {:+.0} ms{}  tempo {:.3}",
+                    error * 1000.0,
+                    if settled { "" } else { " (clock settling)" },
+                    fade.incoming.tempo()
+                ))
             );
         }
         fade.steps += 1;
@@ -697,6 +1337,24 @@ impl Dj {
             fade.timer.remove();
         }
         fade.incoming.set_fade_gain(None);
+        start_held(&fade.incoming);
+        if let Some(mut sync) = fade.sync {
+            if let Some(hold) = sync.hold.take() {
+                hold.remove();
+            }
+            match sync.stage {
+                Stage::Waiting => {}
+                // Cut short before the beat came: just play.
+                Stage::Resting(_) | Stage::Held => {
+                    fade.incoming.set_tempo(1.0);
+                    fade.incoming.resume();
+                }
+                Stage::Matched => {
+                    log::info!("DJ: beat match: {}", sync.summary());
+                    fade.incoming.ease_tempo_home(TEMPO_HOME);
+                }
+            }
+        }
         log::info!("DJ: fade done; releasing the old player");
         fade.outgoing.set_fade_gain(Some(0.0));
         release(fade.outgoing);
@@ -768,11 +1426,15 @@ impl Dj {
         }
 
         for track in &wanted {
+            let video = client.dj_video(track);
+            let prepared = Self::is_prepared(client, &video);
+            if prepared {
+                self.analyse_ahead(client, track, &video);
+            }
             if warm.iter().any(|w| w.id == track.id) {
                 continue;
             }
-            let video = client.dj_video(track);
-            if !Self::is_prepared(client, &video) {
+            if !prepared {
                 let mut asked = inner.prepared.borrow_mut();
                 if !asked.contains(&track.id) {
                     log::info!("DJ: preparing {} ({})", track.id, track.title);
@@ -805,6 +1467,27 @@ impl Dj {
                 ready: false,
             });
         }
+    }
+
+    /// With "Match Beats" on: work out the beats of a track whose stream is
+    /// prepared, once, in the background. They are kept on disk, so a track
+    /// that was analysed before costs nothing.
+    fn analyse_ahead(&self, client: &Client, track: &Track, video: &Video) {
+        let mut analysed = self.0.analysed.borrow_mut();
+        if analysed.contains(&track.id) || !client.core().dj_settings().match_beats {
+            return;
+        }
+        let Some(uri) = client
+            .prepared_audio_playback_uri(video)
+            .or_else(|| client.prepared_playback_uri(video))
+        else {
+            return;
+        };
+        analysed.push(track.id.clone());
+        let (core, id) = (client.core(), video.id());
+        let _ = std::thread::Builder::new()
+            .name("kinora-beats".into())
+            .spawn(move || analyse_intro(core, id, uri));
     }
 
     /// The track is about to play: its warmed page, if there is one, and how
@@ -975,6 +1658,22 @@ impl Dj {
         }
     }
 
+    /// Test hook: switch "Match Beats".
+    #[cfg(feature = "dev-hooks")]
+    pub fn dev_toggle_match(&self) {
+        let Some(window) = self.0.window.upgrade() else {
+            return;
+        };
+        let on = !window.client().core().dj_settings().match_beats;
+        crate::gui::extension_settings::store(
+            &window.imp().settings,
+            kinora_core::extension::builtin::dj::ID,
+            kinora_core::extension::builtin::dj::MATCH_BEATS,
+            kinora_core::extension::SettingValue::Bool(on),
+        );
+        log::info!("DEV: match beats {}", if on { "on" } else { "off" });
+    }
+
     /// Test hook: act on the queue as the panel's buttons would. `what` is
     /// `play-next`, `remove` or `play-now`, applied to the queue's third track.
     #[cfg(feature = "dev-hooks")]
@@ -1015,6 +1714,35 @@ fn seed_video(seed: &DjSeed) -> Option<&str> {
 fn release(page: VideoPage) {
     page.stop();
     page.retire();
+}
+
+/// Start a warm track that was held back for its beat (see
+/// `Dj::hold_for_beats`); nothing for any other.
+fn start_held(page: &VideoPage) {
+    if page.is_warm_held() {
+        page.hold_warm(false);
+        page.start_warm();
+    }
+}
+
+/// The incoming track plays: the fade starts now, over what the old track
+/// has left at most.
+fn begin_fade(fade: &mut Fade) {
+    let out = &fade.outgoing;
+    let left = match (out.player_state(), out.duration_secs()) {
+        (clapper::PlayerState::Playing, Some(d)) => {
+            Duration::from_secs_f64((d - out.position_secs()).max(0.0))
+        }
+        _ => Duration::ZERO,
+    };
+    let over = fade.wanted.min(left);
+    log::info!(
+        "DJ: started after {:.1} s ({}); fading over {:.1} s",
+        fade.began.elapsed().as_secs_f64(),
+        fade.readiness,
+        over.as_secs_f64()
+    );
+    fade.running = Some((fade_plan(over), Instant::now()));
 }
 
 /// A fade of `over` that starts now (a cut when there is nothing to fade).

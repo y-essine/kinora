@@ -109,6 +109,9 @@ pub struct DjSettings {
     /// Play the tracks' videos. Off (the default), the DJ is audio only:
     /// tracks start in about half the time and no video is decoded.
     pub show_video: bool,
+    /// During a crossfade, play the incoming track at the outgoing one's
+    /// tempo, beat on beat (see [`crate::beats`]). Off by default.
+    pub match_beats: bool,
 }
 
 impl Default for DjSettings {
@@ -118,6 +121,7 @@ impl Default for DjSettings {
             avoid_repeats: true,
             start_from: StartFrom::CurrentVideo,
             show_video: false,
+            match_beats: false,
         }
     }
 }

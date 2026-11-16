@@ -737,6 +737,12 @@ pub mod imp {
                     break;
                 }
                 let name = w.type_().name();
+                // The DJ's record is taken by hand (the deck around it is not).
+                if let Some(deck) = w.downcast_ref::<crate::gui::turntable::Turntable>() {
+                    return obj
+                        .compute_point(deck, &gtk::graphene::Point::new(x as f32, y as f32))
+                        .is_some_and(|p| deck.on_record(p.x() as f64, p.y() as f64));
+                }
                 if w.is::<gtk::Button>()
                     || w.is::<gtk::MenuButton>()
                     || w.is::<gtk::Range>()

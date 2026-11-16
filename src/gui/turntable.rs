@@ -8,6 +8,11 @@
 //! arm goes back to its rest. A new deck's record drops in, so a change of
 //! track reads as a change of record.
 //!
+//! The record can be taken by hand: pressed and dragged around its centre,
+//! it turns with the pointer, and the deck says so ([`Hand`]) for whoever
+//! plays the sound to follow (the page scratches, see `gui/scratch.rs`). A
+//! press without a drag is a tap.
+//!
 //! Everything is drawn from a few gradients and one texture; only the label's
 //! transform changes from frame to frame, and frames are asked for only while
 //! something moves. With `still` (the "Reduce effects" setting) nothing moves:
@@ -40,7 +45,44 @@ const ARM_LAST: f64 = 29.7;
 
 /// Degrees per second while playing: a calm turn every five seconds (a real
 /// 33 rpm would make the artwork unreadable).
-const SPIN: f64 = 72.0;
+pub const SPIN: f64 = 72.0;
+/// The pointer has to move this far for a press to be a drag, in pixels.
+const DRAG_FROM: f64 = 4.0;
+/// Nearer the spindle than this (in parts of the record's radius), the
+/// pointer's angle says little: the record keeps its turn.
+const HUB: f64 = 0.1;
+
+/// What a hand does with the deck.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Hand {
+    /// The pointer went down on the record. Answer `false` and the record
+    /// is not for taking now.
+    Down,
+    /// The record is dragged: so many degrees since it was taken (clockwise,
+    /// the way it plays, is positive).
+    Turn(f64),
+    /// The record is let go after a drag. It stays [held](Turntable::set_held)
+    /// until the handler says otherwise.
+    Up,
+    /// A press and release without a move, anywhere on the deck.
+    Tap,
+    /// A press on the record came to nothing (it was taken away).
+    Away,
+}
+
+/// A press that is under way.
+#[derive(Clone, Copy)]
+struct Press {
+    start: (f64, f64),
+    /// The record was pressed, and may be taken.
+    on_record: bool,
+    dragged: bool,
+    /// The pointer's angle around the spindle when last looked at, in radians.
+    pointer: f64,
+    /// Degrees turned since the press, and the label's turn at the press.
+    turned: f64,
+    from: f64,
+}
 /// How quickly the record takes up speed and loses it, in seconds.
 const SPIN_EASE: f64 = 0.45;
 const ARM_EASE: f64 = 0.16;
@@ -57,6 +99,156 @@ impl Turntable {
             (h - s) / 2.0 + s * RECORD_Y as f64,
             s * RECORD_R as f64,
         )
+    }
+
+    /// Whether a point of the widget is on the record.
+    pub fn on_record(&self, x: f64, y: f64) -> bool {
+        let (cx, cy, r) = self.record();
+        (x - cx).hypot(y - cy) <= r
+    }
+
+    /// Be told what a hand does with the deck (see [`Hand`]). The answer
+    /// only matters for [`Hand::Down`].
+    pub fn connect_hand(&self, handler: impl Fn(&Self, Hand) -> bool + 'static) {
+        self.imp().handler.replace(Some(Box::new(handler)));
+    }
+
+    /// The record is in someone's hand: it does not turn by itself, and the
+    /// arm stays on it.
+    pub fn is_held(&self) -> bool {
+        self.imp().held.get()
+    }
+
+    /// Let the record go (or take it): let go while `playing`, it turns on at
+    /// once, without running up again.
+    pub fn set_held(&self, held: bool) {
+        let imp = self.imp();
+        if imp.held.replace(held) != held {
+            if !held && self.playing() && !self.still() {
+                imp.speed.set(SPIN);
+            }
+            imp.animate();
+            self.queue_draw();
+        }
+    }
+
+    /// The label's turn, in degrees.
+    pub fn turn(&self) -> f64 {
+        self.imp().angle.get()
+    }
+
+    /// Turn the label to `degrees` (for whoever holds the record).
+    pub fn set_turn(&self, degrees: f64) {
+        self.imp().angle.set(degrees.rem_euclid(360.0));
+        self.queue_draw();
+    }
+
+    fn emit(&self, hand: Hand) -> bool {
+        let handler = self.imp().handler.borrow();
+        handler.as_ref().is_some_and(|handler| handler(self, hand))
+    }
+
+    /// The pointer went down at (`x`, `y`).
+    fn press(&self, x: f64, y: f64) {
+        let (cx, cy, _) = self.record();
+        let on_record = self.on_record(x, y) && self.emit(Hand::Down);
+        self.imp().press.set(Some(Press {
+            start: (x, y),
+            on_record,
+            dragged: false,
+            pointer: (y - cy).atan2(x - cx),
+            turned: 0.0,
+            from: self.turn(),
+        }));
+    }
+
+    /// The pressed pointer is now at (`x`, `y`). `true`: the record is being
+    /// dragged.
+    fn drag(&self, x: f64, y: f64) -> bool {
+        let imp = self.imp();
+        let Some(mut press) = imp.press.get() else {
+            return false;
+        };
+        let (cx, cy, r) = self.record();
+        if !press.dragged && (x - press.start.0).hypot(y - press.start.1) > DRAG_FROM {
+            press.dragged = true;
+            if press.on_record {
+                // Taken from here: not a jump back to where it was pressed.
+                press.pointer = (y - cy).atan2(x - cx);
+                press.from = self.turn();
+                self.set_held(true);
+            }
+        }
+        if press.dragged && press.on_record {
+            if (x - cx).hypot(y - cy) > r * HUB {
+                let pointer = (y - cy).atan2(x - cx);
+                // The short way round from where it was.
+                let step = (pointer - press.pointer + std::f64::consts::PI)
+                    .rem_euclid(std::f64::consts::TAU)
+                    - std::f64::consts::PI;
+                press.pointer = pointer;
+                press.turned += step.to_degrees();
+            }
+            self.set_turn(press.from + press.turned);
+            self.emit(Hand::Turn(press.turned));
+        }
+        imp.press.set(Some(press));
+        press.dragged && press.on_record
+    }
+
+    /// The pointer came up (`cancelled`: was taken away).
+    fn lift(&self, cancelled: bool) {
+        let Some(press) = self.imp().press.take() else {
+            return;
+        };
+        if press.dragged && press.on_record {
+            self.emit(Hand::Up);
+        } else if !press.dragged && !cancelled {
+            self.emit(Hand::Tap);
+        } else if press.on_record {
+            self.emit(Hand::Away);
+        }
+    }
+
+    /// Test hook: take the record and turn it as a hand would, through the
+    /// same steps as a drag: `turns` is a list of (milliseconds since the
+    /// press, degrees turned by then); in between, the hand moves evenly.
+    /// After the last one the record is let go.
+    #[cfg(feature = "dev-hooks")]
+    pub fn dev_scratch(&self, turns: Vec<(u64, f64)>) {
+        let (cx, cy, r) = self.record();
+        // Pressed at three o'clock, two thirds out.
+        let radius = r * 0.66;
+        self.press(cx + radius, cy);
+        if !self.imp().press.get().is_some_and(|press| press.on_record) {
+            log::info!("DEV: scratch: the record is not for taking");
+            self.imp().press.take();
+            return;
+        }
+        let began = std::time::Instant::now();
+        let deck = self.downgrade();
+        glib::timeout_add_local(std::time::Duration::from_millis(8), move || {
+            let Some(deck) = deck.upgrade() else {
+                return glib::ControlFlow::Break;
+            };
+            let now = began.elapsed().as_millis() as u64;
+            let last = turns.last().copied().unwrap_or((0, 0.0));
+            let at = turns.partition_point(|(t, _)| *t <= now);
+            let degrees = match (at.checked_sub(1).map(|i| turns[i]), turns.get(at)) {
+                (Some((t0, d0)), Some(&(t1, d1))) => {
+                    d0 + (d1 - d0) * (now - t0) as f64 / (t1 - t0).max(1) as f64
+                }
+                (None, Some(&(t1, d1))) => d1 * now as f64 / t1.max(1) as f64,
+                _ => last.1,
+            };
+            let angle = degrees.to_radians();
+            deck.drag(cx + radius * angle.cos(), cy + radius * angle.sin());
+            if now >= last.0 {
+                deck.lift(false);
+                return glib::ControlFlow::Break;
+            }
+            glib::ControlFlow::Continue
+        });
     }
 }
 
@@ -107,14 +299,20 @@ mod imp {
         still: Cell<bool>,
 
         /// The label's turn, in degrees, and its speed, in degrees per second.
-        angle: Cell<f64>,
-        speed: Cell<f64>,
+        pub(super) angle: Cell<f64>,
+        pub(super) speed: Cell<f64>,
         /// 0: the arm at rest; 1: on the record.
         arm: Cell<f64>,
         /// 0 to 1: the record dropping in.
         dropped: Cell<f64>,
         ticking: Cell<bool>,
         last_frame: Cell<Option<i64>>,
+
+        /// The record is in a hand (see [`super::Turntable::set_held`]).
+        pub(super) held: Cell<bool>,
+        pub(super) press: Cell<Option<Press>>,
+        #[allow(clippy::type_complexity)]
+        pub(super) handler: RefCell<Option<Box<dyn Fn(&super::Turntable, Hand) -> bool>>>,
     }
 
     impl Turntable {
@@ -146,8 +344,13 @@ mod imp {
             }
         }
 
+        /// The arm lies on the record: it plays, or a hand has it.
+        fn arm_on(&self) -> bool {
+            self.playing.get() || self.held.get()
+        }
+
         fn settled(&self) -> bool {
-            let target = if self.playing.get() { 1.0 } else { 0.0 };
+            let target = if self.arm_on() { 1.0 } else { 0.0 };
             !self.playing.get()
                 && self.speed.get().abs() < 0.5
                 && (self.arm.get() - target).abs() < 0.002
@@ -160,7 +363,7 @@ mod imp {
             let obj = self.obj();
             if self.still.get() {
                 self.speed.set(0.0);
-                self.arm.set(if self.playing.get() { 1.0 } else { 0.0 });
+                self.arm.set(if self.arm_on() { 1.0 } else { 0.0 });
                 self.dropped.set(1.0);
                 obj.queue_draw();
                 return;
@@ -184,12 +387,17 @@ mod imp {
                 let playing = imp.playing.get();
                 let ease =
                     |from: f64, to: f64, over: f64| from + (to - from) * (1.0 - (-dt / over).exp());
-                let speed = ease(imp.speed.get(), if playing { SPIN } else { 0.0 }, SPIN_EASE);
-                imp.speed.set(speed);
-                imp.angle.set((imp.angle.get() + speed * dt) % 360.0);
+                // In a hand, the record turns with it and not by itself.
+                if imp.held.get() {
+                    imp.speed.set(0.0);
+                } else {
+                    let speed = ease(imp.speed.get(), if playing { SPIN } else { 0.0 }, SPIN_EASE);
+                    imp.speed.set(speed);
+                    imp.angle.set((imp.angle.get() + speed * dt) % 360.0);
+                }
                 imp.arm.set(ease(
                     imp.arm.get(),
-                    if playing { 1.0 } else { 0.0 },
+                    if imp.arm_on() { 1.0 } else { 0.0 },
                     ARM_EASE,
                 ));
                 imp.dropped.set((imp.dropped.get() + dt / DROP).min(1.0));
@@ -264,7 +472,41 @@ mod imp {
     }
 
     #[glib::derived_properties]
-    impl ObjectImpl for Turntable {}
+    impl ObjectImpl for Turntable {
+        fn constructed(&self) {
+            self.parent_constructed();
+            // A press on the deck: a tap, or the record taken by hand.
+            let drag = gtk::GestureDrag::new();
+            drag.connect_drag_begin(|gesture, x, y| {
+                if let Some(deck) = gesture.widget().and_downcast::<super::Turntable>() {
+                    deck.press(x, y);
+                }
+            });
+            drag.connect_drag_update(|gesture, dx, dy| {
+                let (Some(deck), Some((x, y))) = (
+                    gesture.widget().and_downcast::<super::Turntable>(),
+                    gesture.start_point(),
+                ) else {
+                    return;
+                };
+                // The record is ours: nothing else is to drag with it.
+                if deck.drag(x + dx, y + dy) {
+                    gesture.set_state(gtk::EventSequenceState::Claimed);
+                }
+            });
+            drag.connect_drag_end(|gesture, _, _| {
+                if let Some(deck) = gesture.widget().and_downcast::<super::Turntable>() {
+                    deck.lift(false);
+                }
+            });
+            drag.connect_cancel(|gesture, _| {
+                if let Some(deck) = gesture.widget().and_downcast::<super::Turntable>() {
+                    deck.lift(true);
+                }
+            });
+            self.obj().add_controller(drag);
+        }
+    }
 
     impl WidgetImpl for Turntable {
         fn measure(&self, _orientation: gtk::Orientation, _for_size: i32) -> (i32, i32, i32, i32) {
