@@ -11,6 +11,7 @@ use gtk::{CssProvider, prelude::GtkWindowExt, prelude::RootExt};
 use std::sync::LazyLock;
 
 mod config;
+mod crashlog;
 mod migrate;
 use crate::config::BASE_ID;
 
@@ -19,6 +20,7 @@ use self::config::{APP_ID, GETTEXT_PACKAGE, LOCALEDIR, RESOURCES_BYTES, RESOURCE
 mod backend;
 mod gui;
 mod pride;
+mod selftest;
 mod splashes;
 mod store;
 
@@ -103,9 +105,28 @@ fn init_internationalization() -> Result<(), Box<dyn std::error::Error>> {
     unsafe {
         gettextrs::setlocale(gettextrs::LocaleCategory::LcAll, "");
     }
-    gettextrs::bindtextdomain(GETTEXT_PACKAGE, LOCALEDIR)?;
+    gettextrs::bindtextdomain(GETTEXT_PACKAGE, locale_dir())?;
     gettextrs::textdomain(GETTEXT_PACKAGE)?;
     Ok(())
+}
+
+/// Kinora: where the translations are. The Windows build is a folder that
+/// can be anywhere, so there they are found next to `kinora.exe`
+/// (`share\locale`), not at the path it was built for.
+pub(crate) fn locale_dir() -> std::path::PathBuf {
+    #[cfg(windows)]
+    if let Some(root) = app_root() {
+        return root.join("share").join("locale");
+    }
+    std::path::PathBuf::from(LOCALEDIR)
+}
+
+/// Kinora: the Windows build's folder (the one holding `bin\kinora.exe`).
+#[cfg(windows)]
+fn app_root() -> Option<std::path::PathBuf> {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent()?.parent().map(|p| p.to_path_buf()))
 }
 
 fn init_icons<P: IsA<gdk::Display>>(display: &P) {
@@ -153,6 +174,18 @@ fn init_css() {
 /// Kinora: logs. On Windows there is no console: they go to
 /// `%LOCALAPPDATA%\\kinora\\kinora.log` (info and up unless RUST_LOG says).
 fn init_logging() {
+    // Kinora: a panic goes to the log too, with where it happened. On Windows
+    // there is no console: without this a crash leaves no trace at all.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let thread = std::thread::current();
+        log::error!(
+            "panic in thread {}: {info}\n{}",
+            thread.name().unwrap_or("<unnamed>"),
+            std::backtrace::Backtrace::force_capture()
+        );
+        default_hook(info);
+    }));
     #[cfg(windows)]
     {
         let dir = std::env::var_os("LOCALAPPDATA")
@@ -160,7 +193,14 @@ fn init_logging() {
             .unwrap_or_else(std::env::temp_dir)
             .join("kinora");
         let _ = std::fs::create_dir_all(&dir);
-        if let Ok(file) = std::fs::File::create(dir.join("kinora.log")) {
+        crashlog::install(&dir);
+        // A self-test keeps its own log: the app's last session stays readable.
+        let name = if std::env::args().any(|a| a == "--self-test") {
+            "kinora-self-test.log"
+        } else {
+            "kinora.log"
+        };
+        if let Ok(file) = std::fs::File::create(dir.join(name)) {
             env_logger::Builder::from_env(
                 env_logger::Env::default().default_filter_or("kinora=info,kinora_core=info"),
             )
@@ -177,16 +217,20 @@ fn init_logging() {
 /// introspection at it, unless set already.
 #[cfg(windows)]
 fn windows_environment() {
-    let Some(root) = std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent()?.parent().map(|p| p.to_path_buf()))
-    else {
+    let Some(root) = app_root() else {
         return;
     };
     let vars = [
         ("CLAPPER_ENHANCERS_PATH", root.join("lib/clapper-0.0/enhancers")),
         ("PYTHONHOME", root.clone()),
         ("GI_TYPELIB_PATH", root.join("lib/girepository-1.0")),
+        // MSYS2's GTK (4.24) is built without AccessKit, so on Windows every
+        // widget gets GTK's "test" accessibility context, whose announce is a
+        // null pointer: gtk_accessible_announce() (a page change, every
+        // AdwToast) then crashes. With no context at all GTK skips it. Nothing
+        // is lost: that GTK has no Windows screen reader support. A GTK with
+        // AccessKit should get GTK_A11Y=accesskit here instead.
+        ("GTK_A11Y", std::path::PathBuf::from("none")),
     ];
     for (name, value) in vars {
         if std::env::var_os(name).is_none() {
@@ -230,7 +274,15 @@ fn main() {
         }
     }
 
-    if gtk::gio::Settings::new(BASE_ID).boolean("cairo-software-renderer") {
+    // Kinora: without its settings schema GSettings aborts; say so in the log
+    // (and let `--self-test` report it) instead of dying here.
+    let schema_found = gtk::gio::SettingsSchemaSource::default()
+        .and_then(|source| source.lookup(BASE_ID, true))
+        .is_some();
+    if !schema_found {
+        log::error!("Settings schema {BASE_ID} not found");
+    }
+    if schema_found && gtk::gio::Settings::new(BASE_ID).boolean("cairo-software-renderer") {
         // Safety: At this point the application is still single-threaded.
         unsafe {
             std::env::set_var("GSK_RENDERER", "cairo");
@@ -259,11 +311,37 @@ fn main() {
         use gtk::gio::prelude::ApplicationExt;
         app.set_flags(gtk::gio::ApplicationFlags::NON_UNIQUE);
     }
+    // Kinora: `--self-test` checks the build on this machine and quits (see
+    // selftest.rs); it never hands over to a Kinora that is already open.
+    if let Some(options) = selftest::options() {
+        if !schema_found {
+            println!("[FAIL] settings schema: {BASE_ID} not found");
+            std::process::exit(1);
+        }
+        app.set_flags(gtk::gio::ApplicationFlags::NON_UNIQUE);
+        let options = std::cell::Cell::new(Some(options));
+        app.connect_activate(move |app| {
+            init_resources();
+            init_folders();
+            init_css();
+            if let Some(options) = options.take() {
+                selftest::run(app, options);
+            }
+        });
+        // Its options are not GTK's.
+        let argv0: Vec<String> = std::env::args().take(1).collect();
+        app.run_with_args(&argv0);
+        return;
+    }
+    if !schema_found {
+        // Nothing works without settings: GSettings would abort in the window.
+        std::process::exit(1);
+    }
     app.connect_activate(build_ui);
     app.run();
 }
 
-fn build_ui(app: &gtk::Application) {
+pub(crate) fn build_ui(app: &gtk::Application) {
     init_resources();
     init_folders();
     init_css();

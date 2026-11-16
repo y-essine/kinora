@@ -32,8 +32,12 @@ pub fn command(name: &str) -> Command {
 pub fn shell(line: &str) -> Command {
     #[cfg(windows)]
     {
+        // As typed: `cmd /S /C "line"` drops just the outer quotes. Passed as a
+        // normal argument, Rust's escaping would turn the line's own quotes
+        // into \" , which cmd does not read. The helpers are found as the
+        // `.cmd` launchers beside kinora.exe (kinora-account.cmd, ...).
         let mut command = Command::new("cmd");
-        command.arg("/C").arg(line);
+        command.raw_arg(format!("/S /C \"{line}\""));
         // Its helpers are found next to kinora.exe.
         let path = std::env::var_os("PATH").unwrap_or_default();
         let mut paths = vec![exe_dir()];
