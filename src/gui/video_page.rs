@@ -148,6 +148,11 @@ impl VideoPage {
         }
     }
 
+    /// Kinora: the page's player (for the app's MPRIS player).
+    pub fn clapper_player(&self) -> Option<clapper::Player> {
+        self.imp().clapper.player()
+    }
+
     pub fn play_pause(&self) {
         let player = self
             .imp()
@@ -427,6 +432,50 @@ impl VideoPage {
         );
     }
 
+    /// Test hook: toggle fullscreen (`window_mode`: fill the window only).
+    #[cfg(feature = "dev-hooks")]
+    pub fn dev_fullscreen(&self, window_mode: bool) {
+        self.imp().toggle_fullscreen_mode(window_mode);
+        log::info!("DEV: fullscreened {}", self.fullscreened());
+    }
+
+    /// Test hook: for every visible button on the page, log which widget a
+    /// click on its centre would reach (what `pick` finds there).
+    #[cfg(feature = "dev-hooks")]
+    pub fn dev_pick_buttons(&self) {
+        use gtk::prelude::*;
+        let Some(root) = self.root() else { return };
+        let root: gtk::Widget = root.upcast();
+        let mut stack: Vec<gtk::Widget> = vec![self.clone().upcast()];
+        let describe = |w: &gtk::Widget| {
+            format!("{}{:?}", w.type_().name(), w.css_classes().iter().map(|c| c.to_string()).collect::<Vec<_>>())
+        };
+        while let Some(w) = stack.pop() {
+            let mut c = w.first_child();
+            while let Some(child) = c {
+                c = child.next_sibling();
+                stack.push(child);
+            }
+            if !w.is::<gtk::Button>() || !w.is_drawable() {
+                continue;
+            }
+            let (ww, wh) = (w.width() as f32, w.height() as f32);
+            let Some(p) = w.compute_point(&root, &gtk::graphene::Point::new(ww / 2.0, wh / 2.0)) else { continue };
+            if p.x() < 0.0 || p.y() < 0.0 || p.x() > root.width() as f32 || p.y() > root.height() as f32 {
+                continue;
+            }
+            let picked = root.pick(p.x() as f64, p.y() as f64, gtk::PickFlags::DEFAULT);
+            let ok = picked.as_ref().is_some_and(|x| x == &w || x.is_ancestor(&w));
+            let name = w.downcast_ref::<gtk::Button>().and_then(|b| b.action_name()).map(|a| a.to_string()).or_else(|| w.tooltip_text().map(|t| t.to_string())).unwrap_or_default();
+            log::info!(
+                "DEV: pick {} {:?} at ({:.0},{:.0}): {}",
+                if ok { "OK " } else { "BLOCKED" },
+                name, p.x(), p.y(),
+                picked.map(|x| { let mut d = describe(&x); let mut a = x.parent(); for _ in 0..3 { if let Some(pa) = a { d.push_str(" < "); d.push_str(&describe(&pa)); a = pa.parent(); } } d }).unwrap_or_default()
+            );
+        }
+    }
+
     /// Test hook: jump to `seconds` before the end.
     #[cfg(feature = "dev-hooks")]
     pub fn dev_seek_near_end(&self, seconds: f64) {
@@ -573,10 +622,7 @@ impl VideoPage {
 pub mod imp {
     use std::cell::Cell;
     use std::cell::RefCell;
-    use std::collections::HashMap;
     use std::marker::PhantomData;
-    use std::sync::atomic::AtomicUsize;
-    use std::sync::atomic::Ordering;
 
     use adw::subclass::bin::BinImpl;
     use clapper_gtk::prelude::AvExt;
@@ -602,13 +648,11 @@ pub mod imp {
     use crate::backend::PlayType;
     use crate::backend::Video;
     use crate::backend::VideoSort;
-    use crate::config::APP_ID;
     use crate::config::BASE_ID;
     use crate::gspawn;
     use crate::gui::utility::Utility;
     use crate::gui::video_item::VideoItem;
 
-    static INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
     #[derive(CompositeTemplate, Properties)]
     #[template(resource = "/ui/video_page.ui")]
@@ -1470,27 +1514,14 @@ pub mod imp {
                 }
             ));
 
-            // Set up MPRIS
-            // Make sure that every instance of VideoPage gets its own own_name, otherwise having multiple videos opened at the same time (e.g. one in the bottom bar and one in the navigation stack) would overwrite each other.
+            // Kinora: no MPRIS player per page: the window has one for the
+            // app (see `gui/mpris.rs`).
             let player = self.clapper.player().expect("Clapper to have a Player");
-            let proxies = player.enhancer_proxies();
-            let mpris = proxies.and_then(|p| p.proxy_by_module("clapper-mpris"));
-
-            if let Some(mpris) = mpris {
-                mpris.set_locally(HashMap::from([
-                    ("app-id", &APP_ID.to_value()),
-                    (
-                        "own-name",
-                        &format!(
-                            "org.mpris.MediaPlayer2.kinora.instance{}",
-                            INSTANCE_COUNT.fetch_add(1, Ordering::Relaxed)
-                        )
-                        .to_value(),
-                    ),
-                    ("identity", &gettextrs::gettext("Kinora").to_value()),
-                    ("desktop-entry", &APP_ID.to_value()),
-                ]));
-                mpris.set_target_creation_allowed(true);
+            if let Some(mpris) = player
+                .enhancer_proxies()
+                .and_then(|p| p.proxy_by_module("clapper-mpris"))
+            {
+                mpris.set_target_creation_allowed(false);
             }
 
             player.connect_state_notify(clone!(

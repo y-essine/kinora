@@ -327,6 +327,8 @@ pub mod imp {
         dj: std::cell::OnceCell<crate::gui::dj::Dj>,
         /// The `player-previous` and `player-next` actions (see `update_transport`).
         transport: std::cell::OnceCell<(SimpleAction, SimpleAction)>,
+        /// The app's media player integration (see `gui/mpris.rs`).
+        mpris: std::cell::OnceCell<crate::gui::mpris::Mpris>,
         /// A DJ session is running.
         #[property(get, set)]
         dj_on: Cell<bool>,
@@ -375,6 +377,7 @@ pub mod imp {
                 watch_history_enabled: Default::default(),
                 dj: Default::default(),
                 transport: Default::default(),
+                mpris: Default::default(),
                 dj_on: Default::default(),
                 dj_available: Default::default(),
 
@@ -491,6 +494,9 @@ pub mod imp {
             if let Some((previous_action, next_action)) = self.transport.get() {
                 previous_action.set_enabled(previous);
                 next_action.set_enabled(next);
+            }
+            if let Some(mpris) = self.mpris.get() {
+                mpris.set_transport(previous, next);
             }
         }
 
@@ -1131,25 +1137,44 @@ pub mod imp {
                     );
                 });
             }
+            let dispatch = |o: &super::Window, name: &str| {
+                let name = name.to_owned();
+                // `video.NAME` goes to the open video page's own actions.
+                let (target, full): (gtk::Widget, String) =
+                    match name.strip_prefix("video.") {
+                        Some(_) => match super::dev_find_video_page(o.upcast_ref()) {
+                            Some(page) => (page, name.clone()),
+                            None => return,
+                        },
+                        None => (o.clone().upcast(), format!("win.{name}")),
+                    };
+                log::info!("DEV: action {full}");
+                let _ = gtk::prelude::WidgetExt::activate_action(&target, &full, None);
+            };
             if let Ok(list) = std::env::var("KH_ACTION") {
                 for item in list.split(',') {
                     let (name, secs) = item.split_once('@').unwrap_or((item, "1"));
                     let secs: u64 = secs.parse().unwrap_or(1);
                     let (o, name) = (obj.clone(), name.to_owned());
                     glib::timeout_add_local_once(std::time::Duration::from_secs(secs), move || {
-                        // `video.NAME` goes to the open video page's own actions.
-                        let (target, full): (gtk::Widget, String) =
-                            match name.strip_prefix("video.") {
-                                Some(_) => match super::dev_find_video_page(o.upcast_ref()) {
-                                    Some(page) => (page, name.clone()),
-                                    None => return,
-                                },
-                                None => (o.clone().upcast(), format!("win.{name}")),
-                            };
-                        log::info!("DEV: action {full}");
-                        let _ = gtk::prelude::WidgetExt::activate_action(&target, &full, None);
+                        dispatch(&o, &name)
                     });
                 }
+            }
+            // `KH_CTL=FILE`: actions written to FILE (one per line) run at once.
+            if let Ok(path) = std::env::var("KH_CTL") {
+                let o = obj.clone();
+                glib::timeout_add_local(std::time::Duration::from_millis(250), move || {
+                    if let Ok(text) = std::fs::read_to_string(&path)
+                        && !text.trim().is_empty()
+                    {
+                        let _ = std::fs::write(&path, "");
+                        for line in text.lines().map(str::trim).filter(|l| !l.is_empty()) {
+                            dispatch(&o, line);
+                        }
+                    }
+                    glib::ControlFlow::Continue
+                });
             }
         }
 
@@ -1973,7 +1998,23 @@ pub mod imp {
             // the queue's buttons applied to its third track.
             #[cfg(feature = "dev-hooks")]
             {
-                let dev_actions: [(&str, fn(&Self)); 9] = [
+                let dev_actions: [(&str, fn(&Self)); 13] = [
+                    ("dev-focus", |s| {
+                        let obj = s.obj();
+                        let focus = gtk::prelude::GtkWindowExt::focus(&*obj);
+                        let page = s.current_video_page();
+                        let inside = match (&focus, &page) {
+                            (Some(f), Some(p)) => f == p.upcast_ref::<gtk::Widget>() || f.is_ancestor(p),
+                            _ => false,
+                        };
+                        log::info!(
+                            "DEV: focus {:?} (in the current page: {inside})",
+                            focus.map(|f| f.type_().name())
+                        );
+                    }),
+                    ("dev-fullscreen", |s| { if let Some(p) = s.current_video_page() { p.dev_fullscreen(false) } }),
+                    ("dev-window-fullscreen", |s| { if let Some(p) = s.current_video_page() { p.dev_fullscreen(true) } }),
+                    ("dev-pick", |s| { if let Some(p) = s.current_video_page() { p.dev_pick_buttons() } }),
                     ("dj-queue-hover", |s| s.dj().dev_queue("hover")),
                     ("dj-show-video", |s| s.dj().dev_toggle_video()),
                     ("dj-show-queue", |s| {
@@ -2177,11 +2218,17 @@ pub mod imp {
         /// Kinora: the DJ, and whether it is offered (its extension is on).
         fn setup_dj(&self) {
             let obj = self.obj();
-            // Previous and Next follow what is in the player.
+            // Previous and Next follow what is in the player; so does MPRIS.
+            let _ = self.mpris.set(crate::gui::mpris::Mpris::new(&obj));
             self.player_sheet.connect_video_page_notify(clone!(
                 #[weak]
                 obj,
-                move |_| obj.imp().update_transport()
+                move |sheet| {
+                    if let Some(mpris) = obj.imp().mpris.get() {
+                        mpris.follow(sheet.video_page());
+                    }
+                    obj.imp().update_transport()
+                }
             ));
             obj.connect_dj_on_notify(|obj| obj.imp().update_transport());
             let _ = self.dj.set(crate::gui::dj::Dj::new(&obj));

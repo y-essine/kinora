@@ -13,6 +13,7 @@ mod finite_video_list;
 mod first_run;
 mod home_view;
 mod import_dialog;
+mod mpris;
 mod player_sheet;
 pub mod playlist_shelf;
 mod preferences_dialog;
