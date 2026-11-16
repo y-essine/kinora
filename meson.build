@@ -1,7 +1,7 @@
 project(
   'kinora',
   'rust',
-  version: '0.1.0-beta.5',
+  version: '0.1.0-beta.6',
   meson_version: '>= 0.59',
   license: 'GPL-3.0-or-later',
 )

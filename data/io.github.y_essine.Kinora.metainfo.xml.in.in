@@ -13,6 +13,11 @@
   <translation type="gettext">@gettext-package@</translation>
 
   <releases>
+    <release version="0.1.0-beta.6" date="2026-11-16" type="development">
+      <description translate="no">
+        <p>Kinora for Windows.</p> <ul> <li>A Windows build: unzip it anywhere and run bin\kinora.exe. It brings its own GTK, GStreamer, and Python with yt-dlp.</li> <li>Connect Account works on Windows with Firefox or a cookies.txt file (Chrome, Edge and Brave lock their cookies there).</li> <li>kinora --self-test checks an installation on its own: settings, plugins, playback, every page, and the account dialog.</li> <li>On Windows, a crash is recorded in crash.txt next to the log, and errors reach the log too.</li> <li>Fixed: a crash when a player was closed.</li> </ul>
+      </description>
+    </release>
     <release version="0.1.0-beta.5" date="2026-11-15" type="development">
       <description translate="no">
         <p>Previous and Next, and a DJ that mixes on every change.</p> <ul> <li>Previous and Next on the player, in fullscreen and on the mini-player.</li> <li>DJ: Next, Previous and picking a song in the queue all crossfade.</li> <li>The DJ plays audio with the album art by default (Show Video brings the videos back), and loads the next song ahead so it starts at once; resting the pointer on a queued song loads it too.</li> </ul>
