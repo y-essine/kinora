@@ -208,8 +208,10 @@ the parsers read, without tracking data, visitor data or playback URLs.
 
 What a frontend does: keep the `DjSession`; when a track starts, prepare `peek_next()` and plan
 the transition with the player's real duration; at `start_at` start the next track at volume 0
-and set both volumes from `gains(elapsed)` every ~50 ms for `fade`, then stop the old one (a cut:
-on end of stream); call `advance()` (or `skip()`), then refill in the background.
+and fade both on `gains(elapsed)` for `fade`, then stop the old one (a cut: on end of stream);
+call `advance()` (or `skip()`), then refill in the background. Fade in the audio itself if the
+player allows it (the GTK frontend does, see *The deck's audio*): a sound device's volume set
+every ~50 ms changes in steps, and every step is a small click.
 
 ### Beat matching
 
@@ -369,7 +371,9 @@ What was measured first, on a prepared HLS audio stream (GStreamer 1.28, Clapper
 - A seek costs 0.15 to 0.4 s of silence. Scratching by seeking is out of the question.
 - A GStreamer "instant rate change" keeps playing but is not taken up by `scaletempo`, and it
   breaks the position the player reports on these streams.
-- The sound device has taken in about 1.2 s more than is heard.
+- The sound device has taken in about 1.2 s more than is heard. A second of that is playbin's
+  queue after the audio filter (`aqueue`, at most 1 s), the rest the sound device's buffer and
+  the sound server's (measured with the `dev-latency` test hook).
 - A player's clock (the sound server's, for its stream) wanders in the first seconds it
   plays: by up to 3 % in rate and 70 ms in place, settling within about 8 s. A null sink
   recorded at a short latency (`parec --latency-msec=20`) does not show this, an ordinary
@@ -396,6 +400,18 @@ So:
     that and any other rate loses about 50 ms of audio, which the sound device puts right a
     second later with a gap (the same recording showed both). Between two other rates
     nothing is lost. A tap that is not engaged leaves the audio untouched;
+  - *fades the player's sound* (`Tap::fade_to`, `VideoPage::fade_gain` and `set_fade_gain`):
+    a gain applied to the samples where the tap's audio leaves playbin's queue (a probe on the
+    queue's output), so a change is heard in about 0.2 s instead of 1.2 s. A fade moves with the
+    audio, sample by sample, on an equal-power curve (the DJ's crossfade) or a raised cosine
+    (short ones); the main loop only starts it. Before, the DJ set both players' volumes every
+    50 ms: each step was a click (about five per 6 s crossfade on a steady recording), and a main
+    loop held up by a new page (100 to 500 ms in a release build) made the volume jump by as
+    much. `Tap::is_silent` says when a fade to silence has been heard (the heard position has
+    passed it), so the old player of a fade is paused and let go only then. After every flush
+    (a seek, an entry, a hand back) the sound comes in over 8 ms instead of with a click. A
+    pause asked for by the user (`VideoPage::play_pause`) fades out over 30 ms and pauses once
+    that is heard, and play fades back in; Clapper's own buttons on a video pause at once;
   - *says where the player really is* (`Tap::position`), to a few milliseconds: the
     pipeline's clock read through the segments the tap sent. Clapper's own `position` is
     refreshed a few times a second, and the position the sound device reports goes by the
@@ -415,8 +431,8 @@ So:
 - **Handing back** (`video_page.rs`, `scratch_step`): let go, the needle runs up to the
   recorded speed in the scratch itself. The player is told to seek (accurately, paused) to
   where the needle will be once it is nearly at speed, 0.8 s on or more; when the needle gets
-  there the player is told to play, and once it does it comes in over 64 ms while the scratch
-  goes out. A player that is slow to start is met further on instead. No seek is ever heard.
+  there the player is told to play, and it comes in over its first 64 ms of audio (its tap's
+  gain, set before it is told to play, and silent from the seek on) while the scratch goes out. A player that is slow to start is met further on instead. No seek is ever heard.
 - The scratch's sound device gets its volume said outright (the player's): a sound server
   gives a new stream the volume it remembers for the app, whatever that was.
 - Measured (the scripted scratch of the `dj-scratch` test hook, recorded off a null sink): 25 ms of

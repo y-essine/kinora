@@ -39,6 +39,121 @@ const OWN_TEMPO: f64 = 1.00002;
 /// 30 ms early). Measured with a click track, see docs/architecture.md.
 pub const STRETCH_LAG: f64 = 0.5;
 
+/// After a flush (a seek), the audio comes in over this long instead of at
+/// once: the first sample after a seek is a click otherwise.
+const RISE: f64 = 0.008;
+/// A gain set without a fade still moves over this long, so as not to click.
+const SNAP: f64 = 0.005;
+/// What went through the gain stage is heard within this long (the sound
+/// device's buffer, measured at about 0.2 s, and the sound server's).
+const HEARD_WITHIN: Duration = Duration::from_millis(500);
+
+/// How a gain goes from one value to another (see [`Tap::fade_to`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Curve {
+    /// Equal power: up as a sine, down as a cosine. Two of them make a
+    /// crossfade without a dip in loudness.
+    Power,
+    /// Slow at both ends (a raised cosine): short fades that only take a
+    /// click away.
+    Smooth,
+}
+
+impl Curve {
+    /// How far from `from` to `to` the gain is at `done` (0 to 1) of a fade.
+    fn at(self, from: f64, to: f64, done: f64) -> f64 {
+        let done = done.clamp(0.0, 1.0);
+        let share = match self {
+            Curve::Power if to >= from => (done * std::f64::consts::FRAC_PI_2).sin(),
+            Curve::Power => 1.0 - (done * std::f64::consts::FRAC_PI_2).cos(),
+            Curve::Smooth => 0.5 - 0.5 * (done * std::f64::consts::PI).cos(),
+        };
+        from + (to - from) * share
+    }
+}
+
+/// The tap's gain stage (see [`Tap::fade_to`]): a fade moves with the
+/// audio, sample by sample, so it is as smooth as the curve and as long as
+/// asked whatever the main loop is doing. Setting a sound device's volume
+/// instead steps it (every 50 ms, more when the main loop is held up), and
+/// every step is a small click.
+struct Gain {
+    from: f64,
+    to: f64,
+    curve: Curve,
+    /// The fade's length and how far it got, in seconds of audio.
+    length: f64,
+    done: f64,
+    /// After a flush: how far the audio has come in, in seconds (RISE: in).
+    risen: f64,
+    /// The format where the gain is applied (0: not known, or not float).
+    rate: u32,
+    channels: usize,
+    /// When a fade to silence was through, as the audio went by.
+    silent_since: Option<Instant>,
+    /// ...and from where in the track on (heard once the player is there).
+    silent_from: Option<f64>,
+    /// The segment of the audio where the gain is applied.
+    segment: Option<gst::FormattedSegment<gst::ClockTime>>,
+    /// The stage is in the pipeline (see `Tap::new`).
+    attached: bool,
+}
+
+impl Gain {
+    fn value_at(&self, done: f64) -> f64 {
+        if self.length <= 0.0 || done >= self.length {
+            self.to
+        } else {
+            self.curve.at(self.from, self.to, done / self.length)
+        }
+    }
+
+    fn value(&self) -> f64 {
+        self.value_at(self.done)
+    }
+
+    /// Apply to interleaved F32LE samples that start at `at` in the track,
+    /// and move on by as many frames.
+    fn apply(&mut self, bytes: &mut [u8], at: Option<f64>) {
+        let (rate, channels) = (self.rate as f64, self.channels.max(1));
+        let scale = |sample: &mut [u8], gain: f32| {
+            let value = f32::from_le_bytes([sample[0], sample[1], sample[2], sample[3]]) * gain;
+            sample.copy_from_slice(&value.to_le_bytes());
+        };
+        let frames = bytes.len() / (4 * channels);
+        let seconds = frames as f64 / rate;
+        if self.done >= self.length && self.risen >= RISE {
+            match self.to {
+                1.0 => {}
+                0.0 => bytes.fill(0),
+                g => bytes.chunks_exact_mut(4).for_each(|s| scale(s, g as f32)),
+            }
+        } else {
+            for (index, frame) in bytes.chunks_exact_mut(4 * channels).enumerate() {
+                let at = index as f64 / rate;
+                let rise = if self.risen + at < RISE {
+                    Curve::Smooth.at(0.0, 1.0, (self.risen + at) / RISE)
+                } else {
+                    1.0
+                };
+                let gain = (self.value_at(self.done + at) * rise) as f32;
+                frame.chunks_exact_mut(4).for_each(|s| scale(s, gain));
+            }
+        }
+        self.done = (self.done + seconds).min(self.length.max(0.0));
+        self.risen = (self.risen + seconds).min(RISE);
+        if self.to == 0.0 && self.done >= self.length && self.silent_since.is_none() {
+            self.silent_since = Some(Instant::now());
+            self.silent_from = at.map(|at| at + seconds);
+        }
+    }
+
+    /// Whether a buffer needs touching at all.
+    fn is_identity(&self) -> bool {
+        self.done >= self.length && self.risen >= RISE && self.to == 1.0
+    }
+}
+
 /// Decoded audio: interleaved 32-bit float samples.
 #[derive(Debug, Clone, Default)]
 pub struct Pcm {
@@ -181,6 +296,7 @@ struct Shared {
     channels: AtomicU32,
     ring: Mutex<Ring>,
     tempo: Mutex<Tempo>,
+    gain: Mutex<Gain>,
 }
 
 impl Shared {
@@ -235,7 +351,22 @@ impl Tap {
                 flow: None,
                 since_seek: Vec::new(),
             }),
+            gain: Mutex::new(Gain {
+                from: 1.0,
+                to: 1.0,
+                curve: Curve::Smooth,
+                length: 0.0,
+                done: 0.0,
+                risen: RISE,
+                rate: 0,
+                channels: 0,
+                silent_since: None,
+                silent_from: None,
+                segment: None,
+                attached: false,
+            }),
         });
+        attach_gain(&bin, &shared);
 
         // The player's segments and format, as they come by.
         sink.add_probe(
@@ -448,6 +579,143 @@ impl Tap {
                 .query_position::<gst::ClockTime>()
                 .map(|position| position.nseconds() as f64 / 1e9)
         })
+    }
+}
+
+/// Put the gain stage where the tap's audio goes once it is linked: on the
+/// far side of the queue that follows an audio filter in playbin (a second
+/// of audio). A gain changed there is heard in about 0.2 s, against 1.2 s
+/// inside the tap. Without such a queue, on the tap's own output.
+fn attach_gain(bin: &gst::Bin, shared: &Arc<Shared>) {
+    let Some(out) = bin.static_pad("src") else {
+        return;
+    };
+    let shared = Arc::downgrade(shared);
+    out.connect_linked(move |out, peer| {
+        let Some(shared) = shared.upgrade() else {
+            return;
+        };
+        let pad = peer
+            .parent_element()
+            .filter(|element| {
+                element
+                    .factory()
+                    .is_some_and(|factory| factory.name() == "queue")
+            })
+            .and_then(|queue| queue.static_pad("src"))
+            .unwrap_or_else(|| out.clone().upcast());
+        {
+            let mut gain = shared.gain.lock().unwrap();
+            if gain.attached {
+                return;
+            }
+            gain.attached = true;
+        }
+        let events = Arc::downgrade(&shared);
+        pad.add_probe(gst::PadProbeType::EVENT_DOWNSTREAM, move |_, info| {
+            let Some(shared) = events.upgrade() else {
+                return gst::PadProbeReturn::Remove;
+            };
+            match info.event().map(|e| e.view()) {
+                Some(gst::EventView::Caps(caps)) => {
+                    let mut gain = shared.gain.lock().unwrap();
+                    let s = caps.caps().structure(0);
+                    let float = s.is_some_and(|s| {
+                        s.get::<&str>("format").ok() == Some("F32LE")
+                            && s.get::<&str>("layout").ok() == Some("interleaved")
+                    });
+                    let number = |field| {
+                        s.and_then(|s| s.get::<i32>(field).ok())
+                            .unwrap_or(0)
+                            .max(0) as u32
+                    };
+                    (gain.rate, gain.channels) = if float {
+                        (number("rate"), number("channels") as usize)
+                    } else {
+                        (0, 0)
+                    };
+                }
+                // A seek: what comes next comes in softly.
+                Some(gst::EventView::Segment(event)) => {
+                    shared.gain.lock().unwrap().segment =
+                        event.segment().downcast_ref::<gst::ClockTime>().cloned();
+                }
+                Some(gst::EventView::FlushStop(_)) => {
+                    shared.gain.lock().unwrap().risen = 0.0;
+                }
+                _ => {}
+            }
+            gst::PadProbeReturn::Ok
+        });
+        let buffers = Arc::downgrade(&shared);
+        pad.add_probe(gst::PadProbeType::BUFFER, move |_, info| {
+            let Some(shared) = buffers.upgrade() else {
+                return gst::PadProbeReturn::Remove;
+            };
+            let mut gain = shared.gain.lock().unwrap();
+            if gain.is_identity() || gain.rate == 0 || gain.channels == 0 {
+                return gst::PadProbeReturn::Ok;
+            }
+            let Some(buffer) = info.buffer_mut() else {
+                return gst::PadProbeReturn::Ok;
+            };
+            let at = buffer
+                .pts()
+                .zip(gain.segment.as_ref())
+                .and_then(|(pts, segment)| segment.to_stream_time(pts))
+                .map(|time| time.nseconds() as f64 / 1e9);
+            if let Ok(mut map) = buffer.make_mut().map_writable() {
+                gain.apply(map.as_mut_slice(), at);
+            }
+            gst::PadProbeReturn::Ok
+        });
+    });
+}
+
+impl Tap {
+    /// Fade the player's sound to `gain` (linear, 0 to 1) over `over`, from
+    /// the next audio on: sample by sample, so without a step anywhere. What
+    /// is already on its way to the sound device (about 0.2 s) plays out
+    /// first. Zero length still takes a few milliseconds.
+    pub fn fade_to(&self, gain: f64, over: Duration, curve: Curve) {
+        let mut stage = self.shared.gain.lock().unwrap();
+        let now = stage.value();
+        stage.from = now;
+        stage.to = gain.clamp(0.0, 4.0);
+        stage.curve = curve;
+        stage.length = over.as_secs_f64().max(SNAP);
+        stage.done = 0.0;
+        if gain > 0.0 || now > 0.0 {
+            stage.silent_since = None;
+            stage.silent_from = None;
+        }
+    }
+
+    /// The gain the audio that goes through now gets.
+    pub fn gain(&self) -> f64 {
+        self.shared.gain.lock().unwrap().value()
+    }
+
+    /// The gain it is fading to.
+    pub fn gain_target(&self) -> f64 {
+        self.shared.gain.lock().unwrap().to
+    }
+
+    /// Faded to silence, and that has been heard: the player can be paused
+    /// or let go without a click. Known from where the player is when the
+    /// track position of the silence is known, else after a while.
+    pub fn is_silent(&self) -> bool {
+        let (since, from) = {
+            let stage = self.shared.gain.lock().unwrap();
+            (stage.silent_since, stage.silent_from)
+        };
+        let Some(since) = since else {
+            return false;
+        };
+        let heard = from
+            .zip(self.position())
+            .is_some_and(|(from, position)| position >= from + 0.01);
+        heard || since.elapsed() >= HEARD_WITHIN
     }
 }
 
@@ -700,5 +968,86 @@ impl Tap {
                 at + head as f64 / rate,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stage(rate: u32) -> Gain {
+        Gain {
+            from: 1.0,
+            to: 1.0,
+            curve: Curve::Smooth,
+            length: 0.0,
+            done: 0.0,
+            risen: RISE,
+            rate,
+            channels: 2,
+            silent_since: None,
+            silent_from: None,
+            segment: None,
+            attached: true,
+        }
+    }
+
+    fn bytes(samples: &[f32]) -> Vec<u8> {
+        samples.iter().flat_map(|s| s.to_le_bytes()).collect()
+    }
+
+    fn samples(bytes: &[u8]) -> Vec<f32> {
+        bytes
+            .chunks_exact(4)
+            .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+            .collect()
+    }
+
+    #[test]
+    fn a_crossfade_keeps_its_power() {
+        for step in 0..=20 {
+            let done = step as f64 / 20.0;
+            let out = Curve::Power.at(1.0, 0.0, done);
+            let inn = Curve::Power.at(0.0, 1.0, done);
+            assert!((out * out + inn * inn - 1.0).abs() < 1e-9, "at {done}");
+        }
+        assert_eq!(Curve::Smooth.at(0.2, 0.8, 0.0), 0.2);
+        assert!((Curve::Smooth.at(0.2, 0.8, 1.0) - 0.8).abs() < 1e-12);
+    }
+
+    #[test]
+    fn a_fade_moves_sample_by_sample_across_buffers() {
+        // 1 s down to silence at 1 kHz, in buffers of 10 ms of a steady signal.
+        let mut gain = stage(1000);
+        (gain.from, gain.to, gain.curve, gain.length, gain.done) =
+            (1.0, 0.0, Curve::Power, 1.0, 0.0);
+        let mut heard = Vec::new();
+        for _ in 0..120 {
+            let mut buffer = bytes(&[1.0; 20]);
+            gain.apply(&mut buffer, Some(0.0));
+            heard.extend(samples(&buffer).into_iter().step_by(2));
+        }
+        let largest_step = heard
+            .windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .fold(0.0f32, f32::max);
+        // An even fade of 1000 samples steps by about 1/637 at most.
+        assert!(largest_step < 0.002, "step {largest_step}");
+        assert!(heard[999] < 0.002 && heard[1000..].iter().all(|&s| s == 0.0));
+        assert!(gain.silent_since.is_some());
+    }
+
+    #[test]
+    fn after_a_flush_the_sound_comes_in() {
+        let mut gain = stage(1000);
+        assert!(gain.is_identity());
+        gain.risen = 0.0;
+        let mut buffer = bytes(&[0.5; 40]);
+        gain.apply(&mut buffer, None);
+        let heard: Vec<f32> = samples(&buffer).into_iter().step_by(2).collect();
+        assert_eq!(heard[0], 0.0);
+        assert!(heard.windows(2).all(|w| w[1] >= w[0]));
+        assert_eq!(heard[19], 0.5);
+        assert!(gain.is_identity());
     }
 }

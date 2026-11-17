@@ -1040,6 +1040,28 @@ pub mod imp {
                 log::info!("DEV: click at {x:.0},{y:.0} -> {}", path.join(" < "));
             });
             obj.add_controller(clicks);
+            // `KH_STALLS=MS`: log every time the main loop was held up for
+            // longer than MS (default 50): what makes the picture jitter,
+            // and the DJ's timers late.
+            if let Ok(ms) = std::env::var("KH_STALLS") {
+                let limit = std::time::Duration::from_millis(ms.parse().unwrap_or(50));
+                let last = std::cell::Cell::new(std::time::Instant::now());
+                glib::timeout_add_local(std::time::Duration::from_millis(10), move || {
+                    let now = std::time::Instant::now();
+                    let late = now.duration_since(last.replace(now));
+                    if late > limit {
+                        let epoch = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default();
+                        log::info!(
+                            "DEV: main loop stalled for {} ms (until {:.3})",
+                            late.as_millis(),
+                            epoch.as_secs_f64()
+                        );
+                    }
+                    glib::ControlFlow::Continue
+                });
+            }
             let obj_open = obj.clone();
             if let Ok(page) = std::env::var("KH_PAGE") {
                 self.main_stack.set_visible_child_name(&page);
@@ -2026,7 +2048,7 @@ pub mod imp {
                 // The Dev panel (see `gui/devtools`): Ctrl+Shift+D, `dev-panel`
                 // and `dev-dump`.
                 crate::gui::devtools::attach(obj);
-                let dev_actions: [(&str, fn(&Self)); 19] = [
+                let dev_actions: [(&str, fn(&Self)); 20] = [
                     ("dev-panel", |s| crate::gui::devtools::toggle(&s.obj())),
                     ("dev-dump", |s| crate::gui::devtools::dump(&s.obj())),
                     ("dev-focus", |s| {
@@ -2075,6 +2097,11 @@ pub mod imp {
                     }),
                     ("dj-log", |s| s.dj().dev_log()),
                     ("dev-trim", |_| crate::memory::trim()),
+                    ("dev-latency", |s| {
+                        if let Some(page) = s.current_video_page() {
+                            page.dev_log_latency();
+                        }
+                    }),
                     ("dj-queue-play-next", |s| s.dj().dev_queue("play-next")),
                     ("dj-queue-remove", |s| s.dj().dev_queue("remove")),
                     ("dj-queue-play-now", |s| s.dj().dev_queue("play-now")),

@@ -10,8 +10,10 @@
 //!   planned from the player's real length;
 //! - shortly before the planned start, the next track's page is opened *over*
 //!   the current one, which keeps playing without its picture. Once the new
-//!   player really plays, both volumes follow the plan's equal-power curve
-//!   every 50 ms; then the old player is paused and let go;
+//!   player really plays, both fade on the plan's equal-power curve, in the
+//!   audio itself (each page's `Tap`, sample by sample: no steps, and no
+//!   jumps when the main loop is held up); once the old one is heard to be
+//!   silent, it is paused and let go;
 //! - a cut (short or live tracks, crossfade off) waits for the end of stream;
 //! - Next and Previous are the same crossfade, asked for by hand: it starts as
 //!   soon as the other track plays, over the crossfade setting;
@@ -53,8 +55,13 @@ use crate::gui::window::Window;
 
 /// How often the loop looks at the player.
 const TICK: Duration = Duration::from_millis(200);
-/// How often the volumes are set during a fade.
+/// How often a fade is looked at (and, for a player without a tap, its
+/// volume set).
 const FADE_STEP: Duration = Duration::from_millis(50);
+/// A fade cut short (another change of track) ends this quickly.
+const FADE_CUT_SHORT: Duration = Duration::from_millis(150);
+/// A player that faded out is let go once that was heard, or after this.
+const SILENT_TIMEOUT: Duration = Duration::from_millis(1500);
 /// The next player is opened this long before the planned start: about what
 /// a prepared stream needs to begin playing.
 const LEAD: Duration = Duration::from_millis(2000);
@@ -105,6 +112,9 @@ const BEATS_WAIT: Duration = Duration::from_millis(300);
 /// The incoming player is given this long to come to rest before it is let
 /// go on the beat.
 const REST_TIMEOUT: Duration = Duration::from_millis(1500);
+/// A held track that is let go later than this after its beat waits for
+/// the next one instead.
+const LET_GO_LATE: Duration = Duration::from_millis(15);
 /// The incoming track is held at least this long, in seconds.
 const SHORTEST_HOLD: f64 = 0.04;
 /// From telling a held player to play until it is heard, in seconds (measured:
@@ -163,6 +173,10 @@ struct BeatSync {
     /// The incoming track plays at the matched tempo from here on, in seconds.
     matched_from: f64,
     hold: Option<glib::SourceId>,
+    /// When the hold should end, and how many times a late end was put off
+    /// to the next beat.
+    due: Option<Instant>,
+    reheld: u8,
     /// When the incoming track was let go.
     let_go: Option<Instant>,
     /// The last readings of how far the beats are apart, and those that
@@ -535,6 +549,9 @@ struct Fade {
     began: Instant,
     /// Set once the incoming player plays: the curve, and when it started.
     running: Option<(TransitionPlan, Instant)>,
+    /// The loop sets the players' volumes on the curve, step by step (a
+    /// player without a tap); else the taps fade the audio themselves.
+    stepped: bool,
     steps: u32,
     timer: glib::SourceId,
     /// How ready the incoming track was: "warm", "prepared" or "cold".
@@ -672,6 +689,38 @@ impl Dj {
             .filter(|v| v.platform() == "youtube");
         let seed = seed.unwrap_or_else(|| client.dj_seed(video.as_ref()));
         log::info!("DJ: starting from {seed:?}");
+        // Test hook: `KH_DJ_OFFLINE=1` makes up a playlist of test tracks
+        // instead of asking YouTube Music (their streams come from whatever
+        // `kinora-prepare` is on the PATH, and `KH_MEDIA_FALLBACK`).
+        #[cfg(feature = "dev-hooks")]
+        if std::env::var("KH_DJ_OFFLINE").is_ok() {
+            let tracks = (0..40)
+                .map(|n| Track {
+                    id: format!("kinoratst{n:02}"),
+                    title: format!("Test track {n}"),
+                    artists: Vec::new(),
+                    album: None,
+                    duration: Some(Duration::from_secs(170)),
+                    thumbnail: None,
+                    year: None,
+                    kind: kinora_core::dj::TrackKind::Song,
+                })
+                .collect();
+            let page = kinora_core::dj::RadioPage {
+                tracks,
+                continuation: None,
+                source: RadioSource::Music,
+                personal: false,
+            };
+            let seed = DjSeed::Playlist {
+                id: "PLkinoratest".into(),
+                title: Some("Test tracks".into()),
+                shuffle: false,
+            };
+            let session = DjSession::start(seed.clone(), Default::default(), page);
+            self.begin(session, seed);
+            return;
+        }
         self.0.starting.set(true);
         let dj = self.clone();
         let generation = self.0.generation.get();
@@ -1118,6 +1167,7 @@ impl Dj {
             wanted,
             began: Instant::now(),
             running: None,
+            stepped: false,
             steps: 0,
             timer,
             readiness,
@@ -1236,6 +1286,8 @@ impl Dj {
             asked: Instant::now(),
             matched_from: 0.0,
             hold: None,
+            due: None,
+            reheld: 0,
             let_go: None,
             readings: Vec::new(),
             errors: Vec::new(),
@@ -1281,6 +1333,7 @@ impl Dj {
         );
         sync.matched_from = matched_from;
         sync.stage = Stage::Held;
+        sync.due = Some(Instant::now() + Duration::from_secs_f64(wait.max(0.0)));
         let dj = Rc::downgrade(&self.0);
         sync.hold = Some(glib::timeout_add_local_once(
             Duration::from_secs_f64(wait.max(0.0)),
@@ -1302,6 +1355,19 @@ impl Dj {
             return;
         };
         sync.hold = None;
+        // The main loop was held up (a new page is being laid out, often
+        // just then): let go now and the track starts off the beat by as
+        // much. The next beat is better.
+        let late = sync.due.map_or(Duration::ZERO, |due| due.elapsed());
+        if late > LET_GO_LATE && sync.reheld < 3 {
+            sync.reheld += 1;
+            log::info!(
+                "DJ: the beat came {:.0} ms ago (the main loop was busy): holding for the next one",
+                late.as_secs_f64() * 1000.0
+            );
+            self.hold_for_the_beat(fade);
+            return;
+        }
         sync.stage = Stage::Matched;
         sync.let_go = Some(Instant::now());
         if fade.incoming.is_warm_held() {
@@ -1433,9 +1499,14 @@ impl Dj {
             self.end_fade(false);
             return glib::ControlFlow::Break;
         }
-        let gains = plan.gains(elapsed);
-        fade.outgoing.set_fade_gain(Some(gains.outgoing));
-        fade.incoming.set_fade_gain(Some(gains.incoming));
+        let gains = if fade.stepped {
+            let gains = plan.gains(elapsed);
+            fade.outgoing.set_fade_gain(Some(gains.outgoing));
+            fade.incoming.set_fade_gain(Some(gains.incoming));
+            (gains.outgoing, gains.incoming)
+        } else {
+            (fade.outgoing.fade_level(), fade.incoming.fade_level())
+        };
         let beats = fade
             .sync
             .as_mut()
@@ -1444,7 +1515,7 @@ impl Dj {
         crate::gui::devtools::fade_sample(
             elapsed.as_secs_f64(),
             plan.fade.as_secs_f64(),
-            (gains.outgoing, gains.incoming),
+            gains,
             beats,
             fade.incoming.tempo(),
         );
@@ -1454,8 +1525,8 @@ impl Dj {
                 "DJ: fade {:.2}/{:.2} s  out {:.2}  in {:.2}{}",
                 elapsed.as_secs_f64(),
                 plan.fade.as_secs_f64(),
-                gains.outgoing,
-                gains.incoming,
+                gains.0,
+                gains.1,
                 beats.map_or(String::new(), |(error, settled)| format!(
                     "  beats {:+.0} ms{}  tempo {:.3}",
                     error * 1000.0,
@@ -1481,7 +1552,15 @@ impl Dj {
         if remove_timer {
             fade.timer.remove();
         }
-        fade.incoming.set_fade_gain(None);
+        // Cut short (another change of track), the fade ends quickly but
+        // not at once; else both are where the fade took them already.
+        let cut_short = !fade.stepped && fade.incoming.fade_level() < 0.98;
+        if cut_short && fade.running.is_some() {
+            fade.incoming.fade_gain(1.0, FADE_CUT_SHORT);
+            fade.outgoing.fade_gain(0.0, FADE_CUT_SHORT);
+        } else {
+            fade.incoming.set_fade_gain(None);
+        }
         start_held(&fade.incoming);
         if let Some(mut sync) = fade.sync {
             if let Some(hold) = sync.hold.take() {
@@ -1501,8 +1580,11 @@ impl Dj {
             }
         }
         log::info!("DJ: fade done; releasing the old player");
-        fade.outgoing.set_fade_gain(Some(0.0));
-        release(fade.outgoing);
+        // (Faded by its tap, it gets to silence by itself.)
+        if fade.stepped || fade.running.is_none() {
+            fade.outgoing.set_fade_gain(Some(0.0));
+        }
+        release_when_silent(fade.outgoing);
         self.changed();
     }
 
@@ -1984,6 +2066,25 @@ fn release(page: VideoPage) {
     page.retire();
 }
 
+/// Let a page go once it is heard to be silent (it was faded out): pausing
+/// a player that is still heard is a click.
+fn release_when_silent(page: VideoPage) {
+    let since = Instant::now();
+    let mut page = Some(page);
+    glib::timeout_add_local(FADE_STEP, move || {
+        let silent = page
+            .as_ref()
+            .is_none_or(|page| page.is_faded_out() || since.elapsed() >= SILENT_TIMEOUT);
+        if !silent {
+            return glib::ControlFlow::Continue;
+        }
+        if let Some(page) = page.take() {
+            release(page);
+        }
+        glib::ControlFlow::Break
+    });
+}
+
 /// Start a warm track that was held back for its beat (see
 /// `Dj::hold_for_beats`); nothing for any other.
 fn start_held(page: &VideoPage) {
@@ -2014,7 +2115,20 @@ fn begin_fade(fade: &mut Fade) {
         )),
         over.as_secs_f64()
     );
-    fade.running = Some((fade_plan(over), Instant::now()));
+    let plan = fade_plan(over);
+    if !plan.is_cut() {
+        // Both fade in their own audio, from what they play next on (about
+        // 0.2 s from now for both: what the sound device holds plays first).
+        let outgoing = fade.outgoing.fade_gain(0.0, plan.fade);
+        let incoming = fade.incoming.fade_gain(1.0, plan.fade);
+        fade.stepped = !(outgoing && incoming);
+        if fade.stepped {
+            // (One of them cannot: both go by the loop's steps then.)
+            fade.outgoing.set_fade_gain(Some(1.0));
+            fade.incoming.set_fade_gain(Some(0.0));
+        }
+    }
+    fade.running = Some((plan, Instant::now()));
 }
 
 /// A fade of `over` that starts now (a cut when there is nothing to fade).
