@@ -1696,7 +1696,8 @@ pub mod imp {
             if quiet || self.dj_seek_pending.borrow().is_some() {
                 return;
             }
-            self.dj_seek.set_value(fraction);
+            self.dj_seek
+                .set_value(if fraction.is_finite() { fraction.clamp(0.0, 1.0) } else { 0.0 });
             self.dj_elapsed.set_label(&clock(obj.position_secs()));
             self.dj_length
                 .set_label(&obj.duration_secs().map(clock).unwrap_or_default());
@@ -1709,12 +1710,14 @@ pub mod imp {
             if due && self.dj_seek.is_mapped() {
                 self.dj_buffered_at.set(Some(now));
                 let until = match (obj.duration_secs(), self.clapper.player()) {
-                    (Some(duration), Some(player)) => {
+                    (Some(duration), Some(player)) if duration > 0.0 => {
                         crate::gui::buffer_bar::buffered_ahead(&player)
                             .map_or(0.0, |ahead| (player.position() + ahead) / duration)
                     }
                     _ => 0.0,
                 };
+                // A GLib double property aborts the app on NaN or infinity.
+                let until = if until.is_finite() { until.clamp(0.0, 1.0) } else { 0.0 };
                 self.dj_seek.set_buffered(until);
             }
         }
