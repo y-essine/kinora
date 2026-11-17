@@ -50,6 +50,9 @@ gtk::glib::wrapper! {
             gtk::ConstraintTarget;
 }
 
+/// Kinora: a pause (and the play after it) fades over this long, in ms.
+const SOFT_PAUSE_MS: u64 = 30;
+
 impl VideoPage {
     pub fn new(video: &Video, client: &Client) -> Self {
         Object::builder()
@@ -237,9 +240,71 @@ impl VideoPage {
             .player()
             .expect("Clapper does not have a player");
         match player.state() {
-            clapper::PlayerState::Paused => player.play(),
-            clapper::PlayerState::Playing => player.pause(),
+            clapper::PlayerState::Paused => {
+                self.come_back_in();
+                player.play();
+            }
+            // Asked again while it fades out: it plays on.
+            clapper::PlayerState::Playing if self.imp().soft_pause.borrow().is_some() => {
+                if let Some(timer) = self.imp().soft_pause.take() {
+                    timer.remove();
+                }
+                self.come_back_in();
+            }
+            clapper::PlayerState::Playing => self.pause_softly(&player),
             _ => {}
+        }
+    }
+
+    /// Kinora: pause after a short fade, heard to the end: a sound cut off
+    /// in the middle is a click. It takes as long as the sound device holds
+    /// (about 0.2 s). While the DJ fades the player, it pauses at once.
+    fn pause_softly(&self, player: &clapper::Player) {
+        const LONGEST: std::time::Duration = std::time::Duration::from_millis(700);
+        let imp = self.imp();
+        let Some(tap) = imp.tap().filter(|_| !self.is_faded()) else {
+            player.pause();
+            return;
+        };
+        tap.fade_to(
+            0.0,
+            std::time::Duration::from_millis(SOFT_PAUSE_MS),
+            crate::gui::deck_audio::Curve::Smooth,
+        );
+        imp.soft_paused.set(true);
+        let since = std::time::Instant::now();
+        let page = glib::prelude::ObjectExt::downgrade(self);
+        let timer = glib::timeout_add_local(std::time::Duration::from_millis(10), move || {
+            let Some(page) = page.upgrade() else {
+                return glib::ControlFlow::Break;
+            };
+            let imp = page.imp();
+            if !imp.tap().is_none_or(|tap| tap.is_silent()) && since.elapsed() < LONGEST {
+                return glib::ControlFlow::Continue;
+            }
+            imp.soft_pause.take();
+            if let Some(player) = imp.clapper.player() {
+                player.pause();
+            }
+            glib::ControlFlow::Break
+        });
+        if let Some(old) = imp.soft_pause.replace(Some(timer)) {
+            old.remove();
+        }
+    }
+
+    /// Kinora: after a soft pause the sound comes back in as softly, however
+    /// the player was told to play.
+    fn come_back_in(&self) {
+        let imp = self.imp();
+        if imp.soft_paused.replace(false)
+            && let Some(tap) = imp.tap()
+        {
+            tap.fade_to(
+                1.0,
+                std::time::Duration::from_millis(SOFT_PAUSE_MS),
+                crate::gui::deck_audio::Curve::Smooth,
+            );
         }
     }
 
@@ -833,11 +898,24 @@ impl VideoPage {
     }
 
     /// The DJ's crossfade: play at `gain` (linear amplitude, 0 to 1) of the
-    /// user's volume. While a gain is set, the player's volume is the DJ's:
-    /// it is taken off the `player-volume` setting, which two players fading
-    /// against each other would otherwise fight over. `None` hands it back.
+    /// user's volume, from the next audio on (`None`: at the user's volume
+    /// again). It is done by the page's [`Tap`](crate::gui::deck_audio::Tap),
+    /// in the audio itself, over a few milliseconds so as not to click; see
+    /// [`Self::fade_gain`] for a fade.
+    ///
+    /// Without a tap the player's volume is the DJ's instead while a gain is
+    /// set: it is taken off the `player-volume` setting, which two players
+    /// fading against each other would otherwise fight over.
     pub fn set_fade_gain(&self, gain: Option<f64>) {
         let imp = self.imp();
+        if let Some(tap) = imp.tap() {
+            tap.fade_to(
+                gain.unwrap_or(1.0),
+                std::time::Duration::ZERO,
+                crate::gui::deck_audio::Curve::Smooth,
+            );
+            return;
+        }
         let Some(player) = imp.clapper.player() else {
             return;
         };
@@ -864,6 +942,44 @@ impl VideoPage {
                 }
             }
         }
+    }
+
+    /// Kinora: fade to `gain` over `over`, on an equal-power curve (the
+    /// DJ's crossfade), sample by sample from the next audio on. `false`:
+    /// this page cannot (no tap), and the caller steps the volume itself
+    /// with [`Self::set_fade_gain`].
+    pub fn fade_gain(&self, gain: f64, over: std::time::Duration) -> bool {
+        let Some(tap) = self.imp().tap() else {
+            return false;
+        };
+        tap.fade_to(gain, over, crate::gui::deck_audio::Curve::Power);
+        true
+    }
+
+    /// Kinora: the gain the player's audio gets now (1 without a fade).
+    pub fn fade_level(&self) -> f64 {
+        let imp = self.imp();
+        match imp.tap() {
+            Some(tap) => tap.gain(),
+            None => imp.fade_base.get().map_or(1.0, |base| {
+                let volume = imp.clapper.player().map_or(0.0, |p| p.volume());
+                (volume / base.max(1e-6)).powi(3)
+            }),
+        }
+    }
+
+    /// Kinora: the DJ has this player's sound faded (or fading) below the
+    /// user's volume.
+    pub fn is_faded(&self) -> bool {
+        let imp = self.imp();
+        imp.fade_base.get().is_some() || imp.tap().is_some_and(|tap| tap.gain_target() < 1.0)
+    }
+
+    /// Kinora: faded to silence, and that was heard: pausing it now makes no
+    /// click. (Without a tap the volume is the sound server's, which is
+    /// heard at once.)
+    pub fn is_faded_out(&self) -> bool {
+        self.imp().tap().is_none_or(|tap| tap.is_silent())
     }
 
     /// Put the DJ's widgets into its page (`None` takes them out again): its
@@ -1015,6 +1131,8 @@ pub mod imp {
     /// A player that was told to play and is not heard after this long is
     /// late, in milliseconds.
     const HAND_BACK_PATIENCE: u128 = 250;
+    /// The player's sound comes in over this long, in milliseconds.
+    const HAND_BACK_FADE: u64 = 64;
 
     /// The DJ's record in a hand (see `deck_hand`).
     pub(super) struct ScratchSession {
@@ -1229,6 +1347,10 @@ pub mod imp {
         pub(super) scratch: RefCell<Option<ScratchSession>>,
         /// The player's sound coming back in after a scratch.
         pub(super) scratch_ramp: RefCell<Option<glib::SourceId>>,
+        /// Kinora: a pause that waits for its fade to be heard, and that the
+        /// sound was faded for one (see `VideoPage::pause_softly`).
+        pub(super) soft_pause: RefCell<Option<glib::SourceId>>,
+        pub(super) soft_paused: Cell<bool>,
         /// Kinora: the page is shrunk into the mini-player (see `player_sheet.rs`).
         #[property(get, set)]
         minimized: Cell<bool>,
@@ -1313,6 +1435,8 @@ pub mod imp {
                 playing_uri: Default::default(),
                 scratch: Default::default(),
                 scratch_ramp: Default::default(),
+                soft_pause: Default::default(),
+                soft_paused: Default::default(),
                 minimized: Default::default(),
                 double_click: Default::default(),
                 stage_clamp: Default::default(),
@@ -1581,7 +1705,7 @@ pub mod imp {
             // (Not while the DJ fades this track, or holds it ready.)
             let state = obj.player_state();
             if !self.vinyl()
-                || self.fade_base.get().is_some()
+                || obj.is_faded()
                 || self.warming.get()
                 || !matches!(
                     state,
@@ -1842,6 +1966,9 @@ pub mod imp {
                     released.seek_done.set(false);
                     released.seeks += 1;
                     released.target = Some(target);
+                    // Silent from the seek on: the first audio it gets ready
+                    // is not to be heard before the fade below.
+                    obj.set_fade_gain(Some(0.0));
                     player.seek_custom(target, clapper::PlayerSeekMethod::Accurate);
                 }
                 Some(target) if ready || give_up => {
@@ -1860,8 +1987,17 @@ pub mod imp {
                             if engine.starved() { ", out of audio" } else { "" }
                         );
                         drop(slot);
-                        // Silent until it is heard to play (see above).
-                        obj.set_fade_gain(Some(0.0));
+                        match self.tap() {
+                            // It comes in over its first audio, which is
+                            // heard as soon as it plays.
+                            Some(tap) => tap.fade_to(
+                                1.0,
+                                std::time::Duration::from_millis(HAND_BACK_FADE),
+                                crate::gui::deck_audio::Curve::Smooth,
+                            ),
+                            // Silent until it is heard to play (see above).
+                            None => obj.set_fade_gain(Some(0.0)),
+                        }
                         player.play();
                         return glib::ControlFlow::Continue;
                     }
@@ -1875,6 +2011,10 @@ pub mod imp {
 
         /// The player plays again: its sound comes in as the needle's goes.
         fn fade_in(&self) {
+            // (With a tap it is coming in already, see `scratch_step`.)
+            if self.tap().is_some() {
+                return;
+            }
             let obj = self.obj();
             let step = Cell::new(0u32);
             let ramp = glib::timeout_add_local(
@@ -1912,7 +2052,13 @@ pub mod imp {
                 timer.remove();
             }
             if let Some(released) = session.released.take() {
+                let silenced = released.target.is_some();
                 released.forget(self.clapper.player().as_ref());
+                // (It was made silent for the hand back; whatever came of
+                // that, it is heard again.)
+                if silenced && self.tap().is_some() {
+                    self.obj().set_fade_gain(None);
+                }
             }
             if let Some(ramp) = self.scratch_ramp.take() {
                 ramp.remove();
@@ -2848,7 +2994,13 @@ pub mod imp {
             player.connect_state_notify(clone!(
                 #[weak]
                 obj,
-                move |_player| {
+                move |player| {
+                    // (Played again some other way after a soft pause.)
+                    if player.state() == clapper::PlayerState::Playing
+                        && obj.imp().soft_pause.borrow().is_none()
+                    {
+                        obj.come_back_in();
+                    }
                     obj.notify_state();
                 }
             ));

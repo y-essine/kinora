@@ -102,6 +102,11 @@ There is one player. Whatever is opened next plays in it.
    Shrinking it only scales and moves what is already drawn (the GPU's work),
    so a transition lays nothing out again and an idle mini-player costs what a
    small video costs.
+5. **The sound never clicks.** Pause fades the sound out over 30 ms and stops
+   once that is heard (about 0.2 s after the press); play fades it back in.
+   After a seek the sound comes in over 8 ms. Every fade is in the audio
+   itself, sample by sample. (Clapper's own play button on a video pauses at
+   once.)
 
 ### States
 
@@ -351,7 +356,9 @@ hovered one). A warm track starts in about 0.1 s.
   - Nothing to see: it is only heard.
 - A track **crossfades** into the next over the *Crossfade* setting (0 to 12 s, a slider in Preferences →
   Extensions; short tracks fade shorter, live and very short ones cut). The
-  curve is equal power, so the loudness does not dip halfway.
+  curve is equal power, so the loudness does not dip halfway, and smooth: the
+  fade is in the audio, sample by sample, without steps, whatever else the
+  app is busy with. The old track is let go once its silence is heard.
 - The picture **changes record**: the next track's page takes the sheet about
   2 s before the fade is due (its record drops in; the arm waits at its rest
   until the track plays), and the old track plays on unseen until it has
