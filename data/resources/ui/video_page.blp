@@ -446,19 +446,20 @@ template $TFVideoPage: Adw.Bin {
             orientation: vertical;
           }
 
-          Scale dj_seek {
+          // The line of the track: a wave as far as it has played (see
+          // gui/wavy_bar.rs).
+          $TFWavyBar dj_seek {
             styles [
               "k-dj-seek",
             ]
 
             tooltip-text: _("Seek");
+            // (Shrunk into the mini-player, the line is out of sight.)
+            playing: bind $dj_line_moves(template.state, template.minimized) as <bool>;
 
-            adjustment: Adjustment {
-              lower: 0;
-              upper: 1;
-              step-increment: 0.02;
-              page-increment: 0.1;
-            };
+            accessibility {
+              label: _("Seek");
+            }
           }
 
           Box {
@@ -485,18 +486,18 @@ template $TFVideoPage: Adw.Bin {
             }
           }
 
+          // Previous, Play/Pause, Next: Material's large buttons (see
+          // gui/ripple_button.rs; the shapes are in style.css).
           Box {
             styles [
               "k-dj-transport",
             ]
 
             halign: center;
-            spacing: 28;
+            spacing: 16;
 
-            Button {
+            $TFRippleButton {
               styles [
-                "circular",
-                "flat",
                 "k-dj-step",
               ]
 
@@ -506,9 +507,8 @@ template $TFVideoPage: Adw.Bin {
               valign: center;
             }
 
-            Button dj_play {
+            $TFRippleButton dj_play {
               styles [
-                "circular",
                 "k-dj-play",
               ]
 
@@ -518,10 +518,8 @@ template $TFVideoPage: Adw.Bin {
               valign: center;
             }
 
-            Button {
+            $TFRippleButton {
               styles [
-                "circular",
-                "flat",
                 "k-dj-step",
               ]
 

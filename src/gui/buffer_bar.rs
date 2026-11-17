@@ -91,6 +91,21 @@ pub fn attach(video: &clapper_gtk::Video) {
     });
 }
 
+/// Seconds loaded ahead of `player`'s playhead, when anything can tell (for a
+/// bar of our own: see `gui/wavy_bar.rs`).
+pub fn buffered_ahead(player: &clapper::Player) -> Option<f64> {
+    let pipeline = player.audio_sink().and_then(|s| top_bin(&s))?;
+    let ahead = match find_demux(&pipeline) {
+        Some(demux) => demux_level(&demux),
+        None => {
+            let position = player.position();
+            buffered_until(&pipeline, position)? - position
+        }
+    };
+    log::debug!("Buffered (audio): {ahead:.1} s ahead");
+    (ahead > 0.0).then_some(ahead)
+}
+
 fn cached<T: IsA<glib::Object>>(
     slot: &mut Option<glib::WeakRef<T>>,
     find: impl FnOnce() -> Option<T>,

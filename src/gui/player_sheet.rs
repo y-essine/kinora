@@ -746,6 +746,7 @@ pub mod imp {
                 if w.is::<gtk::Button>()
                     || w.is::<gtk::MenuButton>()
                     || w.is::<gtk::Range>()
+                    || w.is::<crate::gui::wavy_bar::WavyBar>()
                     || w.is::<gtk::Switch>()
                     || w.is::<gtk::Popover>()
                     || name == "ClapperGtkSimpleControls"

@@ -927,7 +927,9 @@ pub mod imp {
     use crate::config::BASE_ID;
     use crate::gspawn;
     use crate::gui::scratch::Scratch;
+    use crate::gui::ripple_button::RippleButton;
     use crate::gui::turntable::{Hand, SPIN, Turntable};
+    use crate::gui::wavy_bar::WavyBar;
 
     /// Let go, the needle and the player meet at least this far on, in
     /// seconds (the player has to seek there first).
@@ -1103,13 +1105,13 @@ pub mod imp {
         #[template_child]
         pub(super) dj_now_slot: TemplateChild<gtk::Box>,
         #[template_child]
-        pub(super) dj_seek: TemplateChild<gtk::Scale>,
+        pub(super) dj_seek: TemplateChild<WavyBar>,
         #[template_child]
         dj_elapsed: TemplateChild<gtk::Label>,
         #[template_child]
         dj_length: TemplateChild<gtk::Label>,
         #[template_child]
-        dj_play: TemplateChild<gtk::Button>,
+        dj_play: TemplateChild<RippleButton>,
         #[template_child]
         pub(super) dj_queue_slot: TemplateChild<gtk::Box>,
         /// A seek asked for on the DJ's line that waits a moment (the knob is
@@ -1117,6 +1119,7 @@ pub mod imp {
         /// (which still reports the old place).
         dj_seek_pending: RefCell<Option<glib::SourceId>>,
         dj_seek_quiet_until: Cell<Option<std::time::Instant>>,
+        dj_buffered_at: Cell<Option<std::time::Instant>>,
         /// What plays was loaded as sound alone: it has no picture to show.
         pub(super) audio_stream: Cell<bool>,
         /// Kinora: the DJ's audio-only way: the stage shows the track's artwork
@@ -1224,6 +1227,7 @@ pub mod imp {
                 dj_queue_slot: Default::default(),
                 dj_seek_pending: Default::default(),
                 dj_seek_quiet_until: Default::default(),
+                dj_buffered_at: Default::default(),
                 audio_stream: Default::default(),
                 audio_only: Default::default(),
                 warming: Default::default(),
@@ -1447,6 +1451,23 @@ pub mod imp {
             self.dj_elapsed.set_label(&clock(obj.position_secs()));
             self.dj_length
                 .set_label(&obj.duration_secs().map(clock).unwrap_or_default());
+            // The loaded part of the track, looked up once a second.
+            let now = std::time::Instant::now();
+            let due = self
+                .dj_buffered_at
+                .get()
+                .is_none_or(|at| now.duration_since(at).as_millis() >= 1000);
+            if due && self.dj_seek.is_mapped() {
+                self.dj_buffered_at.set(Some(now));
+                let until = match (obj.duration_secs(), self.clapper.player()) {
+                    (Some(duration), Some(player)) => {
+                        crate::gui::buffer_bar::buffered_ahead(&player)
+                            .map_or(0.0, |ahead| (player.position() + ahead) / duration)
+                    }
+                    _ => 0.0,
+                };
+                self.dj_seek.set_buffered(until);
+            }
         }
 
         // ---- Kinora: scratching (see docs/design.md, "DJ") ----
@@ -2169,6 +2190,11 @@ pub mod imp {
         }
 
         #[template_callback(function)]
+        fn dj_line_moves(state: clapper::PlayerState, minimized: bool) -> bool {
+            state == clapper::PlayerState::Playing && !minimized
+        }
+
+        #[template_callback(function)]
         fn dj_play_icon(state: clapper::PlayerState, loading: bool) -> &'static str {
             match state {
                 clapper::PlayerState::Playing => "media-playback-pause-symbolic",
@@ -2614,16 +2640,24 @@ pub mod imp {
             // Kinora: the DJ's page. Its line seeks; a click on the deck plays
             // or pauses, and the record can be scratched; nothing turns by
             // itself with "Reduce effects".
-            self.dj_seek.connect_change_value(clone!(
+            self.dj_seek.connect_seek(clone!(
                 #[weak]
                 obj,
-                #[upgrade_or]
-                Propagation::Proceed,
-                move |_, _, value| {
-                    obj.imp().dj_seek_to(value);
-                    Propagation::Proceed
-                }
+                move |_, value| obj.imp().dj_seek_to(value)
             ));
+            settings
+                .bind("reduce-effects", &*self.dj_seek, "still")
+                .flags(gtk::gio::SettingsBindFlags::GET)
+                .build();
+            // (The play button is squarer and filled while it plays: CSS.)
+            obj.connect_state_notify(|obj| {
+                let imp = obj.imp();
+                if obj.player_state() == clapper::PlayerState::Playing {
+                    imp.dj_play.add_css_class("playing");
+                } else {
+                    imp.dj_play.remove_css_class("playing");
+                }
+            });
             self.dj_deck.connect_hand(clone!(
                 #[weak]
                 obj,
@@ -2822,6 +2856,8 @@ pub mod imp {
             clapper_gtk::Video::ensure_type();
             clapper_gtk::Billboard::ensure_type();
             Turntable::ensure_type();
+            WavyBar::ensure_type();
+            RippleButton::ensure_type();
             Self::bind_template(klass);
             Self::bind_template_callbacks(klass);
             Utility::bind_template_callbacks(klass);

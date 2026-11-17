@@ -57,6 +57,8 @@ kicker 11/700 uppercase in the accent.
 | **Player sheet** `TFPlayerSheet` | `player_sheet.{rs,blp}` | Holds the one video page over the window, and the mini-player it shrinks into. See *Player*. |
 | **Panel** `.k-panel` | CSS | A quiet container for text (the description). |
 | **DJ page** | `video_page.blp`, `dj.rs` | The player's page while the DJ is on: a record player, what plays, three large buttons, the queue. See *DJ*. |
+| **Line of the track** `TFWavyBar` | `wavy_bar.rs` | A seek bar in Material 3's wavy manner: a wave as far as the track has played, a flat track with a stop dot for the rest, a thin handle between. Takes `value`, `buffered`, `playing`, `still`; tells of seeks through `connect_seek`. Only on the DJ's page so far. See *DJ*. |
+| **Ripple button** `TFRippleButton` | `ripple_button.rs` | A `GtkButton` whose press ripples from the pointer, inside its rounded shape. Its look is CSS (`.k-dj-play`, `.k-dj-step`). See *DJ*. |
 | **Record player** `TFTurntable` | `turntable.rs` | A deck with the track's artwork as the record's label; it turns while playing, and can be scratched. See *DJ*. |
 | **Playlist card and shelf** | `playlist_shelf.rs` | A playlist or mix: a poster on a stack, with a count and a kicker. A shelf is a titled row of them. See *DJ*. |
 | **Way to watch** `.k-mode-card` | `first_run.rs` | One of the four choices of the first launch. See *First run*. |
@@ -216,11 +218,23 @@ the room. Top to bottom:
    plays or pauses; the record can be taken by hand (see *Scratching*).
 3. **What plays**: title (24/800, two lines at most), artists (16, dim),
    "album · year" for songs (13, faint). Centred.
-4. **The line of the track**: thin, amber, with a knob; elapsed time and
-   length under its ends. Dragging it seeks once the hand rests.
-5. **Previous, Play/Pause, Next**: 64, 84 and 64 px, the middle one filled
-   with the accent. They are the player's own actions (see *Previous and
-   Next*), so they crossfade and grey out like everywhere else.
+4. **The line of the track** (`TFWavyBar`): amber, 4 px. What has played is
+   a wave; then a thin upright handle; then a flat faint track, lighter as
+   far as the track is loaded, ending in an amber stop dot. Elapsed time and
+   length under its ends. A press or a drag anywhere on it seeks once the
+   hand rests (the handle thins in the hand); the arrow keys step it.
+5. **Previous, Play/Pause, Next**: Material 3's expressive buttons, 64, 96×84
+   and 64 px. Previous and Next are tonal circles. The middle one says what
+   plays by its shape as well as its icon: paused it is round and tonal (the
+   accent at 28 %, the icon in the accent); playing it is a rounded square
+   (26 px corners) filled with the accent. Under a press all three square up
+   (18 px) and ripple from the pointer (`TFRippleButton`). They are the
+   player's own actions (see *Previous and Next*), so they crossfade and grey
+   out like everywhere else.
+
+The line and the buttons follow the Material 3 media card of the desktop
+shell (wavy progress, stop dot, shape-morphing play button), in Kinora's own
+amber on its dark page.
 6. **Up next**: the number queued, then up to 30 rows: 48 px artwork, title,
    artists, length. Click a row to mix into it now. *Play next* and *Remove*
    take the length's place on a row with the pointer or the focus (opacity
@@ -231,7 +245,11 @@ Behind it all lie the track's colours (the ambient glow, see above), strongest
 behind the record and gone by the queue.
 
 **The record player's motion** is the one exception to "nothing loops": it is
-what the page is for, and it only runs while music plays.
+what the page is for, and it only runs while music plays. The line's wave is
+part of it: it drifts towards the handle while music plays (16 px a second,
+redrawn only when it has moved half a pixel) and flattens when paused (about
+0.15 s). No frames are asked for while the line is off screen or shrunk into
+the mini-player.
 
 - While a track plays the label turns (one calm turn in 5 s; the light on
   the vinyl stays where it is) and the arm lies on the record, moving inwards
@@ -414,10 +432,12 @@ accent as an outline and a 10 % tint: no motion.
 
 ## Motion
 
-- Only `opacity` and `transform` are animated, plus background colour on hover.
+- Only `opacity` and `transform` are animated, plus background colour on hover
+  (the exception: the corners of the DJ's three buttons, 300 ms with a slight
+  overshoot, and their ripple).
 - Durations 150–250 ms with `--k-ease`; nothing loops (the exceptions: the
-  loading spinner, only while something loads, and the DJ's record, only while
-  music plays).
+  loading spinner, only while something loads, and the DJ's record and the
+  wave of its line, only while music plays).
 - Thumbnails fade in when they arrive; on hover the picture grows 4 % inside
   its frame (the card does not move, so nothing around it shifts).
 - A row scrolls by one page in 250 ms when its arrows are used.
@@ -444,7 +464,10 @@ adds the `reduce-effects` class to the window. With it on:
 - rows jump instead of gliding;
 - videos are no longer prepared when the pointer rests on a card;
 - the DJ's record does not turn and its arm does not swing (it still turns
-  in a hand: scratching is the user's own motion).
+  in a hand: scratching is the user's own motion);
+- the wave of the DJ's line does not drift (it stands while playing and lies
+  flat while paused), and the DJ's buttons change shape at once and do not
+  ripple. The same holds when the desktop's animations are off.
 
 Anything new that is decorative must check this setting (in CSS:
 `window.reduce-effects …`; in Rust: `settings.boolean("reduce-effects")`).
