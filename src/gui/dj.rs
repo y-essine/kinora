@@ -672,6 +672,38 @@ impl Dj {
             .filter(|v| v.platform() == "youtube");
         let seed = seed.unwrap_or_else(|| client.dj_seed(video.as_ref()));
         log::info!("DJ: starting from {seed:?}");
+        // Test hook: `KH_DJ_OFFLINE=1` makes up a playlist of test tracks
+        // instead of asking YouTube Music (their streams come from whatever
+        // `kinora-prepare` is on the PATH, and `KH_MEDIA_FALLBACK`).
+        #[cfg(feature = "dev-hooks")]
+        if std::env::var("KH_DJ_OFFLINE").is_ok() {
+            let tracks = (0..40)
+                .map(|n| Track {
+                    id: format!("kinoratst{n:02}"),
+                    title: format!("Test track {n}"),
+                    artists: Vec::new(),
+                    album: None,
+                    duration: Some(Duration::from_secs(170)),
+                    thumbnail: None,
+                    year: None,
+                    kind: kinora_core::dj::TrackKind::Song,
+                })
+                .collect();
+            let page = kinora_core::dj::RadioPage {
+                tracks,
+                continuation: None,
+                source: RadioSource::Music,
+                personal: false,
+            };
+            let seed = DjSeed::Playlist {
+                id: "PLkinoratest".into(),
+                title: Some("Test tracks".into()),
+                shuffle: false,
+            };
+            let session = DjSession::start(seed.clone(), Default::default(), page);
+            self.begin(session, seed);
+            return;
+        }
         self.0.starting.set(true);
         let dj = self.clone();
         let generation = self.0.generation.get();

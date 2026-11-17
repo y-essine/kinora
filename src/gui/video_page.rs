@@ -91,6 +91,10 @@ impl VideoPage {
             // Kinora: audio only decodes no video, whatever the stream holds.
             player.set_video_enabled(!self.audio_only());
             let fallback = self.convert_to_clapper_playable_url(&video);
+            // Test hook: `KH_MEDIA_FALLBACK=URI` plays that instead of what
+            // yt-dlp would find (tests that must not depend on YouTube).
+            #[cfg(feature = "dev-hooks")]
+            let fallback = std::env::var("KH_MEDIA_FALLBACK").unwrap_or(fallback);
             let audio = Some(self.audio_only())
                 .filter(|audio_only| *audio_only)
                 .and_then(|_| self.client().prepared_audio_playback_uri(&video));
@@ -380,6 +384,76 @@ impl VideoPage {
                     );
                     glib::ControlFlow::Break
                 }
+            }
+        });
+    }
+
+    /// Test hook: how far ahead of what is heard the player's audio filter
+    /// is (what a change made there takes to be heard), five times.
+    #[cfg(feature = "dev-hooks")]
+    pub fn dev_log_latency(&self) {
+        if let Some(tap) = self.imp().tap() {
+            use gst::prelude::*;
+            // What lies between the filter and the sound device.
+            let mut pad = tap.element().static_pad("src");
+            for _ in 0..30 {
+                let Some(peer) = pad.as_ref().and_then(|p| p.peer()) else {
+                    break;
+                };
+                let Some(element) = peer.parent_element() else {
+                    break;
+                };
+                let props: Vec<String> = [
+                    "buffer-time",
+                    "latency-time",
+                    "max-size-time",
+                    "max-size-buffers",
+                    "max-size-bytes",
+                    "sync",
+                    "provide-clock",
+                    "slave-method",
+                ]
+                .iter()
+                .filter_map(|name| {
+                    let spec = element.find_property(name)?;
+                    Some(format!("{name}={:?}", element.property_value(spec.name())))
+                })
+                .collect();
+                log::info!(
+                    "DEV: audio chain: {} ({}) {}",
+                    element.name(),
+                    element.factory().map(|f| f.name().to_string()).unwrap_or_default(),
+                    props.join(" ")
+                );
+                pad = match element.downcast_ref::<gst::Bin>() {
+                    // Into a bin: follow its ghost pad's target.
+                    Some(_) => peer
+                        .downcast_ref::<gst::GhostPad>()
+                        .and_then(|g| g.target())
+                        .and_then(|t| t.parent_element())
+                        .and_then(|e| e.static_pad("src")),
+                    None => element.static_pad("src"),
+                };
+            }
+        }
+        let page = glib::prelude::ObjectExt::downgrade(self);
+        let count = std::cell::Cell::new(0);
+        glib::timeout_add_local(std::time::Duration::from_millis(400), move || {
+            let Some(page) = page.upgrade() else {
+                return glib::ControlFlow::Break;
+            };
+            let heard = page.heard_position();
+            let flow = page.flow_position().unwrap_or(f64::NAN);
+            log::info!(
+                "DEV: latency: heard {heard:.3} s, decoded up to {flow:.3} s: {:.0} ms ahead (Clapper says {:.3} s)",
+                (flow - heard) * 1000.0,
+                page.position_secs()
+            );
+            count.set(count.get() + 1);
+            if count.get() < 5 {
+                glib::ControlFlow::Continue
+            } else {
+                glib::ControlFlow::Break
             }
         });
     }
@@ -1295,6 +1369,11 @@ pub mod imp {
                     self.load_up_next(&video);
                 }
 
+                // (Test hook: the DJ's made-up tracks are nowhere to look up.)
+                #[cfg(feature = "dev-hooks")]
+                if std::env::var("KH_DJ_OFFLINE").is_ok() {
+                    return;
+                }
                 // Load additional data
                 gspawn!(
                     clone!(
