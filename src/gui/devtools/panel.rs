@@ -44,6 +44,29 @@ struct DeckCard {
     overview: gtk::DrawingArea,
     /// Time, left, buffer, gain, tempo; BPM, entry, stream, format, ready.
     tiles: [Tile; 10],
+    /// What was drawn last (see [`drawn`]): nothing new, nothing redrawn.
+    drawn: Cell<u64>,
+}
+
+/// A number that changes when what a deck's waveforms show does.
+fn drawn(deck: Option<&Deck>) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let Some(deck) = deck else { return 0 };
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    deck.id.hash(&mut hasher);
+    deck.role.hash(&mut hasher);
+    for number in [
+        deck.position,
+        deck.duration.unwrap_or(0.0),
+        deck.buffered_ahead.unwrap_or(0.0),
+        deck.decoded_to.unwrap_or(0.0),
+        deck.waveform.known_seconds,
+        deck.grid.as_ref().map_or(0.0, |grid| grid.bpm + grid.anchor),
+        deck.beats.entry.as_ref().map_or(0.0, |entry| entry.start),
+    ] {
+        number.to_bits().hash(&mut hasher);
+    }
+    hasher.finish() | 1
 }
 
 struct Mix {
@@ -53,6 +76,8 @@ struct Mix {
     /// Progress, out, in, stretch, offset, tempos, stage.
     tiles: [Tile; 7],
     notes: [gtk::Label; 2],
+    /// What the graphs showed last (the fade's phase and how far it is).
+    drawn: Cell<(u8, u64)>,
 }
 
 struct Queue {
@@ -274,13 +299,16 @@ impl DeckCard {
                 wave,
                 overview,
                 tiles,
+                drawn: Cell::new(u64::MAX),
             },
         )
     }
 
     fn show(&self, deck: Option<&Deck>) {
-        self.wave.queue_draw();
-        self.overview.queue_draw();
+        if self.drawn.replace(drawn(deck)) != drawn(deck) {
+            self.wave.queue_draw();
+            self.overview.queue_draw();
+        }
         let Some(deck) = deck else {
             self.title.set_text("Empty deck");
             self.sub.set_text("");
@@ -473,13 +501,22 @@ impl Mix {
                 offsets,
                 tiles,
                 notes,
+                drawn: Cell::new((u8::MAX, 0)),
             },
         )
     }
 
     fn show(&self, snapshot: &Snapshot) {
-        self.curves.queue_draw();
-        self.offsets.queue_draw();
+        let now = snapshot.fade.as_ref().map_or((0, 0), |fade| {
+            (
+                1 + fade.live as u8 + fade.phase.len() as u8,
+                fade.elapsed.to_bits() ^ snapshot.notes.skipped.is_some() as u64,
+            )
+        });
+        if self.drawn.replace(now) != now {
+            self.curves.queue_draw();
+            self.offsets.queue_draw();
+        }
         let [progress, out, inc, stretch, apart, tempos, matched] = &self.tiles;
         let notes = &snapshot.notes;
         let Some(fade) = snapshot.fade.as_ref() else {
@@ -1273,15 +1310,15 @@ impl Inner {
                 let positions = super::COLLECTOR.with_borrow(|collector| collector.positions());
                 let mut snapshot = self.snapshot.borrow_mut();
                 for (deck, position) in ["A", "B"].into_iter().zip(positions) {
-                    if let (Some(position), Some(deck)) = (
+                    if let (Some(position), Some(seated)) = (
                         position,
                         snapshot.decks.iter_mut().find(|seated| seated.deck == deck),
-                    ) {
-                        deck.position = position;
+                    ) && (position - seated.position).abs() > 0.001
+                    {
+                        seated.position = position;
+                        self.decks[(deck == "B") as usize].wave.queue_draw();
                     }
                 }
-                drop(snapshot);
-                self.decks.iter().for_each(|card| card.wave.queue_draw());
             }
             return;
         }
