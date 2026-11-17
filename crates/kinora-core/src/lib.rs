@@ -410,14 +410,20 @@ impl Core {
 
     /// Look a video's streams up ahead of time, so it starts at once when
     /// picked. Afterwards [`Self::prepared_uri`] has it.
-    pub async fn prepare(&self, playback: &PlaybackConfig, video: &VideoId) -> Result<(), Error> {
+    pub async fn prepare(
+        &self,
+        playback: &PlaybackConfig,
+        account: &AccountConfig,
+        video: &VideoId,
+    ) -> Result<(), Error> {
         if !youtube::is_youtube(video) {
             return Ok(());
         }
         if playback.fast_start {
             self.fast_playback_uri(video).await.map(|_| ())
         } else {
-            streams::prepare_with_ytdlp(self.paths.streams_dir(), video.id.clone()).await
+            let cookies = account.cookies().await.ok().flatten();
+            streams::prepare_with_ytdlp(self.paths.streams_dir(), video.id.clone(), cookies).await
         }
     }
 
@@ -432,11 +438,12 @@ impl Core {
     /// Like [`Self::prepare`], audio only, in the original language (the DJ
     /// plays music this way): starts in about half the time and decodes no
     /// video. Afterwards [`Self::prepared_audio_uri`] has it.
-    pub async fn prepare_audio(&self, video: &VideoId) -> Result<(), Error> {
+    pub async fn prepare_audio(&self, account: &AccountConfig, video: &VideoId) -> Result<(), Error> {
         if !youtube::is_youtube(video) {
             return Ok(());
         }
-        streams::prepare_audio_with_ytdlp(self.paths.streams_dir(), video.id.clone()).await
+        let cookies = account.cookies().await.ok().flatten();
+        streams::prepare_audio_with_ytdlp(self.paths.streams_dir(), video.id.clone(), cookies).await
     }
 
     /// A prepared audio-only playback URI for this video, if there is a fresh one.

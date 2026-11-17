@@ -61,10 +61,12 @@ def alive(url):
 def audio_manifest(info):
     """A master playlist with the one chosen audio rendition."""
     url = info.get("url")
-    if not url:
+    if not url or info.get("protocol") != "m3u8_native":
         return None
     bandwidth = int((info.get("tbr") or info.get("abr") or 128) * 1000)
     codec = info.get("acodec") or "mp4a.40.2"
+    if (vcodec := info.get("vcodec") or "none") != "none":
+        codec = f"{vcodec},{codec}"
     return (f'#EXTM3U\n#EXT-X-INDEPENDENT-SEGMENTS\n'
             f'#EXT-X-STREAM-INF:BANDWIDTH={bandwidth},CODECS="{codec}"\n{url}\n')
 
@@ -96,7 +98,33 @@ def main():
 
     if audio:
         # The best HLS audio; yt-dlp ranks the original language first.
-        opts["format"] = "bestaudio[protocol=m3u8_native]"
+        # Signed in, YouTube may offer no HLS audio alone: then the smallest
+        # HLS video with proper AAC (the DJ decodes no video anyway).
+        opts["format"] = ("bestaudio[protocol=m3u8_native]"
+                          "/best[protocol=m3u8_native][height<=360][acodec^=mp4a.40.2]"
+                          "/best[protocol=m3u8_native]")
+
+    # Signed in (KINORA_COOKIES: the account's cookies.txt), YouTube doesn't ask
+    # to "confirm you're not a bot" as it does anonymous clients after heavy use.
+    cookies = os.environ.get("KINORA_COOKIES")
+    if cookies and os.path.exists(cookies):
+        # A private copy: yt-dlp may write cookies back, and two runs at once
+        # must not share the file.
+        import shutil
+        import tempfile
+        fd, copy_path = tempfile.mkstemp(suffix=".txt")
+        os.close(fd)
+        shutil.copyfile(cookies, copy_path)
+        opts["cookiefile"] = copy_path
+        import atexit
+        atexit.register(lambda: os.path.exists(copy_path) and os.remove(copy_path))
+
+    # YouTube's web clients (the ones used when signed in) need a JavaScript
+    # challenge solved; yt-dlp does it with any of these it finds.
+    import shutil
+    runtimes = {r: {} for r in ("deno", "node", "bun") if shutil.which(r)}
+    if runtimes:
+        opts["js_runtimes"] = runtimes
 
     ytdl = YoutubeDL(opts, auto_init=False)
     ytdl.add_info_extractor(ClapperYoutubeIE())
@@ -104,14 +132,23 @@ def main():
         if ie._ENABLED and ie.ie_key() not in BLACKLIST:
             ytdl.add_info_extractor(ie)
     raw = ytdl.extract_info(url, download=False, process=False)
+    if opts.get("cookiefile"):
+        # Signed-in web clients' separate (DASH) streams answer 403 without a
+        # PO token; their HLS streams play.
+        raw["formats"] = [f for f in raw.get("formats") or []
+                          if f.get("protocol") == "m3u8_native"]
 
     for _ in range(MAX_ROUNDS):
         info = ytdl.process_ie_result(copy.deepcopy(raw), download=False)
         if audio:
             manifest = audio_manifest(info)
-            if not manifest:
-                sys.exit("kinora-prepare: no HLS audio")
-            path = out + ".audio.m3u8"
+            if manifest:
+                path = out + ".audio.m3u8"
+            elif manifest := dash.generate_manifest(info):
+                path = out + ".audio.mpd"
+                break  # DASH links are media files, not playlists: not checked
+            else:
+                sys.exit("kinora-prepare: no HLS or DASH audio")
         elif manifest := hls.generate_manifest(info):
             path = out + ".m3u8"
         elif manifest := dash.generate_manifest(info):

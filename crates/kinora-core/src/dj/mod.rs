@@ -27,7 +27,7 @@
 //!
 //! // While a track plays: prepare the next one, plan the crossfade.
 //! let (current, next) = (session.current().unwrap(), session.peek_next().unwrap());
-//! core.prepare(&Default::default(), &next.video_id()).await?;
+//! core.prepare(&Default::default(), &Default::default(), &next.video_id()).await?;
 //! let plan = core.dj_transition(current.duration, Duration::from_secs(12), next);
 //! // ...when `plan.should_start(position)`: start `next` at volume 0, then
 //! // every ~50 ms set both volumes from `plan.gains(elapsed)` until

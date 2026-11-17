@@ -86,14 +86,22 @@ fn remember(video_id: String, uri: String, lifetime: Duration) {
 
 /// Prepare a YouTube video in the background with `kinora-prepare` (see the
 /// module docs). Does nothing if it is already prepared or being prepared.
-pub async fn prepare_with_ytdlp(cache_dir: PathBuf, video_id: String) -> Result<(), Error> {
-    prepare_ytdlp(cache_dir, video_id, false).await
+pub async fn prepare_with_ytdlp(
+    cache_dir: PathBuf,
+    video_id: String,
+    cookies: Option<PathBuf>,
+) -> Result<(), Error> {
+    prepare_ytdlp(cache_dir, video_id, false, cookies).await
 }
 
 /// Like [`prepare_with_ytdlp`], audio only (original language): starts in
 /// about half the time and decodes no video. [`prepared_audio`] has it.
-pub async fn prepare_audio_with_ytdlp(cache_dir: PathBuf, video_id: String) -> Result<(), Error> {
-    prepare_ytdlp(cache_dir, video_id, true).await
+pub async fn prepare_audio_with_ytdlp(
+    cache_dir: PathBuf,
+    video_id: String,
+    cookies: Option<PathBuf>,
+) -> Result<(), Error> {
+    prepare_ytdlp(cache_dir, video_id, true, cookies).await
 }
 
 /// A prepared audio-only playback URI for this video, if there is a fresh one.
@@ -106,7 +114,15 @@ fn audio_key(video_id: &str) -> String {
     format!("{video_id}#audio")
 }
 
-async fn prepare_ytdlp(cache_dir: PathBuf, video_id: String, audio: bool) -> Result<(), Error> {
+/// `cookies`: the account's cookies.txt, when one is set up. YouTube asks
+/// anonymous clients to "confirm you're not a bot" after heavy use; signed in,
+/// it doesn't.
+async fn prepare_ytdlp(
+    cache_dir: PathBuf,
+    video_id: String,
+    audio: bool,
+    cookies: Option<PathBuf>,
+) -> Result<(), Error> {
     let key = if audio { audio_key(&video_id) } else { video_id.clone() };
     if prepared(&key).is_some() {
         return Ok(());
@@ -126,6 +142,9 @@ async fn prepare_ytdlp(cache_dir: PathBuf, video_id: String, audio: bool) -> Res
         let mut command = crate::helper::command("kinora-prepare");
         if audio {
             command.arg("--audio");
+        }
+        if let Some(cookies) = &cookies {
+            command.env("KINORA_COOKIES", cookies);
         }
         let out = command
             .arg(format!("https://www.youtube.com/watch?v={video_id}"))

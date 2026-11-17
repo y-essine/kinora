@@ -124,7 +124,10 @@ impl VideoPage {
                 let client = self.client();
                 let video = video.clone();
                 gspawn!(async move {
-                    let fast = client.fast_playback_uri(&video).await;
+                    let mut fast = client.fast_playback_uri(&video).await;
+                    if fast.is_none() {
+                        fast = client.signed_in_playback_uri(&video, page.audio_only()).await;
+                    }
                     if page.video().as_ref() != Some(&video) || page.external() {
                         return;
                     }

@@ -1225,6 +1225,53 @@ impl Client {
     /// Kinora: fast start. A URI Clapper can play right away for a YouTube
     /// video (see `kinora_core::streams`), or `None` when the caller should fall back to
     /// the yt-dlp path (setting off, other platform, or the lookup failed).
+    /// Kinora: with an account, look the streams up now through
+    /// `kinora-prepare` with its cookies, instead of Clapper's anonymous
+    /// yt-dlp lookup, which YouTube answers with "confirm you're not a bot"
+    /// after heavy use. `None` without an account or when it fails.
+    pub async fn signed_in_playback_uri(&self, video: &Video, audio: bool) -> Option<String> {
+        let account = self.account_config();
+        if video.platform() != "youtube" || !account.is_connected() {
+            return None;
+        }
+        let core = self.core();
+        let id = video.id();
+        let started = std::time::Instant::now();
+        let result = tspawn!(async move {
+            let done = if audio {
+                core.prepare_audio(&account, &id).await
+            } else {
+                core.prepare(&kinora_core::PlaybackConfig::default(), &account, &id).await
+            };
+            // Being prepared already (e.g. warmed): wait for that run.
+            for _ in 0..60 {
+                let uri = if audio { core.prepared_audio_uri(&id) } else { core.prepared_uri(&id) };
+                if uri.is_some() || done.is_err() {
+                    return done.map(|_| uri);
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            }
+            Ok(None)
+        })
+        .await
+        .expect("Failed to spawn tokio");
+        match result {
+            Ok(Some(uri)) => {
+                log::info!(
+                    "Signed-in streams for {} in {:.1} s",
+                    video.id().id,
+                    started.elapsed().as_secs_f64()
+                );
+                Some(uri)
+            }
+            Ok(None) => None,
+            Err(e) => {
+                log::warn!("Signed-in streams failed for {}, using yt-dlp: {e}", video.id().id);
+                None
+            }
+        }
+    }
+
     pub async fn fast_playback_uri(&self, video: &Video) -> Option<String> {
         if video.platform() != "youtube" || !self.playback_config().fast_start {
             return None;
@@ -1257,10 +1304,10 @@ impl Client {
         if video.platform() != "youtube" {
             return;
         }
-        let (core, playback) = (self.core(), self.playback_config());
+        let (core, playback, account) = (self.core(), self.playback_config(), self.account_config());
         let id = video.id();
         tspawn!(async move {
-            if let Err(e) = core.prepare(&playback, &id).await {
+            if let Err(e) = core.prepare(&playback, &account, &id).await {
                 // The fast-start lookup failing is expected while it is experimental.
                 if playback.fast_start {
                     log::debug!("Could not prepare {}: {e}", id.id);
@@ -1277,10 +1324,10 @@ impl Client {
         if video.platform() != "youtube" {
             return;
         }
-        let core = self.core();
+        let (core, account) = (self.core(), self.account_config());
         let id = video.id();
         tspawn!(async move {
-            if let Err(e) = core.prepare_audio(&id).await {
+            if let Err(e) = core.prepare_audio(&account, &id).await {
                 log::warn!("Could not prepare the audio of {}: {e}", id.id);
             }
         });
