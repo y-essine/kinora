@@ -32,6 +32,8 @@ pub struct Panel {
 struct Tile {
     value: gtk::Label,
     note: gtk::Label,
+    /// The value's colour, as it was last set.
+    kind: Cell<&'static str>,
 }
 
 struct DeckCard {
@@ -61,7 +63,9 @@ fn drawn(deck: Option<&Deck>) -> u64 {
         deck.buffered_ahead.unwrap_or(0.0),
         deck.decoded_to.unwrap_or(0.0),
         deck.waveform.known_seconds,
-        deck.grid.as_ref().map_or(0.0, |grid| grid.bpm + grid.anchor),
+        deck.grid
+            .as_ref()
+            .map_or(0.0, |grid| grid.bpm + grid.anchor),
         deck.beats.entry.as_ref().map_or(0.0, |entry| entry.start),
     ] {
         number.to_bits().hash(&mut hasher);
@@ -73,8 +77,8 @@ struct Mix {
     status: gtk::Label,
     curves: gtk::DrawingArea,
     offsets: gtk::DrawingArea,
-    /// Progress, out, in, stretch, offset, tempos, stage.
-    tiles: [Tile; 7],
+    /// Progress, gains, stretch, offset, tempos, stage.
+    tiles: [Tile; 6],
     notes: [gtk::Label; 2],
     /// What the graphs showed last (the fade's phase and how far it is).
     drawn: Cell<(u8, u64)>,
@@ -158,16 +162,21 @@ fn tile(caption: &str) -> (gtk::Box, Tile) {
     frame.append(&label(&["k-dev-cap"], caption));
     frame.append(&value);
     frame.append(&note);
-    (frame, Tile { value, note })
+    (
+        frame,
+        Tile {
+            value,
+            note,
+            kind: Cell::new(""),
+        },
+    )
 }
 
 impl Tile {
-    fn set(&self, value: &str, note: &str, kind: &str) {
+    fn set(&self, value: &str, note: &str, kind: &'static str) {
         self.value.set_text(value);
         self.note.set_text(note);
-        if !(kind.is_empty() && self.value.css_classes().len() == 1)
-            && !self.value.has_css_class(kind)
-        {
+        if self.kind.replace(kind) != kind {
             if kind.is_empty() {
                 self.value.set_css_classes(&["k-dev-val"]);
             } else {
@@ -186,7 +195,13 @@ fn tiles<const N: usize>(captions: [&str; N], per_row: usize) -> (gtk::Grid, [Ti
     let mut index = 0;
     let made = captions.map(|caption| {
         let (frame, made) = tile(caption);
-        grid.attach(&frame, (index % per_row) as i32, (index / per_row) as i32, 1, 1);
+        grid.attach(
+            &frame,
+            (index % per_row) as i32,
+            (index / per_row) as i32,
+            1,
+            1,
+        );
         index += 1;
         made
     });
@@ -197,6 +212,8 @@ fn canvas(height: i32) -> gtk::DrawingArea {
     let area = gtk::DrawingArea::new();
     area.set_content_height(height);
     area.set_hexpand(true);
+    area.add_css_class("k-dev-canvas");
+    area.set_overflow(gtk::Overflow::Hidden);
     area
 }
 
@@ -221,7 +238,7 @@ fn grouped(number: u64) -> String {
     let digits = number.to_string();
     let mut out = String::with_capacity(digits.len() + digits.len() / 3);
     for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index) % 3 == 0 {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
             out.push('\u{202f}');
         }
         out.push(digit);
@@ -344,15 +361,34 @@ impl DeckCard {
             status_kind(&deck.status),
         );
 
-        let [time, left, buffered, gain, tempo, beats, entry, stream, format, ready] = &self.tiles;
+        let [
+            time,
+            left,
+            buffered,
+            gain,
+            tempo,
+            beats,
+            entry,
+            stream,
+            format,
+            ready,
+        ] = &self.tiles;
         match deck.duration {
             Some(duration) => {
-                time.set(&clock(deck.position), &format!("of {}", clock(duration)), "");
+                time.set(
+                    &clock(deck.position),
+                    &format!("of {}", clock(duration)),
+                    "",
+                );
                 let remains = duration - deck.position;
                 left.set(
                     &format!("-{}", clock(remains)),
                     &format!("{:.0} %", deck.position / duration * 100.0),
-                    if remains < 20.0 && audible { "amber" } else { "" },
+                    if remains < 20.0 && audible {
+                        "amber"
+                    } else {
+                        ""
+                    },
                 );
             }
             None => {
@@ -368,12 +404,24 @@ impl DeckCard {
                     .map_or(String::new(), |flow| format!("decoded to {}", clock(flow))),
                 if ahead < 3.0 { "red" } else { "mint" },
             ),
-            None => buffered.set("–", if deck.loaded { "not known" } else { "not loaded" }, "dim"),
+            None => buffered.set(
+                "–",
+                if deck.loaded {
+                    "not known"
+                } else {
+                    "not loaded"
+                },
+                "dim",
+            ),
         }
         gain.set(
             &format!("{:.2}", deck.gain),
             &format!("volume {:.2}", deck.volume),
-            if deck.base_volume.is_some() { "amber" } else { "" },
+            if deck.base_volume.is_some() {
+                "amber"
+            } else {
+                ""
+            },
         );
         let stretch = (deck.tempo - 1.0) * 100.0;
         tempo.set(
@@ -408,12 +456,24 @@ impl DeckCard {
                 },
                 "cyan",
             ),
-            Some(found) => entry.set("start", &found.found, ""),
+            Some(found) => entry.set(
+                "start",
+                match found.found.as_str() {
+                    "it gets going from its start" => "goes from its start",
+                    "no clear beat that comes in and stays" => "no clear beat",
+                    "nothing to go by" => "nothing to go by",
+                    _ => "the beat is too far in",
+                },
+                "",
+            ),
             None => entry.set("–", "not looked for", "dim"),
         }
         let prepared = deck.stream.kind.starts_with("prepared");
         stream.set(
-            deck.stream.kind.trim_start_matches("prepared ").trim_end_matches(" fallback"),
+            deck.stream
+                .kind
+                .trim_start_matches("prepared ")
+                .trim_end_matches(" fallback"),
             &match (deck.stream.file_bytes, deck.stream.uri.as_deref()) {
                 (Some(bytes), _) if prepared => {
                     format!("prepared, {:.1} kB", bytes as f64 / 1000.0)
@@ -485,8 +545,15 @@ impl Mix {
         graphs.append(&curves);
         graphs.append(&offsets);
         let (grid, tiles) = tiles(
-            ["PROGRESS", "OUT", "IN", "STRETCH", "BEATS APART", "TEMPOS", "MATCH"],
-            7,
+            [
+                "PROGRESS",
+                "OUT / IN",
+                "STRETCH",
+                "BEATS APART",
+                "TEMPOS",
+                "MATCH",
+            ],
+            6,
         );
         let notes = [label(&["k-dev-note"], ""), label(&["k-dev-note"], "")];
         root.append(&head);
@@ -517,7 +584,7 @@ impl Mix {
             self.curves.queue_draw();
             self.offsets.queue_draw();
         }
-        let [progress, out, inc, stretch, apart, tempos, matched] = &self.tiles;
+        let [progress, gains, stretch, apart, tempos, matched] = &self.tiles;
         let notes = &snapshot.notes;
         let Some(fade) = snapshot.fade.as_ref() else {
             set_chip(&self.status, "IDLE", "dim");
@@ -534,14 +601,17 @@ impl Mix {
         set_chip(&self.status, text, kind);
         progress.set(
             &format!("{:.1} / {:.1} s", fade.elapsed, fade.total),
-            &match (fade.readiness.as_deref(), fade.waited) {
-                (Some(readiness), Some(waited)) => format!("{readiness}, asked {waited:.1} s ago"),
-                _ => String::new(),
-            },
+            &fade
+                .readiness
+                .as_deref()
+                .map_or(String::new(), |readiness| format!("next was {readiness}")),
             "",
         );
-        out.set(&format!("{:.2}", fade.gain_out), "gain", "amber");
-        inc.set(&format!("{:.2}", fade.gain_in), "gain", "cyan");
+        gains.set(
+            &format!("{:.2} / {:.2}", fade.gain_out, fade.gain_in),
+            "gain, linear",
+            if fade.live { "amber" } else { "" },
+        );
         let sync = fade.sync.as_ref();
         match sync.and_then(|sync| sync.stretch_percent) {
             Some(percent) => stretch.set(
@@ -577,19 +647,24 @@ impl Mix {
                     &format!(
                         "{:.1} → {}",
                         sync.bpm_in,
-                        sync.bpm_out.map_or("?".to_owned(), |bpm| format!("{bpm:.1}"))
+                        sync.bpm_out
+                            .map_or("?".to_owned(), |bpm| format!("{bpm:.1}"))
                     ),
                     "BPM in → out",
                     "",
                 );
                 matched.set(
                     &sync.stage,
-                    &format!(
-                        "{} readings{}",
-                        sync.errors_ms.len(),
-                        if sync.nudging { " · nudging" } else { "" }
-                    ),
-                    if sync.stage == "matched" { "mint" } else { "amber" },
+                    &if sync.nudging {
+                        "nudging".to_owned()
+                    } else {
+                        format!("{} readings", sync.errors_ms.len())
+                    },
+                    if sync.stage == "matched" {
+                        "mint"
+                    } else {
+                        "amber"
+                    },
                 );
             }
             None => {
@@ -697,7 +772,16 @@ impl Queue {
     }
 
     fn show(&self, snapshot: &Snapshot) {
-        let [title, id, uploader, length, numbers, uploaded, page, prepared] = &self.video;
+        let [
+            title,
+            id,
+            uploader,
+            length,
+            numbers,
+            uploaded,
+            page,
+            prepared,
+        ] = &self.video;
         match snapshot.video.as_ref() {
             Some(video) => {
                 title.set_text(&video.title);
@@ -713,9 +797,21 @@ impl Queue {
                 uploaded.set_text(&video.uploaded);
                 page.set_text(&format!(
                     "{}{}{}",
-                    if video.dj_page { "DJ track" } else { "video page" },
-                    if video.audio_only { " · audio only" } else { "" },
-                    if video.downloaded { " · downloaded" } else { "" }
+                    if video.dj_page {
+                        "DJ track"
+                    } else {
+                        "video page"
+                    },
+                    if video.audio_only {
+                        " · audio only"
+                    } else {
+                        ""
+                    },
+                    if video.downloaded {
+                        " · downloaded"
+                    } else {
+                        ""
+                    }
                 ));
                 prepared.set_text(&format!(
                     "stream {} · audio stream {}",
@@ -736,7 +832,11 @@ impl Queue {
             track.set_text(&format!("{} · {}", item.title, item.artist));
             id.set_text(&item.id);
             length.set_text(&item.duration.map_or("?".into(), short_clock));
-            set_chip(stream, &item.stream.to_uppercase(), status_kind(&item.stream));
+            set_chip(
+                stream,
+                &item.stream.to_uppercase(),
+                status_kind(&item.stream),
+            );
             beats.set_text(&match item.beats.status.as_str() {
                 "cached" => beats_text(&item.beats),
                 "failed" => format!("failed: {}", beats_text(&item.beats)),
@@ -779,8 +879,16 @@ impl System {
         process.append(&label(&["k-dev-h"], "PROCESS"));
         let (grid, tiles) = tiles(
             [
-                "MEMORY", "CPU", "THREADS", "OPEN FILES", "PLAYERS", "UPTIME", "LOOP LAG",
-                "WORST", "STALLS", "LOG",
+                "MEMORY",
+                "CPU",
+                "THREADS",
+                "OPEN FILES",
+                "PLAYERS",
+                "UPTIME",
+                "LOOP LAG",
+                "WORST",
+                "STALLS",
+                "LOG",
             ],
             5,
         );
@@ -829,7 +937,18 @@ impl System {
     fn show(&self, snapshot: &Snapshot) {
         self.lag.queue_draw();
         let process = &snapshot.process;
-        let [memory, cpu, threads, files, players, uptime, lag, worst, stalls, log] = &self.tiles;
+        let [
+            memory,
+            cpu,
+            threads,
+            files,
+            players,
+            uptime,
+            lag,
+            worst,
+            stalls,
+            log,
+        ] = &self.tiles;
         memory.set(
             &format!("{:.0} MB", process.rss_mb),
             &format!("peak {:.0} MB", process.peak_rss_mb),
@@ -838,7 +957,11 @@ impl System {
         cpu.set(
             &format!("{:.0} %", process.cpu_percent),
             "of one core",
-            if process.cpu_percent > 80.0 { "red" } else { "" },
+            if process.cpu_percent > 80.0 {
+                "red"
+            } else {
+                ""
+            },
         );
         threads.set(&process.threads.to_string(), "", "");
         files.set(&process.open_files.to_string(), "", "");
@@ -850,11 +973,19 @@ impl System {
         players.set(
             &process.players.len().to_string(),
             &format!("{playing} playing"),
-            if process.players.len() > 4 { "amber" } else { "" },
+            if process.players.len() > 4 {
+                "amber"
+            } else {
+                ""
+            },
         );
         uptime.set(&short_clock(snapshot.uptime), "", "");
         let main_loop = &snapshot.main_loop;
-        lag.set(&format!("{:.1} ms", main_loop.lag_ms_mean), "mean, last 60 s", "");
+        lag.set(
+            &format!("{:.1} ms", main_loop.lag_ms_mean),
+            "mean, last 60 s",
+            "",
+        );
         worst.set(
             &format!("{:.0} ms", main_loop.lag_ms_max),
             "last 60 s",
@@ -1305,7 +1436,7 @@ impl Inner {
         // Between two snapshots only the playheads move.
         let looks = self.looks.get().wrapping_add(1);
         self.looks.set(looks);
-        if looks % SNAPSHOT_EVERY != 0 && *self.looked_at.borrow() == page {
+        if !looks.is_multiple_of(SNAPSHOT_EVERY) && *self.looked_at.borrow() == page {
             if page == "decks" {
                 let positions = super::COLLECTOR.with_borrow(|collector| collector.positions());
                 let mut snapshot = self.snapshot.borrow_mut();
@@ -1353,10 +1484,7 @@ impl Inner {
         let smooth = |old: f64, new: Duration| old + (new.as_secs_f64() * 1000.0 - old) * 0.1;
         cost.collect_ms = smooth(cost.collect_ms, collected);
         cost.show_ms = smooth(cost.show_ms, began.elapsed() - collected);
-        cost.draw_ms = smooth(
-            cost.draw_ms,
-            self.drawn.take() / SNAPSHOT_EVERY,
-        );
+        cost.draw_ms = smooth(cost.draw_ms, self.drawn.take() / SNAPSHOT_EVERY);
         super::COST.set(cost);
     }
 

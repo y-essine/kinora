@@ -316,6 +316,11 @@ pub struct LogLine {
     pub text: String,
 }
 
+/// When a page's buffer was asked about, what was buffered, and its demuxer.
+type Buffered = (Instant, Option<f64>, Option<glib::WeakRef<gst::Element>>);
+/// A page on a deck: as what, and the beats a running fade read for it.
+type Shown = (VideoPage, &'static str, Option<(BeatGrid, &'static str)>);
+
 /// Takes snapshots, and remembers between them what is slow to look up.
 #[derive(Default)]
 pub struct Collector {
@@ -323,7 +328,7 @@ pub struct Collector {
     slots: [Option<String>; 2],
     beats: HashMap<String, (Instant, Option<TrackBeats>)>,
     /// Per page: when it was asked, what is buffered, and its demuxer.
-    buffer: HashMap<usize, (Instant, Option<f64>, Option<glib::WeakRef<gst::Element>>)>,
+    buffer: HashMap<usize, Buffered>,
     process: Option<(Instant, Process)>,
     cpu: Option<(Instant, u64)>,
     app: Option<App>,
@@ -331,6 +336,10 @@ pub struct Collector {
     pages: [Option<glib::WeakRef<VideoPage>>; 2],
     /// Per page: what it plays, looked up once a second.
     streams: HashMap<usize, (Instant, Stream)>,
+    /// The beat matching of the fade that ran last, and how ready its
+    /// incoming track was.
+    last_sync: Option<Sync>,
+    last_readiness: Option<String>,
 }
 
 const SLOW: Duration = Duration::from_millis(1000);
@@ -377,7 +386,8 @@ fn video_id(id: &str) -> pcore::VideoId {
 /// A track's prepared stream, as the DJ would play it.
 fn prepared_uri(client: &Client, id: &str) -> Option<String> {
     let (core, id) = (client.core(), video_id(id));
-    core.prepared_audio_uri(&id).or_else(|| core.prepared_uri(&id))
+    core.prepared_audio_uri(&id)
+        .or_else(|| core.prepared_uri(&id))
 }
 
 impl Collector {
@@ -390,8 +400,7 @@ impl Collector {
         let notes = logs::notes();
 
         // Which pages are on the decks, and as what.
-        let mut shown: Vec<(VideoPage, &'static str, Option<(BeatGrid, &'static str)>)> =
-            Vec::new();
+        let mut shown: Vec<Shown> = Vec::new();
         let mut queued_deck = None;
         match probe.as_ref() {
             Some(dj) => {
@@ -400,7 +409,8 @@ impl Collector {
                     shown.push((
                         fade.outgoing.clone(),
                         "out",
-                        sync.and_then(|sync| sync.outgoing).map(|grid| (grid, "tail")),
+                        sync.and_then(|sync| sync.outgoing)
+                            .map(|grid| (grid, "tail")),
                     ));
                     shown.push((
                         fade.incoming.clone(),
@@ -483,7 +493,18 @@ impl Collector {
                 .collect()
         });
 
-        let fade = Self::fade(probe.as_ref(), full);
+        let mut fade = Self::fade(probe.as_ref(), full);
+        match fade.as_mut() {
+            Some(fade) if fade.live => {
+                self.last_sync = fade.sync.clone();
+                self.last_readiness = fade.readiness.clone();
+            }
+            Some(fade) => {
+                fade.sync = self.last_sync.clone();
+                fade.readiness = self.last_readiness.clone();
+            }
+            None => {}
+        }
         // The fade's own gains (a player's volume says the same, unless the
         // user's volume is 0).
         if let Some(fade) = fade.as_ref().filter(|fade| fade.live) {
@@ -502,8 +523,11 @@ impl Collector {
             matches!(what, What::System | What::All),
         );
         let mut app = self.app();
-        app.panel_open = super::PANEL
-            .with_borrow(|panel| panel.as_ref().is_some_and(|panel| panel.window().is_visible()));
+        app.panel_open = super::PANEL.with_borrow(|panel| {
+            panel
+                .as_ref()
+                .is_some_and(|panel| panel.window().is_visible())
+        });
 
         Snapshot {
             schema: SCHEMA,
@@ -766,11 +790,7 @@ impl Collector {
             .map(|uri| uri.to_string());
         let prepared = page.playing_uri();
         let manifest = |uri: &str| {
-            if uri.contains(".mpd") {
-                "DASH"
-            } else {
-                "HLS"
-            }
+            if uri.contains(".mpd") { "DASH" } else { "HLS" }
         };
         let kind = match (&prepared, &item_uri) {
             _ if video.downloaded() => "downloaded file".to_owned(),
@@ -950,6 +970,12 @@ impl Collector {
         let live = probe.and_then(|dj| dj.fade.as_ref());
         super::FADE.with_borrow(|log| {
             let last = log.samples.last().copied();
+            // (While a nudge is heard nothing is read: the reading before it stands.)
+            let reading = log
+                .samples
+                .iter()
+                .rev()
+                .find_map(|sample| Some((sample.beat_ms?, sample.settled)));
             let id = |page: &VideoPage| page.video().map(|video| video.id().id);
             match live {
                 Some(fade) => {
@@ -984,8 +1010,10 @@ impl Collector {
                             errors_ms: sync.errors.iter().map(|e| e * 1000.0).collect(),
                             nudging: sync.nudging,
                         }),
-                        beat_ms: last.and_then(|s| s.beat_ms).map(f64::from),
-                        beat_settled: last.is_some_and(|s| s.settled),
+                        beat_ms: reading
+                            .filter(|_| fade.running.is_some())
+                            .map(|(ms, _)| ms as f64),
+                        beat_settled: reading.is_some_and(|(_, settled)| settled),
                         samples: if full && fade.running.is_some() {
                             log.samples.clone()
                         } else {
@@ -1000,9 +1028,13 @@ impl Collector {
                     total: log.total,
                     gain_out: last.out as f64,
                     gain_in: last.inc as f64,
-                    beat_ms: last.beat_ms.map(f64::from),
-                    beat_settled: last.settled,
-                    samples: if full { log.samples.clone() } else { Vec::new() },
+                    beat_ms: reading.map(|(ms, _)| ms as f64),
+                    beat_settled: reading.is_some_and(|(_, settled)| settled),
+                    samples: if full {
+                        log.samples.clone()
+                    } else {
+                        Vec::new()
+                    },
                     ..Fade::default()
                 }),
             }
@@ -1052,7 +1084,9 @@ impl Collector {
             title: video.title(),
             uploader: video.uploader().name(),
             uploader_id: video.uploader().id().id,
-            duration: video.duration().map(|d| d.num_milliseconds() as f64 / 1000.0),
+            duration: video
+                .duration()
+                .map(|d| d.num_milliseconds() as f64 / 1000.0),
             views: video.has_views().then(|| video.views()),
             likes: video.has_likes().then(|| video.likes()),
             live: video.is_live(),

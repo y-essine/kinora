@@ -157,7 +157,7 @@ impl Heart {
 thread_local! {
     static PAGES: RefCell<Vec<glib::WeakRef<VideoPage>>> = const { RefCell::new(Vec::new()) };
     static FADE: RefCell<FadeLog> = RefCell::new(FadeLog::default());
-    static HEART: RefCell<Heart> = RefCell::new(Heart { lags: VecDeque::new(), stalls: 0 });
+    static HEART: RefCell<Heart> = const { RefCell::new(Heart { lags: VecDeque::new(), stalls: 0 }) };
     static COST: std::cell::Cell<state::PanelCost> = const { std::cell::Cell::new(state::PanelCost { collect_ms: 0.0, show_ms: 0.0, draw_ms: 0.0 }) };
     static PANEL: RefCell<Option<panel::Panel>> = const { RefCell::new(None) };
     static COLLECTOR: RefCell<state::Collector> = RefCell::new(state::Collector::default());

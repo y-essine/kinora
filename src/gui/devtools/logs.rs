@@ -192,16 +192,31 @@ mod tests {
     #[test]
     fn the_djs_lines_are_read() {
         let mut notes = Notes::default();
-        note(&mut notes, "DJ: crossfade to abc (Song), planned over 6.0 s");
-        note(&mut notes, "DJ: beat match: 126.0 BPM into 128.0 BPM: stretch +1.6 %");
-        note(&mut notes, "DJ: beat match: 12 readings, beats 4 ms apart on average");
+        note(
+            &mut notes,
+            "DJ: crossfade to abc (Song), planned over 6.0 s",
+        );
+        note(
+            &mut notes,
+            "DJ: beat match: 126.0 BPM into 128.0 BPM: stretch +1.6 %",
+        );
+        note(
+            &mut notes,
+            "DJ: beat match: 12 readings, beats 4 ms apart on average",
+        );
         assert_eq!(
             notes.matched.as_deref(),
             Some("126.0 BPM into 128.0 BPM: stretch +1.6 %")
         );
         assert!(notes.summary.as_deref().unwrap().starts_with("12 readings"));
-        note(&mut notes, "DJ: could not decode xyz for its beats: timed out");
-        note(&mut notes, "DJ: Next by hand: crossfade to def (Other) over the 6 s setting");
+        note(
+            &mut notes,
+            "DJ: could not decode xyz for its beats: timed out",
+        );
+        note(
+            &mut notes,
+            "DJ: Next by hand: crossfade to def (Other) over the 6 s setting",
+        );
         assert!(notes.matched.is_none());
         assert_eq!(notes.analysis_failed["xyz"], "timed out");
         note(

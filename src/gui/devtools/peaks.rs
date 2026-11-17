@@ -324,7 +324,9 @@ mod tests {
         };
         let read = |samples: &[f32]| {
             let (mut reader, mut bins) = (Reader::default(), Vec::new());
-            reader.feed(samples, 1, rate, 0.0, &mut |index, bin| bins.push((index, bin)));
+            reader.feed(samples, 1, rate, 0.0, &mut |index, bin| {
+                bins.push((index, bin))
+            });
             bins
         };
         let kick = read(&tone(60.0));
@@ -348,7 +350,10 @@ mod tests {
         track.put(3, bin(10), true);
         track.put(3, bin(20), false);
         track.put(5, bin(30), false);
-        assert_eq!((track.bins[3].amp, track.bins[5].amp, track.known), (10, 30, 2));
+        assert_eq!(
+            (track.bins[3].amp, track.bins[5].amp, track.known),
+            (10, 30, 2)
+        );
         assert!(!track.bins[4].known);
     }
 }

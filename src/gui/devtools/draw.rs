@@ -32,21 +32,49 @@ fn color(cr: &Context, (r, g, b): Rgb, alpha: f64) {
     cr.set_source_rgba(r, g, b, alpha);
 }
 
-fn rounded(cr: &Context, x: f64, y: f64, w: f64, h: f64, r: f64) {
-    use std::f64::consts::{FRAC_PI_2, PI};
-    cr.new_sub_path();
-    cr.arc(x + w - r, y + r, r, -FRAC_PI_2, 0.0);
-    cr.arc(x + w - r, y + h - r, r, 0.0, FRAC_PI_2);
-    cr.arc(x + r, y + h - r, r, FRAC_PI_2, PI);
-    cr.arc(x + r, y + r, r, PI, PI + FRAC_PI_2);
-    cr.close_path();
-}
-
-fn well(cr: &Context, w: f64, h: f64) {
-    rounded(cr, 0.0, 0.0, w, h, 6.0);
-    cr.clip();
+/// The dark ground of a graph. (Its round corners are the widget's, in CSS:
+/// a clip that is not a rectangle makes everything drawn in it slow.)
+fn well(cr: &Context, _w: f64, _h: f64) {
     color(cr, WELL, 1.0);
     let _ = cr.paint();
+}
+
+/// The outline of a run of bins, mirrored about `mid`, as one path: every
+/// stretch of known bins is one shape, whatever its length. (A rectangle
+/// per bin is hundreds of them a layer, twenty times a second.)
+fn envelope(
+    cr: &Context,
+    bins: &[peaks::Bin],
+    x_of: impl Fn(usize) -> f64,
+    bar: f64,
+    mid: f64,
+    height: impl Fn(&peaks::Bin) -> f64,
+) -> bool {
+    let (mut any, mut start) = (false, 0);
+    while start < bins.len() {
+        if !bins[start].known {
+            start += 1;
+            continue;
+        }
+        let end = bins[start..]
+            .iter()
+            .position(|bin| !bin.known)
+            .map_or(bins.len(), |gap| start + gap);
+        cr.move_to(x_of(start), mid);
+        for (index, bin) in bins[start..end].iter().enumerate() {
+            let (x, y) = (x_of(start + index), mid - height(bin));
+            cr.line_to(x, y);
+            cr.line_to(x + bar, y);
+        }
+        for (index, bin) in bins[start..end].iter().enumerate().rev() {
+            let (x, y) = (x_of(start + index), mid + height(bin));
+            cr.line_to(x + bar, y);
+            cr.line_to(x, y);
+        }
+        cr.close_path();
+        (any, start) = (true, end);
+    }
+    any
 }
 
 fn text(cr: &Context, x: f64, y: f64, size: f64, rgb: Rgb, alpha: f64, what: &str) {
@@ -135,28 +163,26 @@ pub fn wave(cr: &Context, w: f64, h: f64, deck: Option<&Deck>) {
         if from >= to {
             return false;
         }
-        let bar = (pps / PER_SECOND).max(1.0);
+        let bar = pps / PER_SECOND;
         let mut any = false;
-        // One pass and one fill per layer: the peak's outline, then the
-        // bands, the tallest behind.
-        let layers: [(Rgb, f64, fn(&peaks::Bin) -> u8); 4] = [
-            (MID, 0.16, |bin| bin.amp),
-            (LOW, 0.95, |bin| bin.low),
-            (MID, 0.95, |bin| bin.mid),
-            (HIGH, 0.92, |bin| bin.high),
+        // One shape and one fill per layer: the peak's outline, then the
+        // bands, the tallest behind, narrowing towards the front.
+        type Level = fn(&peaks::Bin) -> u8;
+        let layers: [(Rgb, f64, f64, Level); 4] = [
+            (MID, 0.16, 1.0, |bin| bin.amp),
+            (LOW, 1.0, 1.0, |bin| bin.low),
+            (MID, 1.0, 0.7, |bin| bin.mid),
+            (HIGH, 1.0, 0.38, |bin| bin.high),
         ];
-        for (index, (rgb, alpha, level)) in layers.into_iter().enumerate() {
-            for (offset, bin) in track.bins[from..to].iter().enumerate() {
-                if !bin.known {
-                    continue;
-                }
-                any = true;
-                // The bands narrow towards the front, like a record's groove.
-                let scale = [1.0, 1.0, 0.7, 0.38][index];
-                let height = (level(bin) as f64 / 255.0 * half * scale).max(0.5);
-                let x = x_of((from + offset) as f64 / PER_SECOND);
-                cr.rectangle(x, mid - height, bar, height * 2.0);
-            }
+        for (rgb, alpha, scale, level) in layers {
+            any |= envelope(
+                cr,
+                &track.bins[from..to],
+                |index| x_of((from + index) as f64 / PER_SECOND),
+                bar,
+                mid,
+                |bin| (level(bin) as f64 / 255.0 * half * scale).max(0.5),
+            );
             color(cr, rgb, alpha);
             let _ = cr.fill();
         }
@@ -246,6 +272,8 @@ pub fn overview(cr: &Context, w: f64, h: f64, deck: Option<&Deck>) {
             return;
         };
         let per_px = duration * PER_SECOND / w;
+        // (Whole pixels: no edges to smooth.)
+        cr.set_antialias(gtk::cairo::Antialias::None);
         for played in [true, false] {
             let (from, to) = if played {
                 (0, now as usize)
@@ -271,6 +299,7 @@ pub fn overview(cr: &Context, w: f64, h: f64, deck: Option<&Deck>) {
             color(cr, AMBER, if played { 0.32 } else { 0.85 });
             let _ = cr.fill();
         }
+        cr.set_antialias(gtk::cairo::Antialias::Default);
     });
     if let Some(ahead) = deck.buffered_ahead.filter(|ahead| *ahead > 0.0) {
         color(cr, MINT, 0.9);
@@ -407,6 +436,13 @@ pub fn offsets(cr: &Context, w: f64, h: f64, log: &FadeLog, note: &str) {
         }
         cr.set_line_width(1.6);
         let _ = cr.stroke();
+        // (A reading on its own, between two nudges, is a dot.)
+        for sample in &log.samples {
+            if let Some(ms) = sample.beat_ms.filter(|_| sample.settled == settled) {
+                cr.rectangle(x_of(sample.t as f64) - 1.5, y_of(ms as f64) - 1.5, 3.0, 3.0);
+            }
+        }
+        let _ = cr.fill();
     }
     text(cr, 6.0, 11.0, 8.5, TEXT, 0.4, &format!("+{range:.0} ms"));
     text(cr, 6.0, h - 5.0, 8.5, TEXT, 0.4, &format!("-{range:.0} ms"));
@@ -428,7 +464,15 @@ pub fn lag(cr: &Context, w: f64, h: f64, heart: &Heart, now: f64) {
             color(cr, rgb, 0.35);
             cr.rectangle(0.0, y_of(ms).round(), w, 1.0);
             let _ = cr.fill();
-            text(cr, 4.0, y_of(ms) - 3.0, 8.5, rgb, 0.7, &format!("{ms:.0} ms"));
+            text(
+                cr,
+                4.0,
+                y_of(ms) - 3.0,
+                8.5,
+                rgb,
+                0.7,
+                &format!("{ms:.0} ms"),
+            );
         }
     }
     for stalled in [false, true] {
