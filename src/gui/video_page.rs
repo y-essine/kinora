@@ -282,13 +282,15 @@ impl VideoPage {
             let player = imp.settings.string("player");
 
             if player.is_empty() {
-                self.window().show_toast(
-                    Toast::builder()
-                        .title(gettextrs::gettext(
-                            "Configure your external player in the preferences first",
-                        ))
-                        .build(),
-                );
+                if let Some(w) = self.window() {
+                    w.show_toast(
+                        Toast::builder()
+                            .title(gettextrs::gettext(
+                                "Configure your external player in the preferences first",
+                            ))
+                            .build(),
+                    );
+                }
                 return;
             }
 
@@ -310,8 +312,9 @@ impl VideoPage {
                         Utility::run_command_on_url(player, url, remove_gsk_renderer_env_variable)
                             .await;
                     if let Err(e) = res {
-                        s.window()
-                            .display_error(gettextrs::gettext("Failed to spawn video player"), e);
+                        if let Some(w) = s.window() {
+                            w.display_error(gettextrs::gettext("Failed to spawn video player"), e);
+                        }
                     }
                 }
             ));
@@ -867,8 +870,10 @@ impl VideoPage {
         }
     }
 
-    fn window(&self) -> Window {
-        self.root().unwrap().dynamic_cast().unwrap()
+    /// The window this page is in; `None` for a page that is not (a warm or
+    /// released DJ deck), whose errors and toasts go nowhere.
+    fn window(&self) -> Option<Window> {
+        self.root().and_then(|r| r.dynamic_cast().ok())
     }
 
     fn try_get_downloaded(&self, video: &Video) -> Option<String> {
@@ -878,13 +883,15 @@ impl VideoPage {
             } else {
                 self.client().remove_downloaded(video);
                 video.set_downloaded_path(None::<String>);
-                self.window().show_toast(
-                    Toast::builder()
-                        .title(gettextrs::gettext(
-                            "Downloaded video not available locally anymore",
-                        ))
-                        .build(),
-                );
+                if let Some(w) = self.window() {
+                    w.show_toast(
+                        Toast::builder()
+                            .title(gettextrs::gettext(
+                                "Downloaded video not available locally anymore",
+                            ))
+                            .build(),
+                    );
+                }
                 None
             }
         } else {
@@ -1340,10 +1347,12 @@ pub mod imp {
                             let result = client.populate_video_information(&video.id()).await;
                             if let Err(e) = result {
                                 log::error!("Failed to populate video information: {e}");
-                                obj.window().display_error(
-                                    gettextrs::gettext("Failed to populate video information"),
-                                    Box::new(e),
-                                );
+                                if let Some(w) = obj.window() {
+                                    w.display_error(
+                                        gettextrs::gettext("Failed to populate video information"),
+                                        Box::new(e),
+                                    );
+                                }
                             }
 
                             // The video thumbnail could have changed after updating the information; reload the thumbnail.
@@ -1359,10 +1368,12 @@ pub mod imp {
                             };
                             if let Err(e) = result {
                                 log::error!("Failed to populate channel information: {e}");
-                                obj.window().display_error(
-                                    gettextrs::gettext("Failed to fetch channel information"),
-                                    Box::new(e),
-                                );
+                                if let Some(w) = obj.window() {
+                                    w.display_error(
+                                        gettextrs::gettext("Failed to fetch channel information"),
+                                        Box::new(e),
+                                    );
+                                }
                             }
                         },
                     ),
