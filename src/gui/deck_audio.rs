@@ -643,3 +643,62 @@ pub fn decode(
         _ => Ok(std::mem::take(&mut taken.pcm)),
     }
 }
+
+/// Kinora: what the Dev panel reads (see `gui/devtools`); development builds only.
+#[cfg(feature = "dev-hooks")]
+impl Tap {
+    /// The sample rate and the channels of what goes through.
+    pub fn dev_format(&self) -> (u32, u32) {
+        (
+            self.shared.rate.load(Ordering::Relaxed),
+            self.shared.channels.load(Ordering::Relaxed),
+        )
+    }
+
+    /// The tap stays at work for tempo changes (see [`Tap::set_engaged`]).
+    pub fn dev_engaged(&self) -> bool {
+        self.shared.engaged.load(Ordering::Relaxed)
+    }
+
+    /// The player's pipeline, once the tap is in it.
+    pub fn dev_pipeline(&self) -> Option<gst::Element> {
+        let mut top: gst::Object = self.bin.clone().upcast();
+        while let Some(parent) = top.parent() {
+            top = parent;
+        }
+        top.downcast::<gst::Element>()
+            .ok()
+            .filter(|top| *top != self.bin)
+    }
+
+    /// What was kept after the track time `from`: stereo frames, oldest
+    /// first, in one or two pieces, each with the rate and where it starts.
+    /// Nothing is copied.
+    pub fn dev_read(&self, from: f64, take: &mut dyn FnMut(&[f32], u32, f64)) {
+        let ring = self.shared.ring.lock().unwrap();
+        if ring.filled == 0 || ring.rate == 0 {
+            return;
+        }
+        let rate = ring.rate as f64;
+        let start = ring.end - ring.filled as f64 / rate;
+        let skip = (((from - start).max(0.0) * rate) as usize).min(ring.filled);
+        let frames = ring.filled - skip;
+        if frames == 0 {
+            return;
+        }
+        let capacity = ring.capacity();
+        let first = (ring.head + capacity - frames) % capacity;
+        let at = ring.end - frames as f64 / rate;
+        if first + frames <= capacity {
+            take(&ring.samples[first * 2..(first + frames) * 2], ring.rate, at);
+        } else {
+            let head = capacity - first;
+            take(&ring.samples[first * 2..], ring.rate, at);
+            take(
+                &ring.samples[..(frames - head) * 2],
+                ring.rate,
+                at + head as f64 / rate,
+            );
+        }
+    }
+}

@@ -1,0 +1,160 @@
+/* Kinora: the Dev panel (development builds only; see src/gui/devtools).
+   The app's own tokens (data/resources/style.css), set like an instrument:
+   small capitals for what a number is, a monospace for the number. */
+
+.k-dev {
+  background-color: var(--k-bg);
+  color: var(--k-text);
+}
+
+.k-dev-page {
+  padding: 12px;
+}
+
+.k-dev-card {
+  background-color: var(--k-surface-1);
+  border: 1px solid var(--k-line);
+  border-radius: var(--k-radius-m);
+  padding: 12px;
+}
+
+.k-dev-h {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--k-text-faint);
+}
+
+.k-dev-letter {
+  font-size: 15px;
+  font-weight: 800;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 8px;
+  background-color: var(--k-accent);
+  color: var(--k-on-accent);
+}
+
+.k-dev-letter.idle {
+  background-color: var(--k-surface-3);
+  color: var(--k-text-faint);
+}
+
+.k-dev-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.k-dev-sub,
+.k-dev-note {
+  font-family: monospace;
+  font-size: 10.5px;
+  color: var(--k-text-faint);
+}
+
+.k-dev-chip {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 9px;
+  border-radius: var(--k-radius-pill);
+  background-color: var(--k-surface-3);
+  color: var(--k-text-dim);
+}
+
+.k-dev-chip.amber {
+  background-color: rgba(255, 180, 84, 0.16);
+  color: var(--k-accent);
+}
+
+.k-dev-chip.mint {
+  background-color: rgba(87, 219, 163, 0.14);
+  color: #57dba3;
+}
+
+.k-dev-chip.cyan {
+  background-color: rgba(92, 204, 255, 0.14);
+  color: #5cccff;
+}
+
+.k-dev-chip.red {
+  background-color: rgba(255, 107, 107, 0.16);
+  color: #ff6b6b;
+}
+
+.k-dev-chip.dim {
+  background-color: var(--k-surface-2);
+  color: var(--k-text-faint);
+}
+
+.k-dev-tile {
+  background-color: var(--k-surface-2);
+  border-radius: var(--k-radius-s);
+  padding: 6px 9px 7px 9px;
+}
+
+.k-dev-cap {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--k-text-faint);
+}
+
+.k-dev-val {
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: 600;
+  font-feature-settings: "tnum";
+}
+
+.k-dev-val.amber {
+  color: var(--k-accent);
+}
+
+.k-dev-val.cyan {
+  color: #5cccff;
+}
+
+.k-dev-val.mint {
+  color: #57dba3;
+}
+
+.k-dev-val.red {
+  color: #ff6b6b;
+}
+
+.k-dev-val.dim {
+  color: var(--k-text-faint);
+}
+
+.k-dev-key {
+  font-size: 11px;
+  color: var(--k-text-faint);
+}
+
+.k-dev-td {
+  font-family: monospace;
+  font-size: 11.5px;
+}
+
+.k-dev-td.dim {
+  color: var(--k-text-faint);
+}
+
+.k-dev-mono {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--k-text-dim);
+}
+
+textview.k-dev-log,
+textview.k-dev-log text {
+  font-family: monospace;
+  font-size: 11px;
+  background-color: #08090b;
+  color: var(--k-text-dim);
+}
+
+.k-dev-logbar {
+  padding: 8px 12px;
+}

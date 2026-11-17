@@ -693,6 +693,34 @@ impl VideoPage {
             .map_or(clapper::PlayerState::Stopped, |p| p.state())
     }
 
+    /// Dev panel (see `gui/devtools`): what only the page knows of its player.
+    #[cfg(feature = "dev-hooks")]
+    pub fn dev_probe(&self) -> crate::gui::devtools::DeckProbe {
+        let imp = self.imp();
+        let tap = imp.tap();
+        crate::gui::devtools::DeckProbe {
+            warming: imp.warming.get(),
+            warm_held: imp.warm_held.get(),
+            audio_stream: imp.audio_stream.get(),
+            fast_start: imp.fast_start_active.get(),
+            fade_base: imp.fade_base.get(),
+            scratching: imp.scratch.borrow().is_some(),
+            format: tap.map_or((0, 0), |tap| tap.dev_format()),
+            engaged: tap.is_some_and(|tap| tap.dev_engaged()),
+            pipeline: tap.and_then(|tap| tap.dev_pipeline()),
+            age: imp.born.elapsed().as_secs_f64(),
+        }
+    }
+
+    /// Dev panel: the audio the tap kept after the track time `from` (see
+    /// `Tap::dev_read`).
+    #[cfg(feature = "dev-hooks")]
+    pub fn dev_read_audio(&self, from: f64, take: &mut dyn FnMut(&[f32], u32, f64)) {
+        if let Some(tap) = self.imp().tap() {
+            tap.dev_read(from, take);
+        }
+    }
+
     /// Test hook: scroll the page down to `y`.
     #[cfg(feature = "dev-hooks")]
     pub fn dev_scroll_to(&self, y: f64) {
@@ -2838,6 +2866,8 @@ pub mod imp {
             self.parent_constructed();
             self.setup();
             self.setup_actions();
+            #[cfg(feature = "dev-hooks")]
+            crate::gui::devtools::page_born(&self.obj());
         }
 
         fn signals() -> &'static [Signal] {

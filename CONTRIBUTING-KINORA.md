@@ -12,7 +12,8 @@ Upstream Pipeline's guide is in [CONTRIBUTING.md](CONTRIBUTING.md); this is the 
 
 - **Development build** (`dev/build.sh`): app ID `io.github.y_essine.Kinora.Devel`, built with the `dev-hooks` feature. It runs next to an installed Kinora.
 - **Kept apart** (`dev/run.sh`): its own library, cache and settings under `.dev/home/` (settings in a keyfile, not dconf), so testing never touches your real Kinora. To give it an account, use *Connect Account* in the dev build, or put `account-cookies-command` in `.dev/home/config/glib-2.0/settings/keyfile`.
-- **Inspect live**: `GTK_DEBUG=interactive dev/run.sh` (or Ctrl+Shift+D) opens the GTK Inspector: widget tree, properties, live CSS.
+- **Inspect live**: `GTK_DEBUG=interactive dev/run.sh` (or Ctrl+Shift+I) opens the GTK Inspector: widget tree, properties, live CSS.
+- **Dev panel** (development builds only): **Ctrl+Shift+D** or **F12** opens a window beside the app that shows what the player and the DJ are doing; the same keys close it. See [Dev panel](#dev-panel) below, also for `dev-dump`, which writes the same data as JSON.
 - **Test hooks** (`dev-hooks` feature, never in release builds) drive the app without clicking:
   `KH_PAGE=feed`, `KH_SEARCH=lofi`, `KH_OPEN=0` (Nth Home video), `KH_ACTION=settings@5,connect-account@20`, `KH_NEXT_AFTER=15`, `KH_SCROLL_AFTER=12`, `KH_HOME_SCROLL=600@12` (scroll Home down 600 px after 12 s).
   The player sheet is driven by actions: `KH_ACTION=minimize-player@12,expand-player@18,player-next@22,close-player@30` (also `toggle-player`, `player-previous`); `KH_SHEET_PROGRESS=0.6@12` holds it between minimized (0) and expanded (1), `KH_MINI_DOCK=left` docks the mini-player on the left. `video.NAME` actions go to the open video page (e.g. `KH_ACTION=video.play-pause@22` pauses, which shows the controls). `KH_PREFS_PAGE=extensions` with `KH_ACTION=settings@3` opens Preferences on that page. The seek bar's buffered part logs with `RUST_LOG=kinora::gui::buffer_bar=debug`; a window on a hidden workspace never sets the seek bar's range, so it shows only on screen.
@@ -28,3 +29,43 @@ Upstream Pipeline's guide is in [CONTRIBUTING.md](CONTRIBUTING.md); this is the 
 - **Side by side**: development builds do not hand over to an instance that is already running, so builds from several checkouts (or two windows of one, to compare states) run next to each other.
 - **Design**: the look is described in [docs/design.md](docs/design.md); new interface parts use its tokens and components.
 - **Faster builds**: `dev/build.sh` links with `mold` when it's installed, and uses `sccache` in linked git worktrees so parallel checkouts share compiled dependencies (in the main checkout sccache would add ~1 s to every small rebuild). Measured: a one-file Rust change rebuilds in about 3 s.
+
+## Dev panel
+
+Development builds (`dev-hooks`) have a second window that shows, live, what the player and the DJ are doing. Release builds have none of it (`src/gui/devtools/` is compiled only with the feature).
+
+- **Open and close**: Ctrl+Shift+D or F12 in the app or in the panel, or the `dev-panel` action (`KH_ACTION=dev-panel@6`, or `dev-panel` written to the `KH_CTL` file). It is an ordinary window: tile it beside the app. (GTK's Inspector keeps Ctrl+Shift+I.)
+- **Decks**: deck A and deck B, as in DJ software; a track stays on its deck while it plays, the next one loads on the other. Each has a scrolling waveform of 12 s around the playhead in three bands (kick red, body amber, air white), with the beat grid (every fourth beat stronger), the *Start on the Beat* entry (cyan flag), what is buffered ahead (mint line) and how far audio is decoded (amber tick); under it the whole track in one strip. The tiles: time and what is left, seconds buffered ahead, the fade's gain and the player's volume, the tempo, BPM with its confidence and where the grid is from (`intro`, `entry`, or `tail`/`fade` during a crossfade), the entry, the stream (`HLS audio` prepared, `fast start`, `yt-dlp` for the fallback) with the manifest's size, the format, and for a track loaded ahead whether it is warm and for how long. The whole-track waveform is decoded in the background from the prepared stream while the Decks page shows (one track at a time, thread `kinora-devwave`); without a prepared stream the waveform is what the deck's `Tap` kept of what played.
+- **Crossfade**: both gains over the fade with where it is, and for *Match Beats* how far the beats are apart over time (grey while the incoming player's clock settles, amber once it counts; the band is the 12 ms inside which nothing is nudged), the stretch, both tempos, the stage (`waiting`, `resting`, `held`, `matched`), and in words what the DJ's log said: the match, or why it was skipped, and the summary when the fade is over. The last fade stays until the next one.
+- **Queue**: the video in the player (ids, uploader, length, whether a stream is prepared) and the queue's first eight tracks: `COLD`, `PREPARING`, `PREPARED`, `WARMING` or `WARM`, and the beat analysis (`cached` with BPM and confidence, `analysing`, `pending`, `no beat`, `failed: why`, `off`) with the entry.
+- **System**: memory, CPU, threads (by name), open files, the video pages that are alive and what each is (`current`, `outgoing`, `incoming`, `warm`, `retired`), the main loop's lag over the last minute (how late timers came; 100 ms or more is a stall), the build, the `KH_*` hooks in force, and what the panel itself costs.
+- **Log**: the app's log (what `RUST_LOG` lets through, the last 4000 lines), with a least level and a text filter; *Follow* keeps the end in view.
+- **Cost**: closed, a timer four times a second that notes the main loop's lag, and one push per step of a fade. Open, a snapshot five times a second and the waveforms redrawn twenty times a second, only for the page that shows, and nothing while the window is on another workspace.
+
+### `dev-dump`: the same data as JSON
+
+For a test session that cannot look at the screen. The `dev-dump` action (`KH_ACTION=dev-dump@30`, `dev-dump` in the `KH_CTL` file, or the panel's save button) writes one snapshot to `KH_DUMP` (default `.dev/state.json` under the working directory); `KH_DUMP_EVERY=2` writes it every 2 seconds. The file is replaced whole, never half written. The panel need not be open. Times are seconds unless a name ends in `_ms`.
+
+| Key | What |
+|---|---|
+| `schema` | `1`; raised when a field changes its meaning |
+| `written`, `uptime` | local time (RFC 3339); seconds since the app started (the log's `at` counts from the same moment) |
+| `app` | `version`, `app_id`, `profile`, `pid`, `gtk`, `gstreamer`, `panel_open`, `env` (the `KH_*` hooks and `RUST_LOG`) |
+| `process` | `rss_mb`, `peak_rss_mb`, `cpu_percent` (of one core, since the snapshot before), `threads`, `thread_names` (`[name, count]`, most first), `open_files`, `players[]`: `id`, `state`, `role` (`current`, `outgoing`, `incoming`, `warm`, `retired`), `age` |
+| `main_loop` | `lag_ms_mean` and `lag_ms_max` over the last minute, `stalls` (timers 100 ms late or more, since the start), `samples` (`[uptime, lag_ms]`) |
+| `dj` | `on`, `settings` (`crossfade` as `{secs, nanos}`, `match_beats`, `start_on_beat`, `show_video`, `avoid_repeats`, `start_from`), `seed`, `source`, `queued`, `played`, `starting`, `refilling`, `hovered`, `warm[]` (`id`, `ready`, `since`) |
+| `decks[]` | deck `A` and `B`, see below |
+| `fade` | the crossfade that runs or the last one (`null` before the first), see below |
+| `queue[]` | the first eight: `id`, `title`, `artist`, `duration`, `kind`, `stream` (`warm`, `warming`, `prepared`, `preparing`, `cold`), `beats` (as in a deck) |
+| `video` | what is in the player: `id`, `platform`, `title`, `uploader`, `uploader_id`, `duration`, `views`, `likes`, `live`, `uploaded`, `downloaded`, `dj_page`, `audio_only`, `prepared`, `prepared_audio` |
+| `notes` | read off the DJ's log lines for the current or last fade: `fade`, `started`, `matched`, `skipped` (why there was no beat match), `held`, `summary`; `analysis_failed` (`{id: why}`); `warnings` and `errors` counted since the start |
+| `panel` | what the open panel costs: `collect_ms`, `show_ms` (5 times a second), `draw_ms` (20 times a second); zeros while it is closed |
+| `log[]` | the last 300 lines: `at`, `level`, `target`, `text` |
+
+A deck: `deck` (`A`/`B`), `role` (`live`, `out`, `in`, `next`: loaded ahead, `queued`: the next track without a player, `video`: no DJ), `id`, `title`, `artist`, `status` (`playing`, `paused`, `buffering`, `stopped`, `warming`, `warm`, `held`, `scratching`; for `queued`: `cold`, `preparing`, `prepared`), `player` (the player's own state), `loaded`, `position` (as heard), `duration`, `buffered_ahead`, `decoded_to`, `volume` (Clapper's, cubic), `base_volume` (the user's, while the DJ holds the volume), `gain` (the fade's, linear), `tempo` (1.016: 1.6 % faster), `can_stretch`, `stream` (`kind`: `prepared HLS audio`, `prepared HLS`, `fast start`, `yt-dlp fallback`, `downloaded file`, `none`; `uri`, `file_bytes` of a local manifest, `audio_only`, `codec`, `sample_rate`, `channels`, `bitrate`), `beats` (`status`: `cached`, `no beat`, `analysing`, `failed`, `pending`, `off`; `bpm`, `first_beat`, `confidence`, `usable`, `analysed_seconds`, `entry`: `start`, `found`, `bpm`, `confidence`; `error`), `grid` (the beats drawn: `bpm`, `anchor`, `confidence`, `from`), `entry_target` and `entry_ready` (where the player was sent, and whether it is there), `warm` (`ready`, `since`), `waveform` (`known_seconds`, `source`).
+
+A fade: `live`, `phase` (`starting`: the incoming track does not play yet, `fading`, `done`), `outgoing`, `incoming` (ids), `wanted`, `waited`, `elapsed`, `total`, `gain_out`, `gain_in`, `readiness` (`warm`, `warming`, `prepared`, `cold`), `to_entry`, `sync` (with *Match Beats*: `stage`, `bpm_in`, `bpm_out`, `stretch_percent`, `multiple`, `let_go`, `errors_ms`, `nudging`), `beat_ms` and `beat_settled` (the last reading of the beats' distance, and whether it counts), `samples[]` (every step, 20 a second: `t`, `out`, `in`, `beat_ms`, `settled`, `tempo`).
+
+For example, to wait for a beat-matched fade and read how it went: `KH_DUMP_EVERY=1`, then poll `fade.phase` until `done` and read `notes.summary`, `notes.skipped` and `fade.samples[].beat_ms`.
+
+The code: `src/gui/devtools/` (`state.rs` is the snapshot and its JSON, change it and this table together). The rest of the app knows it by a few calls only: `Dj::dev_probe`, `VideoPage::dev_probe` and `dev_read_audio`, `Tap::dev_read`, and `devtools::fade_sample` in the DJ's fade loop.

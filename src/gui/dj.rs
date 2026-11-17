@@ -1440,6 +1440,14 @@ impl Dj {
             .sync
             .as_mut()
             .and_then(|sync| sync.follow(&fade.outgoing, &fade.incoming));
+        #[cfg(feature = "dev-hooks")]
+        crate::gui::devtools::fade_sample(
+            elapsed.as_secs_f64(),
+            plan.fade.as_secs_f64(),
+            (gains.outgoing, gains.incoming),
+            beats,
+            fade.incoming.tempo(),
+        );
         // Twice a second is enough to follow it in the log.
         if fade.steps % 10 == 0 {
             log::info!(
@@ -1808,6 +1816,69 @@ impl Dj {
         if let Some(session) = self.0.session.borrow_mut().as_mut() {
             change(session);
         }
+    }
+
+    /// Dev panel (see `gui/devtools`): everything the DJ holds right now.
+    #[cfg(feature = "dev-hooks")]
+    pub fn dev_probe(&self) -> Option<crate::gui::devtools::DjProbe> {
+        use crate::gui::devtools::{DjProbe, FadeProbe, SyncProbe, WarmProbe};
+        let inner = &self.0;
+        let session = inner.session.borrow();
+        let session = session.as_ref()?;
+        let fade = inner.fade.borrow();
+        Some(DjProbe {
+            seed: format!("{:?}", session.seed()),
+            source: format!("{:?}", session.source()),
+            upcoming: session.upcoming().iter().take(8).cloned().collect(),
+            queued: session.upcoming().len(),
+            played: session.history().len(),
+            page: inner.page.borrow().clone(),
+            fade: fade.as_ref().map(|fade| FadeProbe {
+                outgoing: fade.outgoing.clone(),
+                incoming: fade.incoming.clone(),
+                wanted: fade.wanted.as_secs_f64(),
+                since: fade.began.elapsed().as_secs_f64(),
+                running: fade
+                    .running
+                    .map(|(plan, since)| (since.elapsed().as_secs_f64(), plan.fade.as_secs_f64())),
+                readiness: fade.readiness,
+                entry: match fade.entry {
+                    ToEntry::No => "no",
+                    ToEntry::Wanted(_) => "wanted",
+                    ToEntry::Seeking(_) => "seeking",
+                },
+                sync: fade.sync.as_ref().map(|sync| SyncProbe {
+                    stage: match sync.stage {
+                        Stage::Waiting => "waiting",
+                        Stage::Resting(_) => "resting",
+                        Stage::Held => "held",
+                        Stage::Matched => "matched",
+                    },
+                    incoming: sync.incoming,
+                    outgoing: sync.outgoing,
+                    matched: sync.matched,
+                    let_go: sync.let_go.map(|at| at.elapsed().as_secs_f64()),
+                    errors: sync.errors.clone(),
+                    nudging: sync.nudge.is_some(),
+                }),
+            }),
+            warm: inner
+                .warm
+                .borrow()
+                .iter()
+                .map(|w| WarmProbe {
+                    id: w.id.clone(),
+                    page: w.page.clone(),
+                    since: w.began.elapsed().as_secs_f64(),
+                    ready: w.ready,
+                })
+                .collect(),
+            prepared: inner.prepared.borrow().clone(),
+            analysed: inner.analysed.borrow().clone(),
+            hovered: inner.hovered.borrow().clone(),
+            starting: inner.starting.get(),
+            refilling: inner.refilling.get(),
+        })
     }
 
     /// Test hook: what the session holds, for the log.

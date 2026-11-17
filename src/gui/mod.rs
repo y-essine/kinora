@@ -3,6 +3,8 @@ mod buffer_bar;
 mod channel_item;
 mod channel_page;
 mod deck_audio;
+#[cfg(feature = "dev-hooks")]
+pub mod devtools;
 mod dj;
 mod error_dialog;
 mod export_dialog;

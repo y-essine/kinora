@@ -764,7 +764,7 @@ pub mod imp {
             self.player_sheet.expand();
         }
 
-        fn dj(&self) -> &crate::gui::dj::Dj {
+        pub(crate) fn dj(&self) -> &crate::gui::dj::Dj {
             self.dj.get().expect("The DJ to be set up")
         }
 
@@ -2023,7 +2023,12 @@ pub mod imp {
             // the queue's buttons applied to its third track.
             #[cfg(feature = "dev-hooks")]
             {
-                let dev_actions: [(&str, fn(&Self)); 16] = [
+                // The Dev panel (see `gui/devtools`): Ctrl+Shift+D, `dev-panel`
+                // and `dev-dump`.
+                crate::gui::devtools::attach(obj);
+                let dev_actions: [(&str, fn(&Self)); 18] = [
+                    ("dev-panel", |s| crate::gui::devtools::toggle(&s.obj())),
+                    ("dev-dump", |s| crate::gui::devtools::dump(&s.obj())),
                     ("dev-focus", |s| {
                         let obj = s.obj();
                         let focus = gtk::prelude::GtkWindowExt::focus(&*obj);

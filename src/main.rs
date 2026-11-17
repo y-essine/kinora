@@ -209,6 +209,10 @@ fn init_logging() {
             return;
         }
     }
+    // Kinora: development builds also keep the log's tail for the Dev panel.
+    #[cfg(feature = "dev-hooks")]
+    gui::devtools::install_logger(env_logger::Builder::from_default_env().build());
+    #[cfg(not(feature = "dev-hooks"))]
     env_logger::init();
 }
 
