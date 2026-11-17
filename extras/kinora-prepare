@@ -17,6 +17,7 @@ decoding.
 import copy
 import os
 import sys
+import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
@@ -46,6 +47,22 @@ CODECS_ORDER = "avc1,av01,hev1,vp09"
 # worked). Such a manifest plays nothing, so check its playlists and pick again
 # without the dead ones.
 MAX_ROUNDS = 4
+
+
+# What yt-dlp says when YouTube wants anonymous clients to sign in.
+BOT_CHECK = ("confirm you\u2019re not a bot", "confirm you're not a bot", "Sign in to confirm")
+# After a bot check, go straight to the account for this long (seconds).
+BOT_CHECK_HOLD = 30 * 60
+
+
+def extract(url, opts):
+    """A YoutubeDL set up as Clapper's, and the video's unprocessed info."""
+    ytdl = YoutubeDL(opts, auto_init=False)
+    ytdl.add_info_extractor(ClapperYoutubeIE())
+    for ie in gen_extractor_classes():
+        if ie._ENABLED and ie.ie_key() not in BLACKLIST:
+            ytdl.add_info_extractor(ie)
+    return ytdl, ytdl.extract_info(url, download=False, process=False)
 
 
 def alive(url):
@@ -104,21 +121,6 @@ def main():
                           "/best[protocol=m3u8_native][height<=360][acodec^=mp4a.40.2]"
                           "/best[protocol=m3u8_native]")
 
-    # Signed in (KINORA_COOKIES: the account's cookies.txt), YouTube doesn't ask
-    # to "confirm you're not a bot" as it does anonymous clients after heavy use.
-    cookies = os.environ.get("KINORA_COOKIES")
-    if cookies and os.path.exists(cookies):
-        # A private copy: yt-dlp may write cookies back, and two runs at once
-        # must not share the file.
-        import shutil
-        import tempfile
-        fd, copy_path = tempfile.mkstemp(suffix=".txt")
-        os.close(fd)
-        shutil.copyfile(cookies, copy_path)
-        opts["cookiefile"] = copy_path
-        import atexit
-        atexit.register(lambda: os.path.exists(copy_path) and os.remove(copy_path))
-
     # YouTube's web clients (the ones used when signed in) need a JavaScript
     # challenge solved; yt-dlp does it with any of these it finds.
     import shutil
@@ -126,12 +128,39 @@ def main():
     if runtimes:
         opts["js_runtimes"] = runtimes
 
-    ytdl = YoutubeDL(opts, auto_init=False)
-    ytdl.add_info_extractor(ClapperYoutubeIE())
-    for ie in gen_extractor_classes():
-        if ie._ENABLED and ie.ie_key() not in BLACKLIST:
-            ytdl.add_info_extractor(ie)
-    raw = ytdl.extract_info(url, download=False, process=False)
+    # Anonymous first. Only when YouTube asks anonymous clients to "confirm
+    # you're not a bot" (after heavy use) is the account used
+    # (KINORA_COOKIES: its cookies.txt), and then for BOT_CHECK_HOLD, so the
+    # account carries as little traffic as possible.
+    cookies = os.environ.get("KINORA_COOKIES")
+    cookies = cookies if cookies and os.path.exists(cookies) else None
+    marker = os.path.join(os.path.dirname(os.path.abspath(out)), ".bot-check")
+    try:
+        held = time.time() - os.path.getmtime(marker) < BOT_CHECK_HOLD
+    except OSError:
+        held = False
+
+    raw = None
+    if not (held and cookies):
+        try:
+            ytdl, raw = extract(url, opts)
+        except Exception as e:  # noqa: BLE001  (yt-dlp raises DownloadError)
+            if not cookies or not any(s in str(e) for s in BOT_CHECK):
+                raise
+            with open(marker, "w"):
+                pass
+            print("kinora-prepare: bot check; using the account", file=sys.stderr)
+    if raw is None:
+        # A private copy: yt-dlp may write cookies back, and two runs at once
+        # must not share the file.
+        import tempfile
+        fd, copy_path = tempfile.mkstemp(suffix=".txt")
+        os.close(fd)
+        shutil.copyfile(cookies, copy_path)
+        import atexit
+        atexit.register(lambda: os.path.exists(copy_path) and os.remove(copy_path))
+        opts["cookiefile"] = copy_path
+        ytdl, raw = extract(url, opts)
     if opts.get("cookiefile"):
         # Signed-in web clients' separate (DASH) streams answer 403 without a
         # PO token; their HLS streams play.
