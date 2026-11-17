@@ -630,6 +630,7 @@ impl VideoPage {
     /// the DJ built its first pages); players never end that young this way.
     pub fn retire(&self) {
         use std::time::Duration;
+        self.unbind_settings();
         let wait = Duration::from_secs(3)
             .max(Duration::from_secs(10).saturating_sub(self.imp().born.elapsed()));
         let page = self.clone();
@@ -638,6 +639,20 @@ impl VideoPage {
             // (Its player's memory is freed on the player's threads.)
             crate::memory::trim_soon();
         });
+    }
+
+    /// Kinora: a page that is let go no longer shares the volume, speed and
+    /// subtitle settings. The bindings go both ways: a player that is ending
+    /// reads as volume 0 (`clapper_player_get_volume` on a dead player), which
+    /// set every other player's volume to 0 through the setting.
+    fn unbind_settings(&self) {
+        let imp = self.imp();
+        imp.settings_unbound.set(true);
+        if let Some(player) = imp.clapper.player() {
+            for property in ["volume", "speed", "subtitles-enabled"] {
+                gtk::gio::Settings::unbind(&player, property);
+            }
+        }
     }
 
     /// Kinora: stop for good (another video replaces this page): pause and
@@ -649,6 +664,7 @@ impl VideoPage {
             .player()
             .expect("Clapper does not have a player");
         self.cancel_scratch();
+        self.unbind_settings();
         // Only pause: the page is destroyed right after, which ends the player.
         // Stopping or clearing the queue here raced with Clapper's player thread
         // (a crash, or the next page's player never starting).
@@ -972,7 +988,7 @@ impl VideoPage {
                 player.set_volume(base * gain.clamp(0.0, 1.0).cbrt());
             }
             None => {
-                if imp.fade_base.take().is_some() {
+                if imp.fade_base.take().is_some() && !imp.settings_unbound.get() {
                     player.set_volume(imp.settings.double("player-volume"));
                     imp.settings
                         .bind("player-volume", &player, "volume")
@@ -1354,6 +1370,8 @@ pub mod imp {
         dj_seek_pending: RefCell<Option<glib::SourceId>>,
         dj_seek_quiet_until: Cell<Option<std::time::Instant>>,
         dj_buffered_at: Cell<Option<std::time::Instant>>,
+        /// Let go: no longer bound to the shared settings (see `unbind_settings`).
+        pub(super) settings_unbound: Cell<bool>,
         /// What plays was loaded as sound alone: it has no picture to show.
         pub(super) audio_stream: Cell<bool>,
         /// Kinora: the DJ's audio-only way: the stage shows the track's artwork
@@ -1466,6 +1484,7 @@ pub mod imp {
                 dj_seek_pending: Default::default(),
                 dj_seek_quiet_until: Default::default(),
                 dj_buffered_at: Default::default(),
+                settings_unbound: Default::default(),
                 audio_stream: Default::default(),
                 audio_only: Default::default(),
                 warming: Default::default(),
