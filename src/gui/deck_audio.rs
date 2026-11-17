@@ -502,6 +502,29 @@ impl Tap {
         self.shared.recording.store(recording, Ordering::Relaxed);
     }
 
+    /// Forget the track that went through: its kept audio (freed), tempo,
+    /// segments and fade. For a DJ page that is used again for another track
+    /// (see `VideoPage::park`); the format and the pipeline stay as they are.
+    pub fn reset(&self) {
+        {
+            let mut ring = self.shared.ring.lock().unwrap();
+            ring.samples = Vec::new();
+            (ring.head, ring.filled, ring.rate, ring.end) = (0, 0, 0, f64::MIN);
+        }
+        {
+            let mut tempo = self.shared.tempo.lock().unwrap();
+            (tempo.want, tempo.sent, tempo.upstream) = (1.0, 1.0, 1.0);
+            tempo.segment = None;
+            tempo.flow = None;
+            tempo.since_seek.clear();
+        }
+        let mut gain = self.shared.gain.lock().unwrap();
+        (gain.from, gain.to, gain.length, gain.done, gain.risen) = (1.0, 1.0, 0.0, 0.0, RISE);
+        gain.curve = Curve::Smooth;
+        gain.silent_since = None;
+        gain.silent_from = None;
+    }
+
     /// The last seconds that went through, as far back as they are gapless.
     /// They reach a little past what is heard: the sound device has not
     /// played all of it yet.

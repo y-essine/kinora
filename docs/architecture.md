@@ -213,6 +213,23 @@ call `advance()` (or `skip()`), then refill in the background. Fade in the audio
 player allows it (the GTK frontend does, see *The deck's audio*): a sound device's volume set
 every ~50 ms changes in steps, and every step is a small click.
 
+The GTK frontend's DJ pages are used again instead of being made per track: a
+`ClapperGtkVideo` keeps its GL context for good (Clapper 0.10, ~11.5 MB and 6 threads each), and
+making a page holds up the main loop. A page the DJ is done with (the old player of a fade once
+it is silent, a warm or hovered one that is no longer wanted, the old one of a cut) goes to
+`Window::recycle_dj_page`, which pauses it and `VideoPage::park`s it, up to three; past that it
+is let go as before (`retire`, dropped 3 s on, at least 10 s after it was made). The next DJ
+page (`new_dj_page`, `open_dj_track`) takes one that has rested 0.5 s and `reuse_dj` loads the
+new track into it. `park` resets what a page holds for its track: the scratch, the soft pause,
+tempo easing and DJ seek timers, the volume the DJ held, the tap's kept audio, tempo, segments
+and fade (`Tap::reset`), warming, held, the entry, the start time, fast start, the URI, sound
+alone, the DJ line's seek and buffered state. A `lease` counted on every park and reuse keeps
+what was started for the old track (the fast-start lookup, the stall fallback, the "watched"
+mark) off the new one. `reuse_dj` sets audio only, *Match Beats*' engaged tap, the line and the
+record at 0, and the video (which clears the page as a new video does; the player's queue is
+replaced by `play`/`warm`). MPRIS follows whatever page the sheet shows, so a parked page is
+never followed. Pages outside the DJ are made and dropped as before.
+
 ### Beat matching
 
 `kinora_core::beats` finds the tempo and the beats of a piece of audio, says how to match one

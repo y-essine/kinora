@@ -50,6 +50,12 @@ gtk::glib::wrapper! {
             gtk::ConstraintTarget;
 }
 
+/// Kinora: a parked page's player is stopped this long after its pause.
+const PARKED_STOP: std::time::Duration = std::time::Duration::from_secs(1);
+/// Kinora: a parked page is used again once it has rested this long (its
+/// player stopped a while before).
+pub const PARKED_REST: std::time::Duration = std::time::Duration::from_secs(3);
+
 /// Kinora: a pause (and the play after it) fades over this long, in ms.
 const SOFT_PAUSE_MS: u64 = 30;
 
@@ -123,12 +129,16 @@ impl VideoPage {
                 let page = self.clone();
                 let client = self.client();
                 let video = video.clone();
+                let lease = imp.lease.get();
                 gspawn!(async move {
                     let mut fast = client.fast_playback_uri(&video).await;
                     if fast.is_none() {
                         fast = client.signed_in_playback_uri(&video, page.audio_only()).await;
                     }
-                    if page.video().as_ref() != Some(&video) || page.external() {
+                    if page.video().as_ref() != Some(&video)
+                        || page.external()
+                        || page.imp().lease.get() != lease
+                    {
                         return;
                     }
                     page.imp().fast_start_active.set(fast.is_some());
@@ -209,7 +219,8 @@ impl VideoPage {
         let Some(player) = imp.clapper.player() else {
             return;
         };
-        if imp.entry.replace(Some(position)).is_none() {
+        imp.entry.set(Some(position));
+        if !imp.entry_hooked.replace(true) {
             let done = imp.entry_done.clone();
             player.connect_seek_done(move |_| done.set(true));
         }
@@ -655,6 +666,24 @@ impl VideoPage {
         }
     }
 
+    /// Kinora: a parked page that is used again shares the settings again
+    /// (see `unbind_settings`; the setting's value is taken, not given).
+    fn rebind_settings(&self) {
+        let imp = self.imp();
+        if !imp.settings_unbound.replace(false) {
+            return;
+        }
+        if let Some(player) = imp.clapper.player() {
+            for (key, property) in [
+                ("player-volume", "volume"),
+                ("player-speed", "speed"),
+                ("player-subtitles-enabled", "subtitles-enabled"),
+            ] {
+                imp.settings.bind(key, &player, property).build();
+            }
+        }
+    }
+
     /// Kinora: stop for good (another video replaces this page): pause and
     /// unload the video, so it no longer plays or streams.
     pub fn stop(&self) {
@@ -671,15 +700,102 @@ impl VideoPage {
         player.pause();
     }
 
+    /// Kinora: a DJ page that was let go waits to be used again (see
+    /// `Window::recycle_dj_page`): every `ClapperGtkVideo` ever made keeps
+    /// its GL context (Clapper 0.10, ~11.5 MB and 6 threads), and making one
+    /// holds up the main loop. Paused, with all it held for its track let
+    /// go: the scratch, its timers, the tap's audio, tempo and fade, the
+    /// loading state and the watchdogs (by `lease`).
+    pub fn park(&self) {
+        let imp = self.imp();
+        self.stop();
+        imp.parked.set(Some(std::time::Instant::now()));
+        imp.lease.set(imp.lease.get().wrapping_add(1));
+        // Once the pause has gone through, the old stream is ended while
+        // the page rests: an HLS stream that was only paused, given a new
+        // item at once, failed an assertion in GStreamer's adaptivedemux2
+        // (`pending_cb_id == 0`, which aborts the app).
+        let lease = imp.lease.get();
+        let page = glib::prelude::ObjectExt::downgrade(self);
+        glib::timeout_add_local_once(PARKED_STOP, move || {
+            if let Some(page) = page.upgrade()
+                && page.imp().lease.get() == lease
+                && let Some(player) = page.imp().clapper.player()
+            {
+                player.stop();
+            }
+        });
+        // (Each of these clears its own slot when it ends.)
+        let timers = [
+            imp.soft_pause.take(),
+            imp.tempo_ease.take(),
+            imp.dj_seek_pending.take(),
+            imp.scratch_ramp.take(),
+        ];
+        timers.into_iter().flatten().for_each(glib::SourceId::remove);
+        imp.soft_paused.set(false);
+        if imp.fade_base.get().is_some() {
+            self.set_fade_gain(None);
+        }
+        if let Some(tap) = imp.tap() {
+            tap.reset();
+        }
+        imp.warming.set(false);
+        imp.warm_held.set(false);
+        imp.entry.set(None);
+        imp.entry_done.set(false);
+        imp.play_started.set(None);
+        imp.fast_start_active.set(false);
+        imp.playing_uri.replace(None);
+        imp.audio_stream.set(false);
+        imp.dj_seek_quiet_until.set(None);
+        imp.dj_buffered_at.set(None);
+        imp.double_click.set(None);
+        imp.quiet_volume_until.set(None);
+        self.set_loading(false);
+    }
+
+    /// Kinora: how long the page has waited since [`Self::park`] (`None`:
+    /// it is in use).
+    pub fn parked_for(&self) -> Option<std::time::Duration> {
+        self.imp().parked.get().map(|at| at.elapsed())
+    }
+
+    /// Kinora: a parked DJ page takes `video` (instead of a new page being
+    /// made for it). It plays nothing until `play` or `warm`, as a new page.
+    pub fn reuse_dj(&self, video: &Video, audio_only: bool, match_beats: bool) {
+        let imp = self.imp();
+        imp.parked.set(None);
+        imp.lease.set(imp.lease.get().wrapping_add(1));
+        self.rebind_settings();
+        self.set_external(false);
+        self.set_dj(true);
+        // (Cleared first: `set_audio_only` keeps a track that was loaded as
+        // sound alone without its video, and this one is not loaded yet.)
+        imp.audio_stream.set(false);
+        self.set_audio_only(audio_only);
+        if let Some(tap) = imp.tap() {
+            tap.set_engaged(match_beats);
+        }
+        imp.dj_deck.set_progress(0.0);
+        imp.dj_seek.set_value(0.0);
+        imp.dj_seek.set_buffered(0.0);
+        self.set_video(Some(video));
+    }
+
     /// Kinora: if a prepared or fast-start stream isn't playing after 10 seconds
     /// (it can stall without an error), start over with yt-dlp.
     fn fall_back_if_stuck(&self, video: &Video) {
         let page = glib::prelude::ObjectExt::downgrade(self);
         let video = video.clone();
+        let lease = self.imp().lease.get();
         glib::timeout_add_seconds_local_once(10, move || {
             let Some(page) = page.upgrade() else { return };
             let imp = page.imp();
-            if page.video().as_ref() != Some(&video) || !imp.fast_start_active.get() {
+            if page.video().as_ref() != Some(&video)
+                || !imp.fast_start_active.get()
+                || imp.lease.get() != lease
+            {
                 return;
             }
             let Some(player) = imp.clapper.player() else {
@@ -714,9 +830,13 @@ impl VideoPage {
     fn mark_watched_on_account_later(&self, video: &Video) {
         let page = glib::prelude::ObjectExt::downgrade(self);
         let video = video.clone();
+        let lease = self.imp().lease.get();
         glib::timeout_add_seconds_local_once(30, move || {
             if let Some(page) = page.upgrade() {
-                if page.video().as_ref() == Some(&video) {
+                if page.video().as_ref() == Some(&video)
+                    && page.imp().lease.get() == lease
+                    && page.imp().parked.get().is_none()
+                {
                     page.client().mark_watched_on_account(&video);
                 }
             }
@@ -1367,9 +1487,9 @@ pub mod imp {
         /// A seek asked for on the DJ's line that waits a moment (the knob is
         /// being dragged), and until when the line then ignores the player
         /// (which still reports the old place).
-        dj_seek_pending: RefCell<Option<glib::SourceId>>,
-        dj_seek_quiet_until: Cell<Option<std::time::Instant>>,
-        dj_buffered_at: Cell<Option<std::time::Instant>>,
+        pub(super) dj_seek_pending: RefCell<Option<glib::SourceId>>,
+        pub(super) dj_seek_quiet_until: Cell<Option<std::time::Instant>>,
+        pub(super) dj_buffered_at: Cell<Option<std::time::Instant>>,
         /// Let go: no longer bound to the shared settings (see `unbind_settings`).
         pub(super) settings_unbound: Cell<bool>,
         /// What plays was loaded as sound alone: it has no picture to show.
@@ -1386,6 +1506,14 @@ pub mod imp {
         /// whether the player has got there.
         pub(super) entry: Cell<Option<f64>>,
         pub(super) entry_done: std::rc::Rc<Cell<bool>>,
+        /// The player tells `entry_done` when a seek is done (connected once).
+        pub(super) entry_hooked: Cell<bool>,
+        /// Kinora: counts the tracks a DJ page was given (see `reuse_dj`), so
+        /// what was started for an earlier one (a fallback, a timer) does not
+        /// act on the next.
+        pub(super) lease: Cell<u32>,
+        /// Kinora: let go and waiting to be used again (see `park`).
+        pub(super) parked: Cell<Option<std::time::Instant>>,
         /// Kinora: "Up next" has arrived, so there is a next video.
         #[property(get)]
         has_next: Cell<bool>,
@@ -1419,7 +1547,7 @@ pub mod imp {
         minimized: Cell<bool>,
         /// Kinora: where and when the player was last double-clicked:
         /// -1 left third, 0 middle, 1 right third.
-        double_click: Cell<Option<(i8, std::time::Instant)>>,
+        pub(super) double_click: Cell<Option<(i8, std::time::Instant)>>,
         autoplay_done: Cell<bool>,
         /// When play() was pressed, to log how long the video took to start.
         pub(super) play_started: Cell<Option<std::time::Instant>>,
@@ -1491,6 +1619,9 @@ pub mod imp {
                 warm_held: Default::default(),
                 entry: Default::default(),
                 entry_done: Default::default(),
+                entry_hooked: Default::default(),
+                lease: Default::default(),
+                parked: Default::default(),
                 has_next: Default::default(),
                 dj: Default::default(),
                 dj_available: Default::default(),

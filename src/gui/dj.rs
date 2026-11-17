@@ -1089,9 +1089,13 @@ impl Dj {
         let client = window.client();
         let (warmed, readiness) = self.take_ahead(&client, &track);
         log::info!("DJ: {} starts {readiness}", track.id);
-        let (page, _) = window
+        // (Over the old page, which is then let go here, to be used again.)
+        let (page, old) = window
             .imp()
-            .open_dj_track(&client.dj_video(&track), false, warmed);
+            .open_dj_track(&client.dj_video(&track), true, warmed);
+        if let Some(old) = old {
+            release(&inner.window, old);
+        }
         page.set_fade_gain(None);
         self.adopt(&page);
     }
@@ -1584,7 +1588,7 @@ impl Dj {
         if fade.stepped || fade.running.is_none() {
             fade.outgoing.set_fade_gain(Some(0.0));
         }
-        release_when_silent(fade.outgoing);
+        release_when_silent(&self.0.window, fade.outgoing);
         self.changed();
     }
 
@@ -1640,7 +1644,7 @@ impl Dj {
         let (keep, gone): (Vec<Warm>, Vec<Warm>) =
             warm.drain(..).partition(|w| queued.contains(&w.id));
         *warm = keep;
-        gone.into_iter().for_each(|w| release(w.page));
+        gone.into_iter().for_each(|w| release(&inner.window, w.page));
         let to_entry = client.core().dj_settings().start_on_beat;
         for w in warm.iter_mut().filter(|w| !w.ready) {
             if !w.page.is_warm() {
@@ -1717,7 +1721,7 @@ impl Dj {
                 else {
                     continue;
                 };
-                release(warm.remove(index).page);
+                release(&inner.window, warm.remove(index).page);
             }
             log::info!("DJ: warming {} ({})", track.id, track.title);
             let page = window.imp().new_dj_page(&video);
@@ -1786,7 +1790,7 @@ impl Dj {
         self.0.prepared.borrow_mut().clear();
         self.0.hovered.take();
         let warm: Vec<Warm> = self.0.warm.borrow_mut().drain(..).collect();
-        warm.into_iter().for_each(|w| release(w.page));
+        warm.into_iter().for_each(|w| release(&self.0.window, w.page));
     }
 
     /// The panel's "Show video" was switched.
@@ -2058,17 +2062,24 @@ fn seed_video(seed: &DjSeed) -> Option<&str> {
     }
 }
 
-/// Let a page go whose player may still run: pause only, and drop it a
+/// Let a page go whose player may still run: pause only, and keep it to be
+/// used again for another track (`Window::recycle_dj_page`), or drop it a
 /// moment later. Stopping a Clapper player, or ending one while another
 /// starts, has crashed (see `VideoPage::stop`).
-fn release(page: VideoPage) {
-    page.stop();
-    page.retire();
+fn release(window: &glib::WeakRef<Window>, page: VideoPage) {
+    match window.upgrade() {
+        Some(window) => window.imp().recycle_dj_page(page),
+        None => {
+            page.stop();
+            page.retire();
+        }
+    }
 }
 
 /// Let a page go once it is heard to be silent (it was faded out): pausing
 /// a player that is still heard is a click.
-fn release_when_silent(page: VideoPage) {
+fn release_when_silent(window: &glib::WeakRef<Window>, page: VideoPage) {
+    let window = window.clone();
     let since = Instant::now();
     let mut page = Some(page);
     glib::timeout_add_local(FADE_STEP, move || {
@@ -2079,7 +2090,7 @@ fn release_when_silent(page: VideoPage) {
             return glib::ControlFlow::Continue;
         }
         if let Some(page) = page.take() {
-            release(page);
+            release(&window, page);
         }
         glib::ControlFlow::Break
     });

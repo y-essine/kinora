@@ -325,6 +325,8 @@ pub mod imp {
 
         // Kinora: the DJ (see `gui/dj.rs`).
         dj: std::cell::OnceCell<crate::gui::dj::Dj>,
+        /// DJ pages that were let go, to be used again (see `recycle_dj_page`).
+        dj_pages: RefCell<Vec<VideoPage>>,
         /// The `player-previous` and `player-next` actions (see `update_transport`).
         transport: std::cell::OnceCell<(SimpleAction, SimpleAction)>,
         /// The app's media player integration (see `gui/mpris.rs`).
@@ -376,6 +378,7 @@ pub mod imp {
                 main_show_sidebar_visible: Default::default(),
                 watch_history_enabled: Default::default(),
                 dj: Default::default(),
+                dj_pages: Default::default(),
                 transport: Default::default(),
                 mpris: Default::default(),
                 dj_on: Default::default(),
@@ -554,7 +557,24 @@ pub mod imp {
                 move |_: &VideoPage| obj.imp().update_transport()
             );
             let video_page = if dj {
-                let audio_only = !obj.client().core().dj_settings().show_video;
+                let settings = obj.client().core().dj_settings();
+                let audio_only = !settings.show_video;
+                // A page that was let go is used again: a new one costs a
+                // GL context that Clapper never frees, and a stall.
+                if let Some(page) = self.take_dj_page() {
+                    log::info!(
+                        "DJ: page used again for {} ({} waiting)",
+                        video.id().id,
+                        self.dj_pages.borrow().len()
+                    );
+                    page.reuse_dj(video, audio_only, settings.match_beats);
+                    obj.announce(
+                        &gettextrs::gettext("Switched to video page {}")
+                            .replace("{}", &video.title()),
+                        AccessibleAnnouncementPriority::Medium,
+                    );
+                    return page;
+                }
                 VideoPage::new_dj(video, &obj.client(), audio_only)
             } else {
                 VideoPage::new(video, &obj.client())
@@ -739,6 +759,9 @@ pub mod imp {
             if let Some(window_mode) = carry_fullscreen {
                 page.set_window_mode(window_mode);
                 page.set_fullscreened(true);
+            } else if page.fullscreened() {
+                // (A page used again was let go in fullscreen.)
+                page.set_fullscreened(false);
             }
             if expand {
                 page.grab_focus();
@@ -754,6 +777,41 @@ pub mod imp {
         /// A page for a DJ track that is not shown yet (to load it ahead).
         pub(crate) fn new_dj_page(&self, video: &Video) -> VideoPage {
             self.new_video_page(video, true)
+        }
+
+        /// A DJ page the DJ is done with: it is paused and kept to be used
+        /// again (at most `DJ_PAGES` of them), else let go as before.
+        pub(crate) fn recycle_dj_page(&self, page: VideoPage) {
+            /// Enough for a session's churn: a track's page, the next one's
+            /// and a hovered one come and go about together.
+            const DJ_PAGES: usize = 3;
+            let (known, full) = {
+                let pool = self.dj_pages.borrow();
+                (pool.contains(&page), pool.len() >= DJ_PAGES)
+            };
+            if known {
+                return;
+            }
+            let shown = page.parent().is_some()
+                || self.player_sheet.video_page().as_ref() == Some(&page);
+            if !page.dj() || shown || full {
+                page.stop();
+                page.retire();
+                return;
+            }
+            page.park();
+            self.dj_pages.borrow_mut().push(page);
+        }
+
+        /// A parked DJ page that has rested (its old stream has been ended,
+        /// see `VideoPage::park`), the longest parked first.
+        fn take_dj_page(&self) -> Option<VideoPage> {
+            let rest = crate::gui::video_page::PARKED_REST;
+            let mut pool = self.dj_pages.borrow_mut();
+            let index = pool
+                .iter()
+                .position(|page| page.parked_for().is_some_and(|rested| rested >= rest))?;
+            Some(pool.remove(index))
         }
 
         pub(crate) fn current_video_page(&self) -> Option<VideoPage> {

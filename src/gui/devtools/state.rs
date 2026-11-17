@@ -94,7 +94,8 @@ pub struct Process {
 pub struct PlayerInfo {
     pub id: String,
     pub state: String,
-    /// "current", "outgoing", "incoming", "warm", or "retired" (let go,
+    /// "current", "outgoing", "incoming", "warm", "parked" (a DJ page
+    /// waiting to be used again), or "retired" (let go,
     /// kept a few seconds).
     pub role: String,
     pub age: f64,
@@ -1063,6 +1064,8 @@ impl Collector {
                     "current"
                 } else if probe.is_some_and(|dj| dj.warm.iter().any(|warm| warm.page == *page)) {
                     "warm"
+                } else if page.parked_for().is_some() {
+                    "parked"
                 } else {
                     "retired"
                 };

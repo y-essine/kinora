@@ -89,9 +89,14 @@ Read this, then `docs/architecture.md`, `docs/design.md`, `CONTRIBUTING-KINORA.m
   Clapper's video sink: each `ClapperGtkVideo` makes a GL context that is
   never freed (`gstclapperglcontexthandler.c`, the commented-out
   `gst_clear_object (&self->gst_context)` and its FIXME, still so on
-  Clapper's master). The DJ makes a page per track (and per warm or hovered
-  one), so a long session adds up. Fix in Clapper (one GL display and
-  context for all sinks, as its FIXME says), or reuse pages. Home's
+  Clapper's master). The DJ now uses its pages again (at most three wait,
+  paused; see docs/architecture.md, "The DJ"), so a DJ session no longer
+  grows: offline test session (synthetic tracks), 10 Nexts, debug build:
+  threads +6 a Next before, flat after; 3 pages made instead of 12; main
+  loop stalls of 100 ms or more over the Nexts 11 (117-2198 ms) before, 1
+  (the first Next) after. Opening a video outside the DJ still makes (and
+  leaks) a page each time; the real fix is in Clapper (one GL display and
+  context for all sinks, as its FIXME says). Home's
   thumbnails are kept decoded at full size (720 px wide, ~0.9 MB each) for
   as long as Home holds their videos: ~35 MB for a screenful of rows, more
   as rows are scrolled; decoding cards smaller needs the banner and the
