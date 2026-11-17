@@ -27,6 +27,20 @@ gtk::glib::wrapper! {
     pub struct Client(ObjectSubclass<imp::Client>);
 }
 
+/// Kinora: what a channel information request said about a channel.
+pub(super) struct ChannelInfo {
+    avatar: Option<Url>,
+    failed: bool,
+    at: std::time::Instant,
+}
+
+impl ChannelInfo {
+    /// At most this many channels are remembered (a few hundred bytes each).
+    const KEPT: usize = 4096;
+    /// A failed request is tried again after this long.
+    const RETRY_AFTER: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+}
+
 const PIPED_INSTANCES_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
 
 impl std::default::Default for Client {
@@ -430,6 +444,25 @@ impl Client {
             .await
     }
 
+    /// Kinora: a picture by its address, through the thumbnail cache, made
+    /// smaller so that its shorter side is at most `pixels` (for small
+    /// artwork: the full-size picture is let go at once).
+    pub async fn picture_at(&self, url: Url, pixels: i32) -> Option<Pixbuf> {
+        let pixbuf = self.picture(url).await?;
+        let (width, height) = (pixbuf.width(), pixbuf.height());
+        let shorter = width.min(height);
+        if shorter <= pixels {
+            return Some(pixbuf);
+        }
+        let scale =
+            |side: i32| ((side as f64 * pixels as f64 / shorter as f64).round() as i32).max(1);
+        pixbuf.scale_simple(
+            scale(width),
+            scale(height),
+            gdk::gdk_pixbuf::InterpType::Bilinear,
+        )
+    }
+
     async fn populate_avatar(&self, channel: &Channel) {
         if let Some(url) = channel.avatar_url() {
             let cache = self.imp().cache.borrow().clone();
@@ -490,7 +523,10 @@ impl Client {
         let mut cache = self.imp().channel_cache.borrow_mut();
         if let Some(cached) = cache.get(&channel.id).and_then(|r| r.upgrade()) {
             if cached.channel() != channel {
-                let requires_avatar_update = cached.avatar_url() != channel.avatar;
+                // (Without an avatar, the channel keeps the one it has: see
+                // `Channel::update`. There is nothing to load again then.)
+                let requires_avatar_update =
+                    channel.avatar.is_some() && cached.avatar_url() != channel.avatar;
 
                 cached.update(channel);
 
@@ -517,6 +553,13 @@ impl Client {
 
             cached
         } else {
+            let mut channel = channel;
+            // Kinora: an avatar found by an earlier channel request.
+            if channel.avatar.is_none()
+                && let Some(info) = self.imp().channel_info.borrow().get(&channel.id)
+            {
+                channel.avatar = info.avatar.clone();
+            }
             let id = channel.id.clone();
             let object = Channel::new(channel);
             cache.insert(id.clone(), object.downgrade());
@@ -532,6 +575,7 @@ impl Client {
                         // If the channel was cached, it could be that the avatar URL is not valid anymore after loading from the store.
                         // Retry setting that information later.
                         if object.avatar().is_none()
+                            && s.claim_channel_info(&id)
                             && let Err(e) = s.populate_channel_information(&id).await
                         {
                             log::warn!(
@@ -677,17 +721,71 @@ impl Client {
         self.await_setup_finished().await;
         let internal = self.imp().internal.clone();
         let channel_id = channel_id.clone();
-        let core_channel = tspawn!(async move {
+        let id = channel_id.clone();
+        let result = tspawn!(async move {
             let internal = internal.lock().await;
             let info = internal.channel_information(&channel_id);
             drop(internal);
             info.await
         })
         .await
-        .expect("Failed to spawn tokio")?;
+        .expect("Failed to spawn tokio");
+        // Kinora: remember the answer (see `claim_channel_info`).
+        let avatar = result.as_ref().ok().and_then(|c| c.avatar.clone());
+        log::debug!(
+            "Channel information for {}: {}",
+            id.id,
+            match &result {
+                Ok(_) if avatar.is_some() => "an avatar",
+                Ok(_) => "no avatar",
+                Err(_) => "failed",
+            }
+        );
+        let mut info = self.imp().channel_info.borrow_mut();
+        if info.len() >= ChannelInfo::KEPT {
+            info.clear();
+        }
+        info.insert(
+            id,
+            ChannelInfo {
+                avatar,
+                failed: result.is_err(),
+                at: std::time::Instant::now(),
+            },
+        );
+        drop(info);
         // Already in cache
-        self.construct_channel(core_channel);
+        self.construct_channel(result?);
         Ok(())
+    }
+
+    /// Kinora: whether to ask for a channel's information to find its avatar
+    /// (and if so, it counts as asked from now on). Listings without avatars
+    /// (the DJ's tracks, Up next) made a new `Channel` each time one was shown
+    /// again, and each one asked: a request to YouTube, and when that failed,
+    /// yt-dlp (a Python process of ~90 MB) for every channel the request could
+    /// not find. Now a channel is asked about once; one whose request failed,
+    /// again after a while.
+    fn claim_channel_info(&self, id: &ChannelId) -> bool {
+        if id.id.is_empty() {
+            return false;
+        }
+        let mut info = self.imp().channel_info.borrow_mut();
+        let wanted = info
+            .get(id)
+            .is_none_or(|known| known.failed && known.at.elapsed() > ChannelInfo::RETRY_AFTER);
+        if wanted {
+            // (Asked: `populate_channel_information` puts the answer here.)
+            info.insert(
+                id.clone(),
+                ChannelInfo {
+                    avatar: None,
+                    failed: false,
+                    at: std::time::Instant::now(),
+                },
+            );
+        }
+        wanted
     }
 
     // ---- Kinora: the signed-in YouTube account ----
@@ -865,6 +963,7 @@ impl Client {
             playlists.len(),
             started.elapsed().as_secs_f64()
         );
+        crate::memory::trim_soon();
         (mixes, playlists)
     }
 
@@ -879,6 +978,7 @@ impl Client {
         let result = tspawn!(async move { core.home(&account, Some(&token)).await })
             .await
             .expect("Failed to spawn tokio");
+        crate::memory::trim_soon();
         match result {
             Ok(page) => page
                 .videos
@@ -950,6 +1050,7 @@ impl Client {
             videos.len(),
             started.elapsed().as_secs_f64()
         );
+        crate::memory::trim_soon();
         if videos.is_empty() {
             self.set_home_error(if chip.is_some() {
                 "YouTube has no videos for this filter.".to_owned()
@@ -1010,6 +1111,7 @@ impl Client {
             store.n_items() - before,
             started.elapsed().as_secs_f64()
         );
+        crate::memory::trim_soon();
         self.fill_in_details_later(videos);
     }
 
@@ -1525,6 +1627,9 @@ mod imp {
         pub(super) reqwest_client: RefCell<Option<reqwest::Client>>,
 
         pub(super) channel_cache: RefCell<HashMap<pcore::ChannelId, WeakRef<Channel>>>,
+        /// Kinora: what a channel information request said about each
+        /// channel (see [`super::ChannelInfo`]), so that it is asked once.
+        pub(super) channel_info: RefCell<HashMap<pcore::ChannelId, super::ChannelInfo>>,
         pub(super) video_cache: RefCell<HashMap<pcore::VideoId, WeakRef<Video>>>,
         pub(super) title_cache: RefCell<HashMap<pcore::VideoId, String>>,
 
@@ -1583,6 +1688,7 @@ mod imp {
                 cache: Default::default(),
                 reqwest_client: Default::default(),
                 channel_cache: Default::default(),
+                channel_info: Default::default(),
                 video_cache: Default::default(),
                 title_cache: Default::default(),
                 subscriptions_store: Default::default(),

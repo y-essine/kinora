@@ -2023,7 +2023,7 @@ pub mod imp {
             // the queue's buttons applied to its third track.
             #[cfg(feature = "dev-hooks")]
             {
-                let dev_actions: [(&str, fn(&Self)); 16] = [
+                let dev_actions: [(&str, fn(&Self)); 17] = [
                     ("dev-focus", |s| {
                         let obj = s.obj();
                         let focus = gtk::prelude::GtkWindowExt::focus(&*obj);
@@ -2069,6 +2069,7 @@ pub mod imp {
                         }
                     }),
                     ("dj-log", |s| s.dj().dev_log()),
+                    ("dev-trim", |_| crate::memory::trim()),
                     ("dj-queue-play-next", |s| s.dj().dev_queue("play-next")),
                     ("dj-queue-remove", |s| s.dj().dev_queue("remove")),
                     ("dj-queue-play-now", |s| s.dj().dev_queue("play-now")),

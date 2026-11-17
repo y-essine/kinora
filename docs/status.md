@@ -81,7 +81,21 @@ Read this, then `docs/architecture.md`, `docs/design.md`, `CONTRIBUTING-KINORA.m
   drag-reorder, real pointer hover preload, crossfade "Off", narrow layouts.
 - Own MPRIS service (media keys, desktop Next/Previous for the DJ).
 - "See all" on topic rows; Home without an account; playback positions for
-  "Continue watching"; memory use (~400 MB); app icon and store screenshots.
+  "Continue watching"; app icon and store screenshots.
+- Memory (measured 2026-11-17, release build, headless): ~185 MB at Home,
+  ~300 MB with a video, ~320-340 MB in the DJ. What still grows: every video
+  page ever made leaves ~11.5 MB and 6 threads behind (11 videos opened one
+  after another, then closed: 275 -> 390 MB, 33 -> 92 threads). That is
+  Clapper's video sink: each `ClapperGtkVideo` makes a GL context that is
+  never freed (`gstclapperglcontexthandler.c`, the commented-out
+  `gst_clear_object (&self->gst_context)` and its FIXME, still so on
+  Clapper's master). The DJ makes a page per track (and per warm or hovered
+  one), so a long session adds up. Fix in Clapper (one GL display and
+  context for all sinks, as its FIXME says), or reuse pages. Home's
+  thumbnails are kept decoded at full size (720 px wide, ~0.9 MB each) for
+  as long as Home holds their videos: ~35 MB for a screenful of rows, more
+  as rows are scrolled; decoding cards smaller needs the banner and the
+  player's poster to load their own full-size picture.
 
 ## Working agreements
 - Commits as `y-essine <60329454+y-essine@users.noreply.github.com>`, message

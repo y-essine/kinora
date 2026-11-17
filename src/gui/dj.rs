@@ -2016,6 +2016,9 @@ struct Panel {
     /// What is shown, to leave the widgets alone when nothing changed.
     shown_now: RefCell<Option<String>>,
     shown_queue: RefCell<Vec<String>>,
+    /// The queue's artwork, small, by track id: only what the queue shows,
+    /// so a row that is built again has its picture at once.
+    artwork: Artwork,
     handler: Handler,
 }
 
@@ -2041,21 +2044,36 @@ fn artwork(size: i32) -> (gtk::Widget, gtk::Picture) {
     (overlay.upcast(), picture)
 }
 
-/// Show `video`'s thumbnail in `picture`, loading it if need be.
-fn show_thumbnail(picture: &gtk::Picture, video: &Video, client: &Client) {
-    let set = |picture: &gtk::Picture, video: &Video| {
-        let texture = video.thumbnail().map(|p| gdk::Texture::for_pixbuf(&p));
-        picture.set_paintable(texture.as_ref());
-    };
-    set(picture, video);
-    if video.thumbnail().is_some() {
+/// The queue's small artwork, by track id (see [`show_artwork`]).
+type Artwork = Rc<RefCell<std::collections::HashMap<String, gdk::Texture>>>;
+
+/// The queue's artwork is 48 px: its pictures are made this many pixels
+/// high (sharp at twice the size too). A thumbnail as it comes (720 px
+/// wide and more) takes about 1 MB in memory; at this size, 50 kB.
+const ARTWORK_PIXELS: i32 = 96;
+
+/// Show `track`'s thumbnail in a queue row's `picture`: from `artwork` when
+/// it is there, else read (through the thumbnail cache) and kept there. No
+/// `Video` is made for it, so nothing else about the track is fetched.
+fn show_artwork(picture: &gtk::Picture, track: &Track, artwork: &Artwork, client: &Client) {
+    if let Some(texture) = artwork.borrow().get(&track.id) {
+        picture.set_paintable(Some(texture));
         return;
     }
-    let (picture, video, client) = (picture.downgrade(), video.clone(), client.clone());
+    let Some(url) = track.thumbnail.clone() else {
+        return;
+    };
+    let (picture, id) = (picture.downgrade(), track.id.clone());
+    let (artwork, client) = (artwork.clone(), client.clone());
     gspawn!(async move {
-        client.populate_thumbnail(&video).await;
+        let Some(pixbuf) = client.picture_at(url, ARTWORK_PIXELS).await else {
+            return;
+        };
+        let texture = gdk::Texture::for_pixbuf(&pixbuf);
         if let Some(picture) = picture.upgrade() {
-            set(&picture, &video);
+            picture.set_paintable(Some(&texture));
+            // (Only for a row that is still shown.)
+            artwork.borrow_mut().insert(id, texture);
         }
     });
 }
@@ -2230,6 +2248,7 @@ impl Panel {
             more,
             shown_now: RefCell::default(),
             shown_queue: RefCell::default(),
+            artwork: Artwork::default(),
             handler,
         }
     }
@@ -2260,6 +2279,7 @@ impl Panel {
         }
         self.shown_now.take();
         self.shown_queue.take();
+        self.artwork.borrow_mut().clear();
         self.list.remove_all();
     }
 
@@ -2299,6 +2319,7 @@ impl Panel {
             return;
         }
         self.list.remove_all();
+        self.artwork.borrow_mut().retain(|id, _| ids.contains(id));
         for (index, track) in upcoming.iter().take(SHOWN).enumerate() {
             self.list.append(&self.row(track, index, client));
         }
@@ -2316,7 +2337,7 @@ impl Panel {
         };
         let line = gtk::Box::builder().spacing(10).build();
         let (art_frame, art) = artwork(48);
-        show_thumbnail(&art, &client.dj_video(track), client);
+        show_artwork(&art, track, &self.artwork, client);
         let text = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(1)
