@@ -2026,7 +2026,7 @@ pub mod imp {
                 // The Dev panel (see `gui/devtools`): Ctrl+Shift+D, `dev-panel`
                 // and `dev-dump`.
                 crate::gui::devtools::attach(obj);
-                let dev_actions: [(&str, fn(&Self)); 18] = [
+                let dev_actions: [(&str, fn(&Self)); 19] = [
                     ("dev-panel", |s| crate::gui::devtools::toggle(&s.obj())),
                     ("dev-dump", |s| crate::gui::devtools::dump(&s.obj())),
                     ("dev-focus", |s| {
@@ -2074,6 +2074,7 @@ pub mod imp {
                         }
                     }),
                     ("dj-log", |s| s.dj().dev_log()),
+                    ("dev-trim", |_| crate::memory::trim()),
                     ("dj-queue-play-next", |s| s.dj().dev_queue("play-next")),
                     ("dj-queue-remove", |s| s.dj().dev_queue("remove")),
                     ("dj-queue-play-now", |s| s.dj().dev_queue("play-now")),

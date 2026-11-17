@@ -19,13 +19,22 @@ use self::config::{APP_ID, GETTEXT_PACKAGE, LOCALEDIR, RESOURCES_BYTES, RESOURCE
 
 mod backend;
 mod gui;
+mod memory;
 mod pride;
 mod selftest;
 mod splashes;
 mod store;
 
-pub static TOKIO_RUNTIME: LazyLock<tokio::runtime::Runtime> =
-    LazyLock::new(|| tokio::runtime::Runtime::new().unwrap());
+/// Kinora: four workers, not one per core: the app's tasks are requests and
+/// child processes that mostly wait, and every worker is a thread with its
+/// own malloc arena (12 of them on a 12-core machine).
+pub static TOKIO_RUNTIME: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(std::thread::available_parallelism().map_or(4, |n| n.get().min(4)))
+        .enable_all()
+        .build()
+        .unwrap()
+});
 
 #[macro_export]
 macro_rules! gspawn {

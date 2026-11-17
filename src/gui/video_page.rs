@@ -491,7 +491,11 @@ impl VideoPage {
         let wait = Duration::from_secs(3)
             .max(Duration::from_secs(10).saturating_sub(self.imp().born.elapsed()));
         let page = self.clone();
-        glib::timeout_add_local_once(wait, move || drop(page));
+        glib::timeout_add_local_once(wait, move || {
+            drop(page);
+            // (Its player's memory is freed on the player's threads.)
+            crate::memory::trim_soon();
+        });
     }
 
     /// Kinora: stop for good (another video replaces this page): pause and
